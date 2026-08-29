@@ -1,29 +1,60 @@
 const demoPalette = require('../../data/colors/demo')
-const { imageToPattern } = require('../../utils/image')
+const { imageToPattern, recommendPatternSize } = require('../../utils/image')
 const { createPattern, savePattern } = require('../../utils/pattern')
 
 Page({
   data: {
     sizes: [32, 48, 64, 128],
     selectedSize: 64,
+    recommendedSize: 64,
     imagePath: '',
     generating: false,
-    paletteName: 'DEMO 演示色卡'
+    paletteName: 'DEMO 演示色卡',
+    cropMode: 'cover',
+    imageMode: 'aspectFill',
+    optimizePreset: 'natural',
+    optimizeOptions: [
+      { value: 'soft', label: '柔和' },
+      { value: 'natural', label: '自然' },
+      { value: 'vivid', label: '增强' }
+    ]
   },
 
   selectSize(event) {
     const size = Number(event.currentTarget.dataset.size)
+    this.setData({ selectedSize: size })
+  },
+
+  selectCrop(event) {
+    const cropMode = event.currentTarget.dataset.mode
     this.setData({
-      selectedSize: size
+      cropMode,
+      imageMode: cropMode === 'contain' ? 'aspectFit' : 'aspectFill'
+    })
+  },
+
+  selectOptimize(event) {
+    this.setData({ optimizePreset: event.currentTarget.dataset.preset })
+  },
+
+  updateRecommendedSize(path) {
+    wx.getImageInfo({
+      src: path,
+      success: (info) => {
+        const recommendedSize = recommendPatternSize(info.width, info.height)
+        this.setData({
+          recommendedSize,
+          selectedSize: recommendedSize
+        })
+      }
     })
   },
 
   chooseImage() {
     const done = (path) => {
       if (path) {
-        this.setData({
-          imagePath: path
-        })
+        this.setData({ imagePath: path })
+        this.updateRecommendedSize(path)
       }
     }
 
@@ -72,7 +103,11 @@ Page({
       const result = await imageToPattern(
         this.data.imagePath,
         this.data.selectedSize,
-        demoPalette
+        demoPalette,
+        {
+          cropMode: this.data.cropMode,
+          optimizePreset: this.data.optimizePreset
+        }
       )
 
       const pattern = savePattern(createPattern({
