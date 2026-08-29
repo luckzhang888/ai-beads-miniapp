@@ -1,4 +1,4 @@
-const demoPalette = require('../data/colors/demo')
+const mardPalette = require('../data/colors/mard')
 const { buildStats } = require('./color-match')
 
 const CURRENT_KEY = 'currentPattern:v1'
@@ -20,12 +20,12 @@ function countMatrix(matrix) {
 }
 
 function rebuildStats(matrix, palette) {
-  return buildStats(countMatrix(matrix), palette || demoPalette)
+  return buildStats(countMatrix(matrix), palette || mardPalette)
 }
 
 function createPattern(options) {
   const matrix = cloneMatrix(options.matrix || [])
-  const palette = options.palette || demoPalette
+  const palette = options.palette || mardPalette
   const stats = options.stats || rebuildStats(matrix, palette)
 
   return {
@@ -34,7 +34,7 @@ function createPattern(options) {
     createdAt: options.createdAt || Date.now(),
     updatedAt: Date.now(),
     size: matrix.length,
-    brand: options.brand || 'DEMO',
+    brand: options.brand || 'MARD',
     matrix,
     stats,
     completedCount: Number(options.completedCount || 0)
@@ -54,12 +54,8 @@ function createDemoPattern(size) {
         nx * nx * Math.pow(ny, 3)
 
       let code = 'D26'
-      if (heart <= 0) {
-        code = 'D05'
-      }
-      if (x < 2 || y < 2 || x >= n - 2 || y >= n - 2) {
-        code = 'D01'
-      }
+      if (heart <= 0) code = 'F5'
+      if (x < 2 || y < 2 || x >= n - 2 || y >= n - 2) code = 'H2'
       row.push(code)
     }
     matrix.push(row)
@@ -67,10 +63,10 @@ function createDemoPattern(size) {
 
   return createPattern({
     id: 'demo-' + Date.now(),
-    name: '示例爱心图纸',
+    name: 'MARD 示例爱心图纸',
     matrix,
-    palette: demoPalette,
-    brand: 'DEMO'
+    palette: mardPalette,
+    brand: 'MARD'
   })
 }
 
@@ -94,13 +90,11 @@ function savePattern(pattern, palette) {
   const next = Object.assign({}, pattern, {
     matrix,
     size: matrix.length,
-    stats: rebuildStats(matrix, palette || demoPalette),
+    stats: rebuildStats(matrix, palette || mardPalette),
     updatedAt: Date.now()
   })
 
-  if (index >= 0) {
-    patterns.splice(index, 1)
-  }
+  if (index >= 0) patterns.splice(index, 1)
   patterns.unshift(next)
 
   wx.setStorageSync(PATTERNS_KEY, patterns.slice(0, MAX_PATTERNS))
@@ -109,9 +103,7 @@ function savePattern(pattern, palette) {
 }
 
 function getPatternById(id) {
-  if (!id) {
-    return null
-  }
+  if (!id) return null
   return getSavedPatterns().find((item) => item.id === id) || null
 }
 
@@ -119,35 +111,27 @@ function deletePattern(id) {
   const patterns = getSavedPatterns().filter((item) => item.id !== id)
   wx.setStorageSync(PATTERNS_KEY, patterns)
   const current = getCurrentPattern()
-  if (current && current.id === id) {
-    wx.removeStorageSync(CURRENT_KEY)
-  }
+  if (current && current.id === id) wx.removeStorageSync(CURRENT_KEY)
   return patterns
 }
 
 function renamePattern(id, name) {
   const cleanName = String(name || '').trim().slice(0, 30)
-  if (!cleanName) {
-    return null
-  }
+  if (!cleanName) return null
   const pattern = getPatternById(id)
-  if (!pattern) {
-    return null
-  }
-  return savePattern(Object.assign({}, pattern, { name: cleanName }))
+  if (!pattern) return null
+  return savePattern(Object.assign({}, pattern, { name: cleanName }), mardPalette)
 }
 
 function duplicatePattern(id) {
   const pattern = getPatternById(id)
-  if (!pattern) {
-    return null
-  }
+  if (!pattern) return null
   return savePattern(createPattern({
     name: pattern.name + ' 副本',
     matrix: pattern.matrix,
-    brand: pattern.brand,
+    brand: pattern.brand || 'MARD',
     completedCount: 0
-  }))
+  }), mardPalette)
 }
 
 function mirrorHorizontal(matrix) {
@@ -161,9 +145,7 @@ function mirrorVertical(matrix) {
 function rotate90(matrix) {
   const source = cloneMatrix(matrix)
   const n = source.length
-  if (!n) {
-    return []
-  }
+  if (!n) return []
   const result = Array.from({ length: n }, () => new Array(n))
   for (let y = 0; y < n; y += 1) {
     for (let x = 0; x < n; x += 1) {
@@ -175,30 +157,22 @@ function rotate90(matrix) {
 
 function setCell(matrix, x, y, code) {
   const next = cloneMatrix(matrix)
-  if (!next[y] || typeof next[y][x] === 'undefined') {
-    return next
-  }
+  if (!next[y] || typeof next[y][x] === 'undefined') return next
   next[y][x] = code
   return next
 }
 
 function replaceColor(matrix, fromCode, toCode) {
-  if (!fromCode || !toCode || fromCode === toCode) {
-    return cloneMatrix(matrix)
-  }
+  if (!fromCode || !toCode || fromCode === toCode) return cloneMatrix(matrix)
   return matrix.map((row) => row.map((code) => code === fromCode ? toCode : code))
 }
 
 function floodFill(matrix, x, y, toCode) {
   const next = cloneMatrix(matrix)
-  if (!next[y] || typeof next[y][x] === 'undefined') {
-    return next
-  }
+  if (!next[y] || typeof next[y][x] === 'undefined') return next
 
   const fromCode = next[y][x]
-  if (fromCode === toCode) {
-    return next
-  }
+  if (fromCode === toCode) return next
 
   const height = next.length
   const width = next[0].length
@@ -209,12 +183,7 @@ function floodFill(matrix, x, y, toCode) {
     const point = queue[index]
     const px = point[0]
     const py = point[1]
-    const neighbors = [
-      [px - 1, py],
-      [px + 1, py],
-      [px, py - 1],
-      [px, py + 1]
-    ]
+    const neighbors = [[px - 1, py], [px + 1, py], [px, py - 1], [px, py + 1]]
 
     neighbors.forEach((neighbor) => {
       const nx = neighbor[0]
