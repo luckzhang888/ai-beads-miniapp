@@ -24,6 +24,7 @@ const requiredFiles = [
   'miniprogram/utils/lab.js',
   'miniprogram/utils/color-match.js',
   'miniprogram/utils/image.js',
+  'miniprogram/utils/export.js',
   'miniprogram/utils/inventory.js',
   'miniprogram/utils/pattern.js'
 ]

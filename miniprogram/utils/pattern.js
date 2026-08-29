@@ -19,6 +19,7 @@ function countMatrix(matrix) {
   const counts = Object.create(null)
   matrix.forEach((row) => {
     row.forEach((code) => {
+      if (!code) return
       counts[code] = (counts[code] || 0) + 1
     })
   })
@@ -50,7 +51,13 @@ function createPattern(options) {
     completedCount: Number(options.completedCount || 0),
     status: options.status || '待拼',
     tags: Array.isArray(options.tags) ? options.tags.slice(0, 8) : [],
-    completedCodes: Array.isArray(options.completedCodes) ? options.completedCodes.slice() : []
+    completedCodes: Array.isArray(options.completedCodes) ? options.completedCodes.slice() : [],
+    completedCellIndices: Array.isArray(options.completedCellIndices) ? options.completedCellIndices.slice() : [],
+    lockedCodes: Array.isArray(options.lockedCodes) ? options.lockedCodes.slice() : [],
+    viewState: options.viewState && typeof options.viewState === 'object' ? Object.assign({}, options.viewState) : {},
+    sourceOptions: options.sourceOptions && typeof options.sourceOptions === 'object' ? Object.assign({}, options.sourceOptions) : {},
+    inventoryConsumed: Boolean(options.inventoryConsumed),
+    lastConsumeTransactionId: options.lastConsumeTransactionId || ''
   }
 }
 
@@ -106,6 +113,14 @@ function normalizePattern(pattern, palette) {
     status: pattern.status || (Number(pattern.completedCount || 0) > 0 ? '已拼' : '待拼'),
     tags: Array.isArray(pattern.tags) ? pattern.tags.slice(0, 8) : [],
     completedCodes: Array.isArray(pattern.completedCodes) ? pattern.completedCodes.slice() : [],
+    completedCellIndices: Array.isArray(pattern.completedCellIndices)
+      ? pattern.completedCellIndices.filter((index) => Number.isInteger(index) && index >= 0 && index < dims.width * dims.height)
+      : [],
+    lockedCodes: Array.isArray(pattern.lockedCodes) ? pattern.lockedCodes.slice() : [],
+    viewState: pattern.viewState && typeof pattern.viewState === 'object' ? Object.assign({}, pattern.viewState) : {},
+    sourceOptions: pattern.sourceOptions && typeof pattern.sourceOptions === 'object' ? Object.assign({}, pattern.sourceOptions) : {},
+    inventoryConsumed: Boolean(pattern.inventoryConsumed),
+    lastConsumeTransactionId: pattern.lastConsumeTransactionId || '',
     updatedAt: Date.now()
   })
 }
@@ -152,7 +167,11 @@ function duplicatePattern(id) {
     matrix: pattern.matrix,
     brand: pattern.brand || 'MARD',
     qualityMode: pattern.qualityMode || 'balanced',
-    completedCount: 0
+    completedCount: 0,
+    completedCodes: [],
+    completedCellIndices: [],
+    inventoryConsumed: false,
+    lastConsumeTransactionId: ''
   }), mardPalette)
 }
 
@@ -222,6 +241,90 @@ function floodFill(matrix, x, y, toCode) {
   return next
 }
 
+function replaceColorInRect(matrix, first, second, fromCode, toCode) {
+  const next = cloneMatrix(matrix)
+  const height = next.length
+  const width = height && next[0] ? next[0].length : 0
+  const minX = Math.max(0, Math.min(Number(first.x), Number(second.x)))
+  const maxX = Math.min(width - 1, Math.max(Number(first.x), Number(second.x)))
+  const minY = Math.max(0, Math.min(Number(first.y), Number(second.y)))
+  const maxY = Math.min(height - 1, Math.max(Number(first.y), Number(second.y)))
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      if (next[y][x] === fromCode) next[y][x] = toCode
+    }
+  }
+  return next
+}
+
+function indicesForRow(matrix, rowIndex) {
+  const row = matrix[Number(rowIndex)] || []
+  const width = row.length
+  return row.map((code, x) => code ? Number(rowIndex) * width + x : -1).filter((index) => index >= 0)
+}
+
+function indicesForRect(matrix, first, second) {
+  const height = matrix.length
+  const width = height && matrix[0] ? matrix[0].length : 0
+  if (!width) return []
+  const minX = Math.max(0, Math.min(Number(first.x), Number(second.x)))
+  const maxX = Math.min(width - 1, Math.max(Number(first.x), Number(second.x)))
+  const minY = Math.max(0, Math.min(Number(first.y), Number(second.y)))
+  const maxY = Math.min(height - 1, Math.max(Number(first.y), Number(second.y)))
+  const indices = []
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      if (matrix[y][x]) indices.push(y * width + x)
+    }
+  }
+  return indices
+}
+
+function indicesForCode(matrix, targetCode) {
+  const width = matrix.length && matrix[0] ? matrix[0].length : 0
+  const indices = []
+  matrix.forEach((row, y) => row.forEach((code, x) => {
+    if (code && code === targetCode) indices.push(y * width + x)
+  }))
+  return indices
+}
+
+function toggleProgressIndices(completedIndices, targetIndices) {
+  const completed = new Set(completedIndices || [])
+  const targets = (targetIndices || []).filter((index) => Number.isInteger(index) && index >= 0)
+  const shouldComplete = targets.some((index) => !completed.has(index))
+  targets.forEach((index) => {
+    if (shouldComplete) completed.add(index)
+    else completed.delete(index)
+  })
+  return Array.from(completed).sort((a, b) => a - b)
+}
+
+function calculateProgress(matrix, completedIndices) {
+  const completed = new Set(completedIndices || [])
+  const width = matrix.length && matrix[0] ? matrix[0].length : 0
+  const codeTotals = Object.create(null)
+  const codeCompleted = Object.create(null)
+  let total = 0
+  let done = 0
+  matrix.forEach((row, y) => row.forEach((code, x) => {
+    if (!code) return
+    const index = y * width + x
+    total += 1
+    codeTotals[code] = (codeTotals[code] || 0) + 1
+    if (completed.has(index)) {
+      done += 1
+      codeCompleted[code] = (codeCompleted[code] || 0) + 1
+    }
+  }))
+  return {
+    total,
+    completed: done,
+    percent: total ? Math.round(done / total * 100) : 0,
+    completedCodes: Object.keys(codeTotals).filter((code) => codeCompleted[code] === codeTotals[code])
+  }
+}
+
 function makeShareCode(pattern) {
   return pattern && pattern.id ? 'DC1-' + pattern.id : ''
 }
@@ -251,6 +354,12 @@ module.exports = {
   rotate90,
   setCell,
   replaceColor,
+  replaceColorInRect,
+  indicesForRow,
+  indicesForRect,
+  indicesForCode,
+  toggleProgressIndices,
+  calculateProgress,
   floodFill,
   makeShareCode,
   getPatternByShareCode

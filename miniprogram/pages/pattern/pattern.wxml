@@ -6,6 +6,7 @@
       <view class="tool-item {{mirrored ? 'active' : ''}}" bindtap="toggleMirror"><text>⇆</text><view>镜像</view></view>
       <view class="tool-item {{showCodes ? 'active' : ''}}" bindtap="toggleCodes"><text>A1</text><view>色号</view></view>
       <view class="tool-item {{locked ? 'active' : ''}}" bindtap="toggleLock"><text>{{locked ? '●' : '○'}}</text><view>锁定</view></view>
+      <view class="tool-item {{working ? 'active' : ''}}" bindtap="chooseProgressTool"><text>✓</text><view>{{progressToolName}}</view></view>
       <view class="tool-item" bindtap="previewExport"><text>⇩</text><view>导出</view></view>
       <view class="tool-item" bindtap="openSettings"><text>⚙</text><view>设置</view></view>
     </view>
@@ -28,13 +29,18 @@
       highlight-code="{{highlightCode}}"
       locked="{{locked}}"
       max-zoom="{{6}}"
+      completed-indices="{{displayCompletedIndices}}"
+      scroll-left="{{scrollLeft}}"
+      scroll-top="{{scrollTop}}"
       interactive="{{true}}"
       bind:celltap="handleCellTap"
       bind:zoomchange="handleZoomChange"
+      bind:viewchange="handleViewChange"
     />
   </view>
 
-  <view class="gesture-hint">双指缩放 · 单指拖动 · 放大后显示色号</view>
+  <view class="performance-hint" wx:if="{{performanceHint}}">{{performanceHint}}</view>
+  <view class="gesture-hint">{{working ? progressToolName + '标记模式 · 点击图纸记录进度' : '双指缩放 · 单指拖动 · 放大后显示色号'}}</view>
   <view class="zoom-control"><view bindtap="zoomIn">＋</view><text>{{zoom}}×</text><view bindtap="zoomOut">－</view></view>
   <button class="work-button" bindtap="toggleWorking">{{workButtonText}}</button>
 

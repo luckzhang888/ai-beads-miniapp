@@ -11,7 +11,10 @@ Component({
     compact: { type: Boolean, value: false },
     previewSize: { type: Number, value: 148 },
     locked: { type: Boolean, value: false },
-    maxZoom: { type: Number, value: 6 }
+    maxZoom: { type: Number, value: 6 },
+    completedIndices: { type: Array, value: [] },
+    scrollLeft: { type: Number, value: 0 },
+    scrollTop: { type: Number, value: 0 }
   },
 
   data: {
@@ -22,7 +25,7 @@ Component({
   },
 
   observers: {
-    'matrix,palette,showCodes,showGrid,highlightCode,zoom,majorGrid,compact,previewSize,locked': function () {
+    'matrix,palette,showCodes,showGrid,highlightCode,zoom,majorGrid,compact,previewSize,locked,completedIndices': function () {
       this.scheduleDraw()
     }
   },
@@ -57,6 +60,7 @@ Component({
       this._pinchStartDistance = distance
       this._pinchStartZoom = Number(this.data.zoom) || 1
       this._lastPinchZoom = this._pinchStartZoom
+      this._lastGestureAt = Date.now()
     },
 
     handleTouchMove(event) {
@@ -67,7 +71,11 @@ Component({
       const rawZoom = this._pinchStartZoom * distance / this._pinchStartDistance
       const nextZoom = Math.max(1, Math.min(maxZoom, Math.round(rawZoom * 20) / 20))
       if (Math.abs(nextZoom - this._lastPinchZoom) < 0.05) return
+      const now = Date.now()
+      if (this._lastZoomEventAt && now - this._lastZoomEventAt < 45) return
+      this._lastZoomEventAt = now
       this._lastPinchZoom = nextZoom
+      this._lastGestureAt = now
       this.triggerEvent('zoomchange', { zoom: nextZoom })
     },
 
@@ -75,6 +83,29 @@ Component({
       if (!event.touches || event.touches.length < 2) {
         this._pinching = false
         this._pinchStartDistance = 0
+        this._lastGestureAt = Date.now()
+        this.scheduleDraw()
+      }
+    },
+
+    handleScroll(event) {
+      const detail = event.detail || {}
+      this._scrollLeft = Number(detail.scrollLeft) || 0
+      this._scrollTop = Number(detail.scrollTop) || 0
+      const now = Date.now()
+      if (!this._lastViewEventAt || now - this._lastViewEventAt >= 120) {
+        this._lastViewEventAt = now
+        this.triggerEvent('viewchange', {
+          scrollLeft: this._scrollLeft,
+          scrollTop: this._scrollTop
+        })
+      }
+      const matrix = this.data.matrix || []
+      if (matrix.length * ((matrix[0] && matrix[0].length) || 0) >= 4096) {
+        if (!this._lastScrollDrawAt || now - this._lastScrollDrawAt >= 100) {
+          this._lastScrollDrawAt = now
+          this.scheduleDraw()
+        }
       }
     },
 
@@ -118,7 +149,7 @@ Component({
       const cols = matrix[0].length
       const system = wx.getSystemInfoSync()
       const cells = rows * cols
-      const maxDpr = cells >= 12000 ? 1.15 : (cells >= 7000 ? 1.4 : 2)
+      const maxDpr = this._pinching ? 1 : (cells >= 12000 ? 1.05 : (cells >= 7000 ? 1.25 : 2))
       const dpr = Math.min(system.pixelRatio || 1, maxDpr)
       const width = Math.max(1, Math.floor(cssWidth))
       const height = Math.max(1, Math.floor(cssHeight))
@@ -134,6 +165,7 @@ Component({
       const cellY = height / rows
       const palette = this.data.palette || {}
       const highlight = this.data.highlightCode
+      const completed = new Set(this.data.completedIndices || [])
 
       for (let y = 0; y < rows; y += 1) {
         const row = matrix[y]
@@ -141,8 +173,17 @@ Component({
           const code = row[x]
           const color = palette[code]
           ctx.globalAlpha = highlight && code !== highlight ? 0.14 : 1
-          ctx.fillStyle = color && color.hex ? color.hex : '#dddddd'
+          if (!code) {
+            ctx.fillStyle = (x + y) % 2 ? '#f2f2f2' : '#ffffff'
+          } else {
+            ctx.fillStyle = color && color.hex ? color.hex : '#dddddd'
+          }
           ctx.fillRect(x * cellX, y * cellY, cellX + 0.5, cellY + 0.5)
+          if (code && completed.has(y * cols + x)) {
+            ctx.globalAlpha = 0.58
+            ctx.fillStyle = '#ffffff'
+            ctx.fillRect(x * cellX, y * cellY, cellX + 0.5, cellY + 0.5)
+          }
         }
       }
 
@@ -182,22 +223,36 @@ Component({
         }
       }
 
-      if (this.data.showCodes && Math.min(cellX, cellY) >= 8) {
+      if (this.data.showCodes && !this._pinching && Math.min(cellX, cellY) >= 8) {
         const cell = Math.min(cellX, cellY)
         const fontSize = Math.max(4.5, Math.min(12, cell * 0.48))
         ctx.font = '600 ' + fontSize + 'px sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
 
-        for (let y = 0; y < rows; y += 1) {
-          for (let x = 0; x < cols; x += 1) {
+        const visibleOnly = cells >= 4096
+        const scrollLeft = this._scrollLeft || Number(this.data.scrollLeft) || 0
+        const scrollTop = this._scrollTop || Number(this.data.scrollTop) || 0
+        const startX = visibleOnly ? Math.max(0, Math.floor(scrollLeft / cellX) - 2) : 0
+        const endX = visibleOnly ? Math.min(cols, Math.ceil((scrollLeft + this.data.viewportSize) / cellX) + 2) : cols
+        const startY = visibleOnly ? Math.max(0, Math.floor(scrollTop / cellY) - 2) : 0
+        const endY = visibleOnly ? Math.min(rows, Math.ceil((scrollTop + this.data.viewportHeight) / cellY) + 2) : rows
+
+        for (let y = startY; y < endY; y += 1) {
+          for (let x = startX; x < endX; x += 1) {
             const code = matrix[y][x]
+            if (!code) continue
             const color = palette[code]
             const rgb = color && color.rgb ? color.rgb : [220, 220, 220]
             const luminance = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114
             ctx.globalAlpha = highlight && code !== highlight ? 0.2 : 0.92
             ctx.fillStyle = luminance > 150 ? '#111111' : '#ffffff'
             ctx.fillText(code, x * cellX + cellX / 2, y * cellY + cellY / 2, cellX * 0.94)
+            if (completed.has(y * cols + x) && cell >= 11) {
+              ctx.globalAlpha = 0.9
+              ctx.fillStyle = '#59446f'
+              ctx.fillText('✓', x * cellX + cellX / 2, y * cellY + cellY / 2, cellX * 0.8)
+            }
           }
         }
         ctx.globalAlpha = 1
@@ -207,6 +262,7 @@ Component({
     handleTap(event) {
       const matrix = this.data.matrix
       if (!this.data.interactive || !matrix.length || !matrix[0] || !matrix[0].length) return
+      if (this._pinching || (this._lastGestureAt && Date.now() - this._lastGestureAt < 220)) return
 
       const touch = event.changedTouches && event.changedTouches[0]
       const clientX = touch ? touch.clientX : event.detail.x

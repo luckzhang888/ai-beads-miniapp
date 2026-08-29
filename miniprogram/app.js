@@ -1,3 +1,5 @@
+const { getInventory } = require('./utils/inventory')
+
 App({
   globalData: {
     appName: 'AI 豆仓',
@@ -5,9 +7,7 @@ App({
   },
 
   onLaunch() {
-    const inventory = wx.getStorageSync('beadInventory:v1')
-    if (!inventory) {
-      wx.setStorageSync('beadInventory:v1', {})
-    }
+    // Reading once migrates legacy flat inventory to the brand-aware v2 store.
+    getInventory('MARD')
   }
 })

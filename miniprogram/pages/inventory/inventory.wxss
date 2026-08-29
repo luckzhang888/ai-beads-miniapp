@@ -27,6 +27,8 @@
 
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 12rpx;
 }
 
@@ -52,6 +54,15 @@
   gap: 16rpx;
   margin-bottom: 22rpx;
 }
+
+.brand-scroll { margin-bottom: 18rpx; white-space: nowrap; }
+.brand-tabs { display: inline-flex; gap: 12rpx; }
+.brand-tab { padding: 11rpx 20rpx; border: 1rpx solid #dcd7ea; border-radius: 999rpx; color: #776e82; background: white; font-size: 22rpx; }
+.brand-tab.active { color: white; border-color: #6755ea; background: #6755ea; }
+.inventory-quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11rpx; margin-bottom: 20rpx; }
+.quick-action { padding: 16rpx 8rpx; border: 1rpx solid #e1ddeb; border-radius: 16rpx; color: #655c6e; background: white; text-align: center; font-size: 21rpx; }
+.quick-action text { color: #684bd0; font-weight: 750; }
+.quick-action.active { color: white; border-color: #6755ea; background: #6755ea; }
 
 .summary-label {
   font-size: 28rpx;
@@ -318,3 +329,11 @@
   color: #a1a5ae;
   font-size: 20rpx;
 }
+
+.transaction-section { margin-top: 32rpx; padding: 22rpx; border: 1rpx solid #e3e4eb; border-radius: 22rpx; background: white; }
+.transaction-title { margin-bottom: 12rpx; font-size: 28rpx; font-weight: 750; }
+.transaction-row { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 15rpx 0; border-top: 1rpx solid #f0eef3; }
+.transaction-row button { margin: 0; color: #6547c8; background: #f0ebfb; }
+.transaction-name { font-size: 23rpx; font-weight: 650; }
+.transaction-meta { margin-top: 5rpx; color: #9991a1; font-size: 18rpx; }
+.undone-label { color: #aaa3b0; font-size: 19rpx; }

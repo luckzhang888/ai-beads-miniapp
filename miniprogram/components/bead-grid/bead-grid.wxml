@@ -4,6 +4,9 @@
   scroll-y="{{!compact && !locked}}"
   enhanced
   show-scrollbar="{{false}}"
+  scroll-left="{{scrollLeft}}"
+  scroll-top="{{scrollTop}}"
+  bindscroll="handleScroll"
   style="height: {{viewportHeight}}px; width: {{viewportSize}}px;"
 >
   <canvas

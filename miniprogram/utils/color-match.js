@@ -24,7 +24,28 @@ function findNearestColor(rgb, palette) {
   return best
 }
 
-function matchPixels(data, width, height, palette) {
+function findNearestColors(rgb, palette, limit, excludedCodes) {
+  const lab = rgbToLab(rgb)
+  const excluded = new Set(excludedCodes || [])
+  return palette
+    .filter((item) => !excluded.has(item.code))
+    .map((item) => Object.assign({}, item, { distance: deltaE2000(lab, item.lab || rgbToLab(item.rgb)) }))
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, Math.max(1, Number(limit) || 5))
+}
+
+function shouldTreatAsBlank(r, g, b, alpha, settings) {
+  const options = settings || {}
+  if (options.removeTransparent !== false && alpha < Number(options.alphaThreshold || 32)) return true
+  if (!options.removeBackground) return false
+  const threshold = Math.max(200, Math.min(255, Number(options.whiteThreshold) || 245))
+  const tolerance = Math.max(0, Math.min(80, Number(options.whiteTolerance) || 20))
+  const brightest = Math.max(r, g, b)
+  const darkest = Math.min(r, g, b)
+  return darkest >= threshold && brightest - darkest <= tolerance
+}
+
+function matchPixels(data, width, height, palette, settings) {
   const cache = Object.create(null)
   const matrix = new Array(height)
   const counts = Object.create(null)
@@ -38,10 +59,9 @@ function matchPixels(data, width, height, palette) {
       let g = data[offset + 1]
       let b = data[offset + 2]
 
-      if (alpha < 32) {
-        r = 255
-        g = 255
-        b = 255
+      if (shouldTreatAsBlank(r, g, b, alpha, settings)) {
+        row[x] = ''
+        continue
       }
 
       // 5 bits/channel cache keeps CIEDE2000 practical on a phone.
@@ -81,6 +101,7 @@ function countMatrix(matrix) {
   const counts = Object.create(null)
   matrix.forEach((row) => {
     row.forEach((code) => {
+      if (!code) return
       counts[code] = (counts[code] || 0) + 1
     })
   })
@@ -99,6 +120,7 @@ function cleanupMatrix(matrix, passes) {
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         const currentCode = current[y][x]
+        if (!currentCode) continue
         const neighborCounts = Object.create(null)
         let neighborTotal = 0
         let sameCount = 0
@@ -142,12 +164,12 @@ function cleanupMatrix(matrix, passes) {
 function matchImageData(imageData, width, height, rawPalette, options) {
   const settings = options || {}
   const palette = preparePalette(rawPalette)
-  const first = matchPixels(imageData.data, width, height, palette)
+  const first = matchPixels(imageData.data, width, height, palette, settings)
   const selectedPalette = selectPaletteByUsage(first.counts, palette, settings.colorLimit)
 
   let matrix = first.matrix
   if (selectedPalette.length && selectedPalette.length < Object.keys(first.counts).length) {
-    matrix = matchPixels(imageData.data, width, height, selectedPalette).matrix
+    matrix = matchPixels(imageData.data, width, height, selectedPalette, settings).matrix
   }
 
   matrix = cleanupMatrix(matrix, settings.cleanupPasses)
@@ -191,11 +213,48 @@ function createPaletteMap(rawPalette) {
   return map
 }
 
+function mergeSimilarColors(matrix, rawPalette, threshold, lockedCodes) {
+  const palette = preparePalette(rawPalette)
+  const paletteMap = Object.create(null)
+  palette.forEach((item) => { paletteMap[item.code] = item })
+  const counts = countMatrix(matrix)
+  const locked = new Set(lockedCodes || [])
+  const usedCodes = Object.keys(counts)
+  const replacements = Object.create(null)
+
+  usedCodes
+    .slice()
+    .sort((a, b) => counts[a] - counts[b])
+    .forEach((code) => {
+      if (locked.has(code) || replacements[code] || !paletteMap[code]) return
+      let bestCode = ''
+      let bestDistance = Infinity
+      usedCodes.forEach((candidate) => {
+        if (candidate === code || replacements[candidate] || !paletteMap[candidate]) return
+        if (counts[candidate] < counts[code] && !locked.has(candidate)) return
+        const distance = deltaE2000(paletteMap[code].lab, paletteMap[candidate].lab)
+        if (distance < bestDistance) {
+          bestDistance = distance
+          bestCode = candidate
+        }
+      })
+      if (bestCode && bestDistance <= Number(threshold || 0)) replacements[code] = bestCode
+    })
+
+  return {
+    matrix: matrix.map((row) => row.map((code) => replacements[code] || code)),
+    replacements
+  }
+}
+
 module.exports = {
   preparePalette,
   findNearestColor,
+  findNearestColors,
+  shouldTreatAsBlank,
   matchImageData,
   cleanupMatrix,
   buildStats,
-  createPaletteMap
+  createPaletteMap,
+  mergeSimilarColors
 }

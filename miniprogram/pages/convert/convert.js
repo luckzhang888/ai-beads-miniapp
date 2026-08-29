@@ -1,4 +1,5 @@
 const mardPalette = require('../../data/colors/mard')
+const { createPaletteMap } = require('../../utils/color-match')
 const {
   imageToPattern,
   recommendPatternSize,
@@ -36,11 +37,22 @@ Page({
     outputWidth: 80,
     outputHeight: 80,
     generating: false,
+    previewing: false,
+    previewResult: null,
+    paletteMap: createPaletteMap(mardPalette),
     paletteName: 'MARD 221 标准色',
     cropMode: 'ratio',
     imageMode: 'aspectFit',
     optimizePreset: 'photo',
     qualityMode: 'balanced',
+    removeBackground: true,
+    whiteThreshold: 245,
+    cropX: 0,
+    cropY: 0,
+    cropScale: 1,
+    cropRotation: 0,
+    cropMirrored: false,
+    cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
     optimizeOptions: [
       { value: 'soft', label: '柔和' },
       { value: 'natural', label: '自然' },
@@ -77,7 +89,19 @@ Page({
   },
 
   resetMethods() {
-    this.setData({ stage: 'methods', imagePath: '', imageInfo: null, pdfFile: null })
+    this.setData({
+      stage: 'methods',
+      imagePath: '',
+      imageInfo: null,
+      pdfFile: null,
+      previewResult: null,
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1,
+      cropRotation: 0,
+      cropMirrored: false,
+      cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);'
+    })
   },
 
   choosePdf(method) {
@@ -142,7 +166,7 @@ Page({
 
   selectSize(event) {
     const selectedSize = Number(event.currentTarget.dataset.size)
-    this.setData({ selectedSize })
+    this.setData({ selectedSize, previewResult: null })
     this.refreshOutputSize({ selectedSize })
   },
 
@@ -150,17 +174,147 @@ Page({
     const cropMode = event.currentTarget.dataset.mode
     this.setData({
       cropMode,
-      imageMode: cropMode === 'cover' ? 'aspectFill' : 'aspectFit'
+      imageMode: cropMode === 'cover' ? 'aspectFill' : 'aspectFit',
+      previewResult: null
     })
     this.refreshOutputSize({ cropMode })
   },
 
   selectOptimize(event) {
-    this.setData({ optimizePreset: event.currentTarget.dataset.preset })
+    this.setData({ optimizePreset: event.currentTarget.dataset.preset, previewResult: null })
   },
 
   selectQuality(event) {
-    this.setData({ qualityMode: event.currentTarget.dataset.mode })
+    this.setData({ qualityMode: event.currentTarget.dataset.mode, previewResult: null })
+  },
+
+  toggleBackgroundRemoval(event) {
+    this.setData({ removeBackground: Boolean(event.detail.value), previewResult: null })
+  },
+
+  changeWhiteThreshold(event) {
+    this.setData({ whiteThreshold: Number(event.detail.value), previewResult: null })
+  },
+
+  cropTouchStart(event) {
+    const touches = event.touches || []
+    if (touches.length >= 2) {
+      const dx = touches[0].clientX - touches[1].clientX
+      const dy = touches[0].clientY - touches[1].clientY
+      this.cropGesture = {
+        type: 'pinch',
+        distance: Math.sqrt(dx * dx + dy * dy),
+        scale: this.data.cropScale
+      }
+      return
+    }
+    if (touches.length === 1) {
+      this.cropGesture = {
+        type: 'move',
+        x: touches[0].clientX,
+        y: touches[0].clientY,
+        cropX: this.data.cropX,
+        cropY: this.data.cropY
+      }
+    }
+  },
+
+  cropTouchMove(event) {
+    if (!this.cropGesture) return
+    const touches = event.touches || []
+    if (this.cropGesture.type === 'pinch' && touches.length >= 2) {
+      const dx = touches[0].clientX - touches[1].clientX
+      const dy = touches[0].clientY - touches[1].clientY
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      const cropScale = Math.max(0.5, Math.min(4, this.cropGesture.scale * distance / this.cropGesture.distance))
+      this.updateCropTransform({ cropScale })
+      return
+    }
+    if (this.cropGesture.type === 'move' && touches.length === 1) {
+      const cropX = Math.max(-150, Math.min(150, this.cropGesture.cropX + touches[0].clientX - this.cropGesture.x))
+      const cropY = Math.max(-150, Math.min(150, this.cropGesture.cropY + touches[0].clientY - this.cropGesture.y))
+      this.updateCropTransform({ cropX, cropY })
+    }
+  },
+
+  cropTouchEnd() {
+    this.cropGesture = null
+  },
+
+  updateCropTransform(changes) {
+    const next = Object.assign({}, this.data, changes || {})
+    const cropStyle = 'transform: translate(' + next.cropX + 'px, ' + next.cropY + 'px) scale(' +
+      Number(next.cropScale).toFixed(2) + ') rotate(' + next.cropRotation + 'deg) scaleX(' +
+      (next.cropMirrored ? -1 : 1) + ');'
+    this.setData(Object.assign({}, changes, { cropStyle, previewResult: null }))
+  },
+
+  rotateCrop() {
+    this.updateCropTransform({ cropRotation: (this.data.cropRotation + 90) % 360 })
+  },
+
+  toggleCropMirror() {
+    this.updateCropTransform({ cropMirrored: !this.data.cropMirrored })
+  },
+
+  resetCrop() {
+    this.updateCropTransform({ cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, cropMirrored: false })
+  },
+
+  processingOptions() {
+    return {
+      cropMode: this.data.cropMode,
+      optimizePreset: this.data.optimizePreset,
+      qualityMode: this.data.qualityMode,
+      removeTransparent: true,
+      removeBackground: this.data.removeBackground,
+      whiteThreshold: this.data.whiteThreshold,
+      whiteTolerance: 22,
+      transform: {
+        offsetX: this.data.cropX / 150,
+        offsetY: this.data.cropY / 150,
+        scale: this.data.cropScale,
+        rotation: this.data.cropRotation,
+        mirrored: this.data.cropMirrored
+      }
+    }
+  },
+
+  processingSignature() {
+    return JSON.stringify({
+      path: this.data.imagePath,
+      size: this.data.selectedSize,
+      options: this.processingOptions()
+    })
+  },
+
+  async processCurrentImage() {
+    const signature = this.processingSignature()
+    if (this.cachedResult && this.cachedSignature === signature) return this.cachedResult
+    const result = await imageToPattern(
+      this.data.imagePath,
+      this.data.selectedSize,
+      mardPalette,
+      this.processingOptions()
+    )
+    this.cachedSignature = signature
+    this.cachedResult = result
+    return result
+  },
+
+  async previewPattern() {
+    if (!this.data.imagePath || this.data.previewing) return
+    this.setData({ previewing: true })
+    wx.showLoading({ title: '生成预览', mask: true })
+    try {
+      const result = await this.processCurrentImage()
+      this.setData({ previewResult: result })
+    } catch (error) {
+      wx.showToast({ title: '预览生成失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ previewing: false })
+    }
   },
 
   updateRecommendedSize(path) {
@@ -174,7 +328,8 @@ Page({
           recommendedSize,
           selectedSize: recommendedSize,
           outputWidth: dims.width,
-          outputHeight: dims.height
+          outputHeight: dims.height,
+          previewResult: null
         })
       }
     })
@@ -222,16 +377,7 @@ Page({
     wx.showLoading({ title: '生成图纸中', mask: true })
 
     try {
-      const result = await imageToPattern(
-        this.data.imagePath,
-        this.data.selectedSize,
-        mardPalette,
-        {
-          cropMode: this.data.cropMode,
-          optimizePreset: this.data.optimizePreset,
-          qualityMode: this.data.qualityMode
-        }
-      )
+      const result = await this.processCurrentImage()
 
       const pattern = savePattern(createPattern({
         name: '图片图纸 ' + result.width + '×' + result.height,
@@ -243,7 +389,8 @@ Page({
         height: result.height,
         qualityMode: this.data.qualityMode,
         status: '待拼',
-        tags: [this.data.selectedMethodTitle || '图片导入']
+        tags: [this.data.selectedMethodTitle || '图片导入'],
+        sourceOptions: this.processingOptions()
       }), mardPalette)
 
       wx.navigateTo({

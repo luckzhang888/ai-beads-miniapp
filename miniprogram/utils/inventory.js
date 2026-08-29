@@ -1,52 +1,128 @@
-const STORAGE_KEY = 'beadInventory:v1'
+const LEGACY_STORAGE_KEY = 'beadInventory:v1'
+const STORAGE_KEY = 'beadInventory:v2'
+const SETTINGS_KEY = 'inventorySettings:v1'
+const TRANSACTIONS_KEY = 'inventoryTransactions:v1'
+const DEFAULT_BRAND = 'MARD'
+const MAX_TRANSACTIONS = 100
 
 function normalizeStock(value) {
   const number = Math.floor(Number(value) || 0)
   return Math.max(0, Math.min(number, 999999))
 }
 
-function getInventory() {
-  const value = wx.getStorageSync(STORAGE_KEY)
-  return value && typeof value === 'object' ? value : {}
+function getInventoryStore() {
+  const stored = wx.getStorageSync(STORAGE_KEY)
+  if (stored && typeof stored === 'object') return stored
+  const legacy = wx.getStorageSync(LEGACY_STORAGE_KEY)
+  const migrated = { [DEFAULT_BRAND]: legacy && typeof legacy === 'object' ? Object.assign({}, legacy) : {} }
+  wx.setStorageSync(STORAGE_KEY, migrated)
+  return migrated
 }
 
-function saveInventory(inventory) {
-  wx.setStorageSync(STORAGE_KEY, inventory)
+function saveInventoryStore(store) {
+  wx.setStorageSync(STORAGE_KEY, store)
 }
 
-function setStock(code, value) {
-  const inventory = getInventory()
-  inventory[code] = normalizeStock(value)
-  saveInventory(inventory)
-  return inventory[code]
+function getInventory(brand) {
+  const store = getInventoryStore()
+  return Object.assign({}, store[brand || DEFAULT_BRAND] || {})
 }
 
-function adjustStock(code, delta) {
-  const inventory = getInventory()
-  const next = normalizeStock((inventory[code] || 0) + Number(delta || 0))
+function saveInventory(inventory, brand) {
+  const targetBrand = brand || DEFAULT_BRAND
+  const store = getInventoryStore()
+  store[targetBrand] = Object.assign({}, inventory)
+  saveInventoryStore(store)
+}
+
+function getTransactions() {
+  const transactions = wx.getStorageSync(TRANSACTIONS_KEY)
+  return Array.isArray(transactions) ? transactions : []
+}
+
+function hasConsumedPattern(patternId) {
+  return Boolean(patternId && getTransactions().some((item) =>
+    item.type === 'consume' && !item.undone && item.metadata && item.metadata.patternId === patternId
+  ))
+}
+
+function saveTransactions(transactions) {
+  wx.setStorageSync(TRANSACTIONS_KEY, transactions.slice(0, MAX_TRANSACTIONS))
+}
+
+function recordTransaction(type, items, metadata) {
+  const filtered = (items || []).filter((item) => Number(item.delta) !== 0)
+  if (!filtered.length) return null
+  const transaction = {
+    id: 'stock-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
+    type,
+    createdAt: Date.now(),
+    items: filtered.map((item) => ({
+      brand: item.brand || DEFAULT_BRAND,
+      code: item.code,
+      delta: Number(item.delta)
+    })),
+    metadata: Object.assign({}, metadata || {}),
+    undone: false
+  }
+  const transactions = getTransactions()
+  transactions.unshift(transaction)
+  saveTransactions(transactions)
+  return transaction
+}
+
+function setStock(code, value, brand, metadata) {
+  const targetBrand = brand || DEFAULT_BRAND
+  const inventory = getInventory(targetBrand)
+  const previous = normalizeStock(inventory[code] || 0)
+  const next = normalizeStock(value)
   inventory[code] = next
-  saveInventory(inventory)
+  saveInventory(inventory, targetBrand)
+  recordTransaction('set', [{ brand: targetBrand, code, delta: next - previous }], metadata)
   return next
 }
 
-function mergeStatsWithInventory(stats) {
-  const inventory = getInventory()
+function adjustStock(code, delta, brand, metadata) {
+  const targetBrand = brand || DEFAULT_BRAND
+  const inventory = getInventory(targetBrand)
+  const previous = normalizeStock(inventory[code] || 0)
+  const next = normalizeStock(previous + Number(delta || 0))
+  inventory[code] = next
+  saveInventory(inventory, targetBrand)
+  recordTransaction('adjust', [{ brand: targetBrand, code, delta: next - previous }], metadata)
+  return next
+}
 
+function batchAdjustStock(items, metadata) {
+  const store = getInventoryStore()
+  const changes = []
+  ;(items || []).forEach((item) => {
+    const brand = item.brand || DEFAULT_BRAND
+    if (!store[brand]) store[brand] = {}
+    const previous = normalizeStock(store[brand][item.code] || 0)
+    const next = normalizeStock(previous + Number(item.delta || 0))
+    store[brand][item.code] = next
+    changes.push({ brand, code: item.code, delta: next - previous })
+  })
+  saveInventoryStore(store)
+  return recordTransaction('batch', changes, metadata)
+}
+
+function mergeStatsWithInventory(stats, brand) {
+  const inventory = getInventory(brand)
   return stats.map((item) => {
     const stock = normalizeStock(inventory[item.code] || 0)
     const missing = Math.max(0, item.required - stock)
-    const remaining = Math.max(0, stock - item.required)
-
     return Object.assign({}, item, {
       stock,
       missing,
-      remaining
+      remaining: Math.max(0, stock - item.required)
     })
   })
 }
 
-function canConsumeStats(stats) {
-  const merged = mergeStatsWithInventory(stats)
+function canConsumeStats(stats, brand) {
+  const merged = mergeStatsWithInventory(stats, brand)
   return {
     ok: merged.every((item) => item.missing === 0),
     items: merged,
@@ -54,31 +130,82 @@ function canConsumeStats(stats) {
   }
 }
 
-function consumeStats(stats) {
-  const check = canConsumeStats(stats)
-  if (!check.ok) {
-    return check
+function getShortageList(stats, brand) {
+  return mergeStatsWithInventory(stats, brand).filter((item) => item.missing > 0)
+}
+
+function consumeStats(stats, options) {
+  const settings = options || {}
+  const brand = settings.brand || DEFAULT_BRAND
+  if (settings.patternId) {
+    const duplicate = getTransactions().find((item) =>
+      item.type === 'consume' && !item.undone && item.metadata && item.metadata.patternId === settings.patternId
+    )
+    if (duplicate) return { ok: false, duplicate: true, transactionId: duplicate.id, items: [], missing: [] }
   }
+  const check = canConsumeStats(stats, brand)
+  if (!check.ok) return check
 
-  const inventory = getInventory()
+  const inventory = getInventory(brand)
+  const changes = []
   stats.forEach((item) => {
-    inventory[item.code] = normalizeStock((inventory[item.code] || 0) - item.required)
+    const amount = Math.max(0, Number(item.required) || 0)
+    inventory[item.code] = normalizeStock((inventory[item.code] || 0) - amount)
+    changes.push({ brand, code: item.code, delta: -amount })
   })
-  saveInventory(inventory)
-
+  saveInventory(inventory, brand)
+  const transaction = recordTransaction('consume', changes, settings)
   return {
     ok: true,
-    items: mergeStatsWithInventory(stats),
-    missing: []
+    items: mergeStatsWithInventory(stats, brand),
+    missing: [],
+    transactionId: transaction ? transaction.id : ''
   }
 }
 
+function undoTransaction(id) {
+  const transactions = getTransactions()
+  const transaction = transactions.find((item) => item.id === id)
+  if (!transaction || transaction.undone) return { ok: false }
+  const store = getInventoryStore()
+  transaction.items.forEach((item) => {
+    if (!store[item.brand]) store[item.brand] = {}
+    store[item.brand][item.code] = normalizeStock((store[item.brand][item.code] || 0) - item.delta)
+  })
+  transaction.undone = true
+  transaction.undoneAt = Date.now()
+  saveInventoryStore(store)
+  saveTransactions(transactions)
+  return { ok: true, transaction }
+}
+
+function getInventorySettings() {
+  const settings = wx.getStorageSync(SETTINGS_KEY)
+  return Object.assign({ lowStock: 100, activeBrand: DEFAULT_BRAND }, settings || {})
+}
+
+function saveInventorySettings(settings) {
+  const next = Object.assign({}, getInventorySettings(), settings || {})
+  next.lowStock = Math.max(0, Math.min(999999, Number(next.lowStock) || 0))
+  wx.setStorageSync(SETTINGS_KEY, next)
+  return next
+}
+
 module.exports = {
+  DEFAULT_BRAND,
+  normalizeStock,
   getInventory,
   saveInventory,
   setStock,
   adjustStock,
+  batchAdjustStock,
   mergeStatsWithInventory,
   canConsumeStats,
-  consumeStats
+  getShortageList,
+  consumeStats,
+  getTransactions,
+  hasConsumedPattern,
+  undoTransaction,
+  getInventorySettings,
+  saveInventorySettings
 }

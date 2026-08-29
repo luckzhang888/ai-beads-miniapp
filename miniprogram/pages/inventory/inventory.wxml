@@ -5,10 +5,17 @@
       <view class="warehouse-subtitle">MARD 221 标准色库存</view>
     </view>
     <view class="header-actions">
+      <button class="outline-btn" bindtap="batchTransaction">批量调整</button>
       <button class="outline-btn" data-direction="-1" bindtap="quickTransaction">－ 手动出库</button>
       <button class="outline-btn" data-direction="1" bindtap="quickTransaction">＋ 补豆入库</button>
     </view>
   </view>
+
+  <scroll-view class="brand-scroll" scroll-x enhanced show-scrollbar="false">
+    <view class="brand-tabs">
+      <view wx:for="{{brandOptions}}" wx:key="*this" class="brand-tab {{activeBrand === item ? 'active' : ''}}" data-brand="{{item}}" bindtap="selectBrand">{{item}} 色卡</view>
+    </view>
+  </scroll-view>
 
   <view class="summary-row">
     <view class="summary-label">总库存</view>
@@ -19,6 +26,12 @@
       <text class="summary-unit"> 色号</text>
     </view>
     <view class="low-pill">⚠ {{lowCount}} 不足</view>
+  </view>
+
+  <view class="inventory-quick-actions">
+    <view class="quick-action" bindtap="showShortageList">缺豆清单 <text>{{shortageCount}}</text></view>
+    <view class="quick-action" bindtap="setLowStockThreshold">低库存阈值 <text>{{lowStock}}</text></view>
+    <view class="quick-action {{showLowOnly ? 'active' : ''}}" bindtap="toggleLowOnly">{{showLowOnly ? '显示全部' : '只看不足'}}</view>
   </view>
 
   <view class="search-wrap">
@@ -102,5 +115,14 @@
     </view>
   </view>
 
-  <view class="page-note">低于 100 粒暂标记为“库存不足”，后续会增加可自定义安全库存。</view>
+  <view wx:if="{{transactions.length}}" class="transaction-section">
+    <view class="transaction-title">最近库存记录</view>
+    <view class="transaction-row" wx:for="{{transactions}}" wx:key="id">
+      <view><view class="transaction-name">{{item.typeLabel}}{{item.patternName ? ' · ' + item.patternName : ''}}</view><view class="transaction-meta">{{item.itemCount}} 个色号 · {{item.timeLabel}}</view></view>
+      <button wx:if="{{!item.undone}}" size="mini" data-id="{{item.id}}" bindtap="undoStockTransaction">撤销</button>
+      <text wx:else class="undone-label">已撤销</text>
+    </view>
+  </view>
+
+  <view class="page-note">库存按品牌隔离保存；当前已接入 MARD 221 色，新增品牌色卡后可直接扩展。</view>
 </view>

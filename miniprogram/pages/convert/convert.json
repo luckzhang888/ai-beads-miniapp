@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "创建拼豆图纸"
+  "navigationBarTitleText": "创建拼豆图纸",
+  "usingComponents": {
+    "bead-grid": "/components/bead-grid/bead-grid"
+  }
 }

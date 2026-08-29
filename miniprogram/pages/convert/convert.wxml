@@ -23,14 +23,27 @@
   <view class="config-head"><view><view class="config-title">{{selectedMethodTitle || '图纸导入'}}</view><view class="config-note">使用 MARD 221 标准色与 CIEDE2000 匹配</view></view><view class="back-methods" bindtap="resetMethods">更换方式</view></view>
   <view class="card">
     <view class="step-title">1. 选择图片</view>
-    <view class="image-box" bindtap="chooseImage">
-      <image wx:if="{{imagePath}}" class="preview-image" src="{{imagePath}}" mode="{{imageMode}}" />
-      <view wx:else class="image-placeholder">
+    <view
+      class="image-box crop-stage"
+      bindtouchstart="cropTouchStart"
+      catchtouchmove="cropTouchMove"
+      bindtouchend="cropTouchEnd"
+      bindtouchcancel="cropTouchEnd"
+    >
+      <image wx:if="{{imagePath}}" class="preview-image crop-image" src="{{imagePath}}" mode="{{imageMode}}" style="{{cropStyle}}" />
+      <view class="crop-frame" wx:if="{{imagePath}}"><text>{{outputWidth}} × {{outputHeight}}</text></view>
+      <view wx:else class="image-placeholder" bindtap="chooseImage">
         <view class="plus">＋</view>
         <view>从相册或相机选择图片</view>
       </view>
     </view>
     <button class="secondary-btn" bindtap="chooseImage">{{imagePath ? '重新选择图片' : '选择图片'}}</button>
+    <view wx:if="{{imagePath}}" class="crop-toolbar">
+      <view bindtap="rotateCrop">↻ 旋转</view>
+      <view bindtap="toggleCropMirror">⇆ 镜像</view>
+      <view bindtap="resetCrop">重置构图</view>
+    </view>
+    <view wx:if="{{imagePath}}" class="hint">在图片上单指移动、双指缩放；虚线框就是最终生成区域。</view>
   </view>
 
   <view class="card">
@@ -48,6 +61,17 @@
       <view wx:for="{{optimizeOptions}}" wx:key="value" class="{{optimizePreset == item.value ? 'choice active' : 'choice'}}" data-preset="{{item.value}}" bindtap="selectOptimize">{{item.label}}</view>
     </view>
     <view class="hint">“照片优化”会适度提亮暗部，让深色头发、盔甲等细节更容易映射到拼豆色。</view>
+
+    <view class="option-label option-space">空白背景</view>
+    <view class="background-row">
+      <view><view class="background-title">去除透明/近白背景</view><view class="hint compact-hint">空白格不计入豆数和库存</view></view>
+      <switch checked="{{removeBackground}}" bindchange="toggleBackgroundRemoval" color="#7150d8" />
+    </view>
+    <view wx:if="{{removeBackground}}" class="threshold-row">
+      <text>去白更强</text>
+      <slider min="220" max="255" step="5" value="{{whiteThreshold}}" bindchange="changeWhiteThreshold" activeColor="#7150d8" block-size="18" />
+      <text>保留更多白色</text>
+    </view>
   </view>
 
   <view class="card">
@@ -81,6 +105,19 @@
       </view>
       <view class="badge">Lab / ΔE2000</view>
     </view>
+  </view>
+
+  <view class="card preview-card">
+    <view class="preview-head"><view><view class="step-title">6. 生成前预览</view><view class="hint compact-hint">先检查空白、色号数量和构图，再保存图纸。</view></view><button size="mini" loading="{{previewing}}" bindtap="previewPattern">刷新预览</button></view>
+    <view wx:if="{{previewResult}}" class="pixel-preview">
+      <bead-grid matrix="{{previewResult.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{300}}" show-grid="{{true}}" />
+      <view class="preview-summary">
+        <text>{{previewResult.width}}×{{previewResult.height}}</text>
+        <text>{{previewResult.usedColorCount}} 色</text>
+        <text>{{previewResult.blankCount}} 空白格</text>
+      </view>
+    </view>
+    <view wx:else class="preview-empty">点击“刷新预览”查看转换结果</view>
   </view>
 
   <button class="primary-btn generate-btn" loading="{{generating}}" disabled="{{generating}}" bindtap="generatePattern">

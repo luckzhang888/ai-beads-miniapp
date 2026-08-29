@@ -1,13 +1,19 @@
 const mardPalette = require('../../data/colors/mard')
 const { createPaletteMap } = require('../../utils/color-match')
-const { mergeStatsWithInventory, consumeStats } = require('../../utils/inventory')
+const { mergeStatsWithInventory, consumeStats, hasConsumedPattern } = require('../../utils/inventory')
+const { exportPatternImages, saveImagesToAlbum } = require('../../utils/export')
 const {
   getCurrentPattern,
   getPatternById,
   savePattern,
   setCurrentPattern,
   mirrorHorizontal,
-  makeShareCode
+  makeShareCode,
+  indicesForRow,
+  indicesForRect,
+  indicesForCode,
+  toggleProgressIndices,
+  calculateProgress
 } = require('../../utils/pattern')
 
 const MIN_ZOOM = 1
@@ -19,6 +25,21 @@ function recommendedZoom(pattern) {
   const columns = Math.max(1, Number(pattern && pattern.width) || 1)
   const target = columns * 10 / viewport
   return Math.max(1.5, Math.min(4, Math.ceil(target * 2) / 2))
+}
+
+function migrateCompletedIndices(pattern) {
+  const existing = Array.isArray(pattern.completedCellIndices) ? pattern.completedCellIndices : []
+  if (existing.length || !Array.isArray(pattern.completedCodes) || !pattern.completedCodes.length) return existing
+  return pattern.completedCodes.reduce((result, code) => result.concat(indicesForCode(pattern.matrix, code)), [])
+}
+
+function displayIndices(indices, width, mirrored) {
+  if (!mirrored) return indices.slice()
+  return indices.map((index) => {
+    const y = Math.floor(index / width)
+    const x = index % width
+    return y * width + (width - 1 - x)
+  })
 }
 
 Page({
@@ -37,7 +58,15 @@ Page({
     mirrored: false,
     working: false,
     progress: 0,
-    workButtonText: '选择色号开始拼豆'
+    workButtonText: '选择色号开始拼豆',
+    completedIndices: [],
+    displayCompletedIndices: [],
+    progressTool: 'cell',
+    progressToolName: '单格',
+    areaStart: null,
+    scrollLeft: 0,
+    scrollTop: 0,
+    performanceHint: ''
   },
 
   onLoad(options) {
@@ -62,15 +91,19 @@ Page({
     this.setPattern(pattern)
   },
 
+  onUnload() {
+    this.persistViewState()
+  },
+
   setPattern(pattern) {
-    const completedCodes = Array.isArray(pattern.completedCodes) ? pattern.completedCodes : []
+    const completedIndices = migrateCompletedIndices(pattern)
+    const progressInfo = calculateProgress(pattern.matrix || [], completedIndices)
+    const completedCodes = progressInfo.completedCodes
     const stats = mergeStatsWithInventory(pattern.stats || []).map((item) => Object.assign({}, item, {
       completed: completedCodes.indexOf(item.code) >= 0
     }))
     const totalMissing = stats.reduce((sum, item) => sum + item.missing, 0)
-    const totalBeads = stats.reduce((sum, item) => sum + Number(item.required || 0), 0)
-    const completedBeads = stats.reduce((sum, item) => sum + (item.completed ? Number(item.required || 0) : 0), 0)
-    const progress = totalBeads ? Math.round(completedBeads / totalBeads * 100) : 0
+    const progress = progressInfo.percent
     const view = Object.assign({}, pattern, {
       status: pattern.status || (Number(pattern.completedCount || 0) > 0 ? '已拼' : '待拼')
     })
@@ -79,10 +112,20 @@ Page({
       displayMatrix: this.data.mirrored ? mirrorHorizontal(pattern.matrix) : pattern.matrix,
       stats,
       totalMissing,
-      progress
+      progress,
+      completedIndices,
+      displayCompletedIndices: displayIndices(completedIndices, pattern.width, this.data.mirrored),
+      performanceHint: pattern.width * pattern.height >= 12000 ? '大图已启用性能模式：拖动时降低清晰度，停止后自动恢复' : ''
     }
     if (!this.hasInitialZoom) {
-      changes.zoom = recommendedZoom(pattern)
+      const viewState = pattern.viewState || {}
+      changes.zoom = Number(viewState.zoom) || recommendedZoom(pattern)
+      changes.scrollLeft = Number(viewState.scrollLeft) || 0
+      changes.scrollTop = Number(viewState.scrollTop) || 0
+      changes.highlightCode = viewState.highlightCode || ''
+      changes.mirrored = Boolean(viewState.mirrored)
+      changes.displayMatrix = changes.mirrored ? mirrorHorizontal(pattern.matrix) : pattern.matrix
+      changes.displayCompletedIndices = displayIndices(completedIndices, pattern.width, changes.mirrored)
       this.hasInitialZoom = true
     }
     this.setData(changes, () => {
@@ -106,8 +149,9 @@ Page({
     const mirrored = !this.data.mirrored
     this.setData({
       mirrored,
-      displayMatrix: mirrored ? mirrorHorizontal(this.data.pattern.matrix) : this.data.pattern.matrix
-    })
+      displayMatrix: mirrored ? mirrorHorizontal(this.data.pattern.matrix) : this.data.pattern.matrix,
+      displayCompletedIndices: displayIndices(this.data.completedIndices, this.data.pattern.width, mirrored)
+    }, () => this.persistViewState())
   },
 
   toggleLock() {
@@ -117,29 +161,140 @@ Page({
   },
 
   zoomIn() {
-    this.setData({ zoom: Math.min(MAX_ZOOM, Math.round((this.data.zoom + 0.5) * 20) / 20) })
+    this.setData({ zoom: Math.min(MAX_ZOOM, Math.round((this.data.zoom + 0.5) * 20) / 20) }, () => this.persistViewState())
   },
 
   zoomOut() {
-    this.setData({ zoom: Math.max(MIN_ZOOM, Math.round((this.data.zoom - 0.5) * 20) / 20) })
+    this.setData({ zoom: Math.max(MIN_ZOOM, Math.round((this.data.zoom - 0.5) * 20) / 20) }, () => this.persistViewState())
   },
 
   handleZoomChange(event) {
     const value = event.detail && Number(event.detail.zoom)
     if (!Number.isFinite(value)) return
-    this.setData({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value)) })
+    this.setData({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value)) }, () => this.persistViewState())
+  },
+
+  handleViewChange(event) {
+    const detail = event.detail || {}
+    this.setData({
+      scrollLeft: Number(detail.scrollLeft) || 0,
+      scrollTop: Number(detail.scrollTop) || 0
+    })
+    this.persistViewState()
   },
 
   selectColor(event) {
     const code = event.currentTarget.dataset.code || ''
-    this.setData({ highlightCode: code, working: false }, () => this.updateWorkButton())
+    this.setData({ highlightCode: code, working: false }, () => {
+      this.updateWorkButton()
+      this.persistViewState()
+    })
   },
 
   handleCellTap(event) {
     if (this.data.locked) return
-    const code = event.detail && event.detail.code
+    const detail = event.detail || {}
+    const code = detail.code
     if (!code) return
+    const point = {
+      x: this.data.mirrored ? this.data.pattern.width - 1 - Number(detail.x) : Number(detail.x),
+      y: Number(detail.y)
+    }
+    if (this.data.working) {
+      this.applyProgressPoint(point)
+      return
+    }
     this.setData({ highlightCode: code, working: false }, () => this.updateWorkButton())
+  },
+
+  chooseProgressTool() {
+    wx.showActionSheet({
+      itemList: ['单格标记', '整行标记', '矩形区域标记', '撤销进度操作'],
+      success: (result) => {
+        if (result.tapIndex === 3) {
+          this.undoProgress()
+          return
+        }
+        const tools = [
+          { value: 'cell', name: '单格' },
+          { value: 'row', name: '整行' },
+          { value: 'area', name: '区域' }
+        ]
+        const selected = tools[result.tapIndex]
+        if (selected) this.setData({ progressTool: selected.value, progressToolName: selected.name, areaStart: null })
+      }
+    })
+  },
+
+  applyProgressPoint(point) {
+    if (this.data.progressTool === 'area' && !this.data.areaStart) {
+      this.setData({ areaStart: point })
+      wx.showToast({ title: '再点一个格子确定区域', icon: 'none' })
+      return
+    }
+    let targets
+    if (this.data.progressTool === 'row') targets = indicesForRow(this.data.pattern.matrix, point.y)
+    else if (this.data.progressTool === 'area') targets = indicesForRect(this.data.pattern.matrix, this.data.areaStart, point)
+    else targets = [point.y * this.data.pattern.width + point.x]
+    this.setData({ areaStart: null })
+    this.applyProgressTargets(targets)
+  },
+
+  applyProgressTargets(targets, forceComplete) {
+    if (!targets || !targets.length) return
+    this.progressUndoStack = this.progressUndoStack || []
+    this.progressUndoStack.push(this.data.completedIndices.slice())
+    if (this.progressUndoStack.length > 20) this.progressUndoStack.shift()
+    let completedIndices
+    if (forceComplete) {
+      const completed = new Set(this.data.completedIndices)
+      targets.forEach((index) => completed.add(index))
+      completedIndices = Array.from(completed).sort((a, b) => a - b)
+    } else {
+      completedIndices = toggleProgressIndices(this.data.completedIndices, targets)
+    }
+    this.persistProgress(completedIndices)
+  },
+
+  undoProgress() {
+    if (!this.progressUndoStack || !this.progressUndoStack.length) {
+      wx.showToast({ title: '没有可撤销的进度', icon: 'none' })
+      return
+    }
+    this.persistProgress(this.progressUndoStack.pop())
+  },
+
+  persistProgress(completedIndices) {
+    const current = getPatternById(this.patternId) || this.data.pattern
+    const info = calculateProgress(current.matrix, completedIndices)
+    const saved = savePattern(Object.assign({}, current, {
+      completedCellIndices: completedIndices,
+      completedCodes: info.completedCodes,
+      status: info.percent >= 100 ? '已拼' : (info.completed > 0 ? '正在拼' : '待拼'),
+      viewState: this.currentViewState()
+    }), mardPalette)
+    setCurrentPattern(saved)
+    this.setPattern(saved)
+  },
+
+  currentViewState() {
+    return {
+      zoom: this.data.zoom,
+      scrollLeft: this.data.scrollLeft,
+      scrollTop: this.data.scrollTop,
+      highlightCode: this.data.highlightCode,
+      mirrored: this.data.mirrored
+    }
+  },
+
+  persistViewState() {
+    if (!this.patternId || !this.data.pattern) return
+    clearTimeout(this.viewSaveTimer)
+    this.viewSaveTimer = setTimeout(() => {
+      const current = getPatternById(this.patternId)
+      if (!current) return
+      savePattern(Object.assign({}, current, { viewState: this.currentViewState() }), mardPalette)
+    }, 180)
   },
 
   clearHighlight() {
@@ -149,7 +304,7 @@ Page({
   updateWorkButton() {
     let workButtonText = '选择色号开始拼豆'
     if (this.data.highlightCode && !this.data.working) workButtonText = '开始拼 ' + this.data.highlightCode
-    if (this.data.highlightCode && this.data.working) workButtonText = '完成 ' + this.data.highlightCode
+    if (this.data.highlightCode && this.data.working) workButtonText = '完成该色全部格子'
     this.setData({ workButtonText })
   },
 
@@ -170,20 +325,10 @@ Page({
 
   completeSelectedColor() {
     const pattern = getPatternById(this.patternId)
-    const completedCodes = Array.isArray(pattern.completedCodes) ? pattern.completedCodes.slice() : []
-    if (completedCodes.indexOf(this.data.highlightCode) < 0) completedCodes.push(this.data.highlightCode)
-    const remaining = (pattern.stats || []).find((item) => completedCodes.indexOf(item.code) < 0)
-    const saved = savePattern(Object.assign({}, pattern, {
-      completedCodes,
-      status: remaining ? '正在拼' : '已拼'
-    }), mardPalette)
-    setCurrentPattern(saved)
-    this.setData({
-      highlightCode: remaining ? remaining.code : '',
-      working: false
-    })
-    this.setPattern(saved)
-    wx.showToast({ title: remaining ? '已完成本色' : '图纸已完成', icon: 'success' })
+    const targets = indicesForCode(pattern.matrix, this.data.highlightCode)
+    this.setData({ working: false })
+    this.applyProgressTargets(targets, true)
+    wx.showToast({ title: '该色格子已完成', icon: 'success' })
   },
 
   resetView() {
@@ -197,6 +342,7 @@ Page({
     }, () => {
       this.setPattern(this.data.pattern)
       this.updateWorkButton()
+      this.persistViewState()
     })
   },
 
@@ -209,19 +355,40 @@ Page({
   },
 
   previewExport() {
-    const grid = this.selectComponent('#patternGrid')
-    if (!grid || typeof grid.exportImage !== 'function') {
-      wx.showToast({ title: '画布尚未准备好', icon: 'none' })
-      return
-    }
-    wx.showLoading({ title: '生成图片' })
-    grid.exportImage().then((path) => {
-      wx.hideLoading()
-      wx.previewImage({ current: path, urls: [path] })
-    }).catch(() => {
-      wx.hideLoading()
-      wx.showToast({ title: '生成失败，请重试', icon: 'none' })
+    wx.showActionSheet({
+      itemList: ['高清完整图纸', '高清完整图纸＋大图分页'],
+      success: (result) => this.generateExport(result.tapIndex === 1)
     })
+  },
+
+  async generateExport(paginate) {
+    wx.showLoading({ title: '生成高清图纸', mask: true })
+    try {
+      const pattern = getPatternById(this.patternId) || this.data.pattern
+      const paths = await exportPatternImages(pattern, this.data.paletteMap, { paginate })
+      wx.hideLoading()
+      wx.previewImage({ current: paths[0], urls: paths })
+      wx.showModal({
+        title: '高清图纸已生成',
+        content: paths.length > 1 ? '已生成完整图和 ' + (paths.length - 1) + ' 张分页图，是否全部保存到相册？' : '是否保存到相册？',
+        confirmText: '全部保存',
+        success: async (result) => {
+          if (!result.confirm) return
+          wx.showLoading({ title: '保存中', mask: true })
+          try {
+            await saveImagesToAlbum(paths)
+            wx.showToast({ title: '已保存到相册', icon: 'success' })
+          } catch (error) {
+            wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
+          } finally {
+            wx.hideLoading()
+          }
+        }
+      })
+    } catch (error) {
+      wx.hideLoading()
+      wx.showToast({ title: '高清导出失败', icon: 'none' })
+    }
   },
 
   openSettings() {
@@ -237,6 +404,10 @@ Page({
   },
 
   completeWork() {
+    if (hasConsumedPattern(this.data.pattern.id)) {
+      wx.showToast({ title: '这张图纸已经扣过库存', icon: 'none' })
+      return
+    }
     if (this.data.totalMissing > 0) {
       wx.showModal({
         title: '库存不足',
@@ -252,15 +423,25 @@ Page({
       confirmText: '确认扣减',
       success: (result) => {
         if (!result.confirm) return
-        const consumed = consumeStats(this.data.pattern.stats || [])
+        const consumed = consumeStats(this.data.pattern.stats || [], {
+          patternId: this.data.pattern.id,
+          patternName: this.data.pattern.name,
+          brand: this.data.pattern.brand || 'MARD'
+        })
         if (!consumed.ok) {
+          if (consumed.duplicate) {
+            wx.showToast({ title: '这张图纸已经扣过库存', icon: 'none' })
+            return
+          }
           this.setPattern(this.data.pattern)
           wx.showToast({ title: '库存已变化，请重新检查', icon: 'none' })
           return
         }
         const saved = savePattern(Object.assign({}, this.data.pattern, {
           completedCount: Number(this.data.pattern.completedCount || 0) + 1,
-          status: '已拼'
+          status: '已拼',
+          inventoryConsumed: true,
+          lastConsumeTransactionId: consumed.transactionId
         }), mardPalette)
         setCurrentPattern(saved)
         this.setPattern(saved)

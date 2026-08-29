@@ -3,7 +3,7 @@
     <view class="editor-head">
       <view>
         <view class="section-title editor-title">{{pattern.name}}</view>
-        <view class="meta">{{pattern.size}} × {{pattern.size}} · {{dirty ? '有未保存修改' : '已保存'}}</view>
+        <view class="meta">{{pattern.width}} × {{pattern.height}} · {{dirty ? '有未保存修改' : '已保存'}}</view>
       </view>
       <button size="mini" class="save-btn" bindtap="save">保存</button>
     </view>
@@ -12,6 +12,8 @@
       <button size="mini" class="{{tool == 'paint' ? 'tool active' : 'tool'}}" data-tool="paint" bindtap="setTool">画笔</button>
       <button size="mini" class="{{tool == 'fill' ? 'tool active' : 'tool'}}" data-tool="fill" bindtap="setTool">填充</button>
       <button size="mini" class="{{tool == 'replace' ? 'tool active' : 'tool'}}" data-tool="replace" bindtap="setTool">替换</button>
+      <button size="mini" class="{{tool == 'areaReplace' ? 'tool active' : 'tool'}}" data-tool="areaReplace" bindtap="setTool">区域换色</button>
+      <button size="mini" class="{{tool == 'inspect' ? 'tool active' : 'tool'}}" data-tool="inspect" bindtap="setTool">吸管</button>
       <button size="mini" bindtap="undo" disabled="{{!canUndo}}">撤销</button>
       <button size="mini" bindtap="redo" disabled="{{!canRedo}}">重做</button>
     </view>
@@ -36,8 +38,10 @@
       zoom="{{zoom}}"
       show-codes="{{showCodes}}"
       show-grid="{{showGrid}}"
+      max-zoom="{{6}}"
       interactive="{{true}}"
       bind:celltap="handleCellTap"
+      bind:zoomchange="handleZoomChange"
     />
   </view>
 
@@ -45,19 +49,37 @@
     <view class="palette-head">
       <view>
         <view class="section-title">选择颜色</view>
-        <view class="meta">当前：{{selectedCode}}</view>
+        <view class="meta">当前：{{selectedCode || '空白格'}} {{selectedLocked ? '· 已锁定' : ''}}</view>
       </view>
       <view class="selected-chip" style="background: {{selectedHex}};"></view>
+    </view>
+
+    <view class="color-actions">
+      <button size="mini" bindtap="selectBlank">橡皮／空白格</button>
+      <button size="mini" bindtap="toggleLockSelected">{{selectedLocked ? '解除锁定' : '锁定当前色'}}</button>
+      <button size="mini" bindtap="mergeNearColors">合并相近色</button>
+    </view>
+
+    <view wx:if="{{candidates.length}}" class="candidate-section">
+      <view class="meta">当前颜色的候选近色</view>
+      <scroll-view scroll-x class="candidate-scroll" enhanced show-scrollbar="false">
+        <view class="candidate-inner">
+          <view class="candidate-chip" wx:for="{{candidates}}" wx:key="code" data-code="{{item.code}}" bindtap="selectCandidate">
+            <view style="background: {{item.hex}};"></view><text>{{item.code}}</text><text>Δ{{item.displayDistance}}</text>
+          </view>
+        </view>
+      </scroll-view>
     </view>
 
     <view class="palette-grid">
       <view
         wx:for="{{palette}}"
         wx:key="code"
-        class="{{selectedCode == item.code ? 'palette-item selected' : 'palette-item'}}"
+        class="{{selectedCode == item.code ? 'palette-item selected' : 'palette-item'}} {{item.locked ? 'locked' : ''}}"
         data-code="{{item.code}}"
         bindtap="selectPalette"
       >
+        <view wx:if="{{item.locked}}" class="lock-tag">锁</view>
         <view class="swatch" style="background: {{item.hex}};"></view>
         <view class="palette-code">{{item.code}}</view>
         <view class="palette-name">{{item.name}}</view>

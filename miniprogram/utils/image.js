@@ -105,34 +105,51 @@ function calculatePatternDimensions(sourceWidth, sourceHeight, shortSide, cropMo
   return { width: targetWidth, height: targetHeight }
 }
 
-function drawCover(ctx, image, sourceWidth, sourceHeight, width, height) {
-  const sourceRatio = sourceWidth / sourceHeight
-  const targetRatio = width / height
-  let sx = 0
-  let sy = 0
-  let sw = sourceWidth
-  let sh = sourceHeight
-
-  if (sourceRatio > targetRatio) {
-    sw = sourceHeight * targetRatio
-    sx = (sourceWidth - sw) / 2
-  } else {
-    sh = sourceWidth / targetRatio
-    sy = (sourceHeight - sh) / 2
+function normalizeTransform(transform) {
+  const value = transform || {}
+  return {
+    scale: Math.max(0.5, Math.min(4, Number(value.scale) || 1)),
+    offsetX: Math.max(-1, Math.min(1, Number(value.offsetX) || 0)),
+    offsetY: Math.max(-1, Math.min(1, Number(value.offsetY) || 0)),
+    rotation: [0, 90, 180, 270].includes(Number(value.rotation)) ? Number(value.rotation) : 0,
+    mirrored: Boolean(value.mirrored)
   }
-
-  ctx.drawImage(image, sx, sy, sw, sh, 0, 0, width, height)
 }
 
-function drawContain(ctx, image, sourceWidth, sourceHeight, width, height) {
-  const scale = Math.min(width / sourceWidth, height / sourceHeight)
-  const drawWidth = sourceWidth * scale
-  const drawHeight = sourceHeight * scale
-  const dx = (width - drawWidth) / 2
-  const dy = (height - drawHeight) / 2
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, width, height)
-  ctx.drawImage(image, 0, 0, sourceWidth, sourceHeight, dx, dy, drawWidth, drawHeight)
+function calculateDrawSize(sourceWidth, sourceHeight, width, height, cropMode) {
+  if (cropMode === 'ratio') return { width, height }
+  const scale = cropMode === 'cover'
+    ? Math.max(width / sourceWidth, height / sourceHeight)
+    : Math.min(width / sourceWidth, height / sourceHeight)
+  return { width: sourceWidth * scale, height: sourceHeight * scale }
+}
+
+function drawTransformed(ctx, image, sourceWidth, sourceHeight, width, height, cropMode, rawTransform) {
+  const transform = normalizeTransform(rawTransform)
+  const drawSize = calculateDrawSize(sourceWidth, sourceHeight, width, height, cropMode)
+  if (cropMode === 'contain') {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, width, height)
+  }
+  ctx.save()
+  ctx.translate(
+    width / 2 + transform.offsetX * width * 0.5,
+    height / 2 + transform.offsetY * height * 0.5
+  )
+  ctx.rotate(transform.rotation * Math.PI / 180)
+  ctx.scale(transform.scale * (transform.mirrored ? -1 : 1), transform.scale)
+  ctx.drawImage(
+    image,
+    0,
+    0,
+    sourceWidth,
+    sourceHeight,
+    -drawSize.width / 2,
+    -drawSize.height / 2,
+    drawSize.width,
+    drawSize.height
+  )
+  ctx.restore()
 }
 
 function qualitySettings(mode) {
@@ -169,13 +186,16 @@ async function imageToPattern(imagePath, shortSide, palette, options) {
   ctx.imageSmoothingEnabled = true
   if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
 
-  if (settings.cropMode === 'cover') {
-    drawCover(ctx, image, sourceWidth, sourceHeight, width, height)
-  } else if (settings.cropMode === 'contain') {
-    drawContain(ctx, image, sourceWidth, sourceHeight, width, height)
-  } else {
-    ctx.drawImage(image, 0, 0, sourceWidth, sourceHeight, 0, 0, width, height)
-  }
+  drawTransformed(
+    ctx,
+    image,
+    sourceWidth,
+    sourceHeight,
+    width,
+    height,
+    settings.cropMode || 'ratio',
+    settings.transform
+  )
 
   const imageData = ctx.getImageData(0, 0, width, height)
   enhanceImageData(imageData, settings.optimizePreset || 'photo')
@@ -184,11 +204,17 @@ async function imageToPattern(imagePath, shortSide, palette, options) {
     width,
     height,
     palette,
-    qualitySettings(settings.qualityMode || 'balanced')
+    Object.assign({}, qualitySettings(settings.qualityMode || 'balanced'), {
+      removeTransparent: settings.removeTransparent !== false,
+      removeBackground: Boolean(settings.removeBackground),
+      whiteThreshold: settings.whiteThreshold,
+      whiteTolerance: settings.whiteTolerance
+    })
   )
 
   result.width = width
   result.height = height
+  result.blankCount = width * height - result.stats.reduce((sum, item) => sum + Number(item.required || 0), 0)
   return result
 }
 
@@ -204,5 +230,7 @@ function recommendPatternSize(width, height) {
 module.exports = {
   imageToPattern,
   recommendPatternSize,
-  calculatePatternDimensions
+  calculatePatternDimensions,
+  normalizeTransform,
+  calculateDrawSize
 }
