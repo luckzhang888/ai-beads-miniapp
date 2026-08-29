@@ -11,12 +11,35 @@
   font-size: 23rpx;
 }
 
+.main-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 22rpx;
+}
+
+.main-actions button {
+  margin: 0;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+}
+
+.edit-btn {
+  color: #ffffff;
+  background: #2563eb;
+}
+
+.secondary-action {
+  color: #1f2329;
+  background: #eef2f7;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12rpx;
-  margin: 24rpx 0 20rpx;
+  margin: 20rpx 0;
 }
 
 .toolbar button {
@@ -37,6 +60,29 @@
   background: #fff7ed;
   color: #c2410c;
   font-size: 24rpx;
+}
+
+.summary-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8rpx;
+  padding: 22rpx 16rpx;
+}
+
+.summary-item {
+  min-width: 0;
+  text-align: center;
+}
+
+.summary-value {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.summary-label {
+  margin-top: 6rpx;
+  color: #8a919f;
+  font-size: 21rpx;
 }
 
 .stat-row {
@@ -96,4 +142,11 @@
 .enough {
   color: #16803a;
   font-weight: 600;
+}
+
+.complete-btn {
+  margin-top: 24rpx;
+  border-radius: 18rpx;
+  color: #ffffff;
+  background: #16803a;
 }

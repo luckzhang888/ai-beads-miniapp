@@ -2,7 +2,9 @@
   "pages": [
     "pages/home/home",
     "pages/convert/convert",
+    "pages/patterns/patterns",
     "pages/pattern/pattern",
+    "pages/editor/editor",
     "pages/inventory/inventory"
   ],
   "window": {

@@ -1,12 +1,11 @@
 const demoPalette = require('../../data/colors/demo')
 const { createPaletteMap } = require('../../utils/color-match')
-const { mergeStatsWithInventory } = require('../../utils/inventory')
+const { mergeStatsWithInventory, consumeStats } = require('../../utils/inventory')
 const {
   getCurrentPattern,
   getPatternById,
   savePattern,
-  setCurrentPattern,
-  mirrorHorizontal
+  setCurrentPattern
 } = require('../../utils/pattern')
 
 Page({
@@ -17,7 +16,8 @@ Page({
     zoom: 1,
     showCodes: false,
     showGrid: true,
-    highlightCode: ''
+    highlightCode: '',
+    totalMissing: 0
   },
 
   onLoad(options) {
@@ -42,31 +42,31 @@ Page({
       return
     }
 
+    this.patternId = pattern.id
     setCurrentPattern(pattern)
     this.setPattern(pattern)
   },
 
   setPattern(pattern) {
+    const stats = mergeStatsWithInventory(pattern.stats || [])
+    const totalMissing = stats.reduce((sum, item) => sum + item.missing, 0)
     this.setData({
       pattern,
-      stats: mergeStatsWithInventory(pattern.stats || [])
+      stats,
+      totalMissing
     })
   },
 
   toggleCodes() {
-    this.setData({
-      showCodes: !this.data.showCodes
-    })
+    this.setData({ showCodes: !this.data.showCodes })
   },
 
   toggleGrid() {
-    this.setData({
-      showGrid: !this.data.showGrid
-    })
+    this.setData({ showGrid: !this.data.showGrid })
   },
 
   zoomIn() {
-    const next = Math.min(2, Math.round((this.data.zoom + 0.5) * 10) / 10)
+    const next = Math.min(3, Math.round((this.data.zoom + 0.5) * 10) / 10)
     this.setData({ zoom: next })
   },
 
@@ -86,22 +86,73 @@ Page({
     this.setData({ highlightCode: '' })
   },
 
-  mirrorPattern() {
-    const pattern = Object.assign({}, this.data.pattern, {
-      matrix: mirrorHorizontal(this.data.pattern.matrix)
-    })
-    const saved = savePattern(pattern)
-    setCurrentPattern(saved)
-    this.setPattern(saved)
-    wx.showToast({
-      title: '已水平镜像',
-      icon: 'success'
+  goEditor() {
+    wx.navigateTo({
+      url: '/pages/editor/editor?id=' + encodeURIComponent(this.data.pattern.id)
     })
   },
 
   goInventory() {
     wx.navigateTo({
       url: '/pages/inventory/inventory'
+    })
+  },
+
+  previewExport() {
+    const grid = this.selectComponent('#patternGrid')
+    if (!grid || typeof grid.exportImage !== 'function') {
+      wx.showToast({ title: '画布尚未准备好', icon: 'none' })
+      return
+    }
+
+    wx.showLoading({ title: '生成图片' })
+    grid.exportImage()
+      .then((path) => {
+        wx.hideLoading()
+        wx.previewImage({ current: path, urls: [path] })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '生成失败，请重试', icon: 'none' })
+      })
+  },
+
+  completeWork() {
+    if (this.data.totalMissing > 0) {
+      wx.showModal({
+        title: '库存不足',
+        content: '当前还缺少 ' + this.data.totalMissing + ' 颗拼豆，请先补充库存后再完成制作。',
+        confirmText: '去库存',
+        success: (result) => {
+          if (result.confirm) {
+            this.goInventory()
+          }
+        }
+      })
+      return
+    }
+
+    wx.showModal({
+      title: '完成作品',
+      content: '将按照本图纸用量从库存中扣减拼豆。确定继续吗？',
+      confirmText: '确认扣减',
+      success: (result) => {
+        if (!result.confirm) {
+          return
+        }
+        const consumed = consumeStats(this.data.pattern.stats || [])
+        if (!consumed.ok) {
+          this.setPattern(this.data.pattern)
+          wx.showToast({ title: '库存已变化，请重新检查', icon: 'none' })
+          return
+        }
+        const saved = savePattern(Object.assign({}, this.data.pattern, {
+          completedCount: Number(this.data.pattern.completedCount || 0) + 1
+        }), demoPalette)
+        setCurrentPattern(saved)
+        this.setPattern(saved)
+        wx.showToast({ title: '库存已扣减', icon: 'success' })
+      }
     })
   }
 })

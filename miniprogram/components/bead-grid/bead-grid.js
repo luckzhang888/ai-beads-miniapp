@@ -23,6 +23,10 @@ Component({
     zoom: {
       type: Number,
       value: 1
+    },
+    interactive: {
+      type: Boolean,
+      value: false
     }
   },
 
@@ -40,6 +44,11 @@ Component({
   lifetimes: {
     ready() {
       this.scheduleDraw()
+    },
+    detached() {
+      if (this._drawTimer) {
+        clearTimeout(this._drawTimer)
+      }
     }
   },
 
@@ -61,7 +70,7 @@ Component({
 
       const system = wx.getSystemInfoSync()
       const base = Math.max(280, Math.min(system.windowWidth - 24, 680))
-      const zoom = Math.max(1, Math.min(Number(this.data.zoom) || 1, 2))
+      const zoom = Math.max(1, Math.min(Number(this.data.zoom) || 1, 3))
       const canvasSize = Math.round(base * zoom)
       const viewportSize = base
 
@@ -77,6 +86,7 @@ Component({
             if (!res || !res.node) {
               return
             }
+            this._canvasNode = res.node
             this.paint(res.node, res.width || canvasSize, matrix)
           })
       })
@@ -152,6 +162,59 @@ Component({
         }
         ctx.globalAlpha = 1
       }
+    },
+
+    handleTap(event) {
+      if (!this.data.interactive || !this.data.matrix.length) {
+        return
+      }
+
+      const touch = event.changedTouches && event.changedTouches[0]
+      const clientX = touch ? touch.clientX : event.detail.x
+      const clientY = touch ? touch.clientY : event.detail.y
+
+      this.createSelectorQuery()
+        .select('#beadCanvas')
+        .boundingClientRect()
+        .exec((result) => {
+          const rect = result && result[0]
+          if (!rect || typeof clientX !== 'number' || typeof clientY !== 'number') {
+            return
+          }
+
+          const localX = clientX - rect.left
+          const localY = clientY - rect.top
+          const n = this.data.matrix.length
+          const x = Math.floor((localX / rect.width) * n)
+          const y = Math.floor((localY / rect.height) * n)
+
+          if (x < 0 || y < 0 || x >= n || y >= n) {
+            return
+          }
+
+          this.triggerEvent('celltap', {
+            x,
+            y,
+            code: this.data.matrix[y][x]
+          })
+        })
+    },
+
+    exportImage() {
+      return new Promise((resolve, reject) => {
+        const canvas = this._canvasNode
+        if (!canvas) {
+          reject(new Error('canvas not ready'))
+          return
+        }
+        wx.canvasToTempFilePath({
+          canvas,
+          fileType: 'png',
+          quality: 1,
+          success: (result) => resolve(result.tempFilePath),
+          fail: reject
+        }, this)
+      })
     }
   }
 })

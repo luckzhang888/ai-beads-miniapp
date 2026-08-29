@@ -27,6 +27,12 @@ Page({
     })
   },
 
+  goPatterns() {
+    wx.navigateTo({
+      url: '/pages/patterns/patterns'
+    })
+  },
+
   goInventory() {
     wx.navigateTo({
       url: '/pages/inventory/inventory'

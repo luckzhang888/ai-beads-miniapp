@@ -1,0 +1,67 @@
+<view class="container" wx:if="{{pattern}}">
+  <view class="card compact-card">
+    <view class="editor-head">
+      <view>
+        <view class="section-title editor-title">{{pattern.name}}</view>
+        <view class="meta">{{pattern.size}} × {{pattern.size}} · {{dirty ? '有未保存修改' : '已保存'}}</view>
+      </view>
+      <button size="mini" class="save-btn" bindtap="save">保存</button>
+    </view>
+
+    <view class="tools">
+      <button size="mini" class="{{tool == 'paint' ? 'tool active' : 'tool'}}" data-tool="paint" bindtap="setTool">画笔</button>
+      <button size="mini" class="{{tool == 'fill' ? 'tool active' : 'tool'}}" data-tool="fill" bindtap="setTool">填充</button>
+      <button size="mini" class="{{tool == 'replace' ? 'tool active' : 'tool'}}" data-tool="replace" bindtap="setTool">替换</button>
+      <button size="mini" bindtap="undo" disabled="{{!canUndo}}">撤销</button>
+      <button size="mini" bindtap="redo" disabled="{{!canRedo}}">重做</button>
+    </view>
+
+    <view class="tools secondary-tools">
+      <button size="mini" bindtap="zoomOut">－</button>
+      <view class="zoom-text">{{zoom}}×</view>
+      <button size="mini" bindtap="zoomIn">＋</button>
+      <button size="mini" bindtap="toggleGrid">{{showGrid ? '隐藏网格' : '显示网格'}}</button>
+      <button size="mini" bindtap="toggleCodes">{{showCodes ? '隐藏色号' : '显示色号'}}</button>
+      <button size="mini" bindtap="mirrorH">水平镜像</button>
+      <button size="mini" bindtap="mirrorV">垂直镜像</button>
+      <button size="mini" bindtap="rotate">旋转90°</button>
+    </view>
+
+    <view class="tip">当前工具：{{toolName}}。选择下面的色号，然后点击图纸格子。</view>
+
+    <bead-grid
+      id="editorGrid"
+      matrix="{{matrix}}"
+      palette="{{paletteMap}}"
+      zoom="{{zoom}}"
+      show-codes="{{showCodes}}"
+      show-grid="{{showGrid}}"
+      interactive="{{true}}"
+      bind:celltap="handleCellTap"
+    />
+  </view>
+
+  <view class="card">
+    <view class="palette-head">
+      <view>
+        <view class="section-title">选择颜色</view>
+        <view class="meta">当前：{{selectedCode}}</view>
+      </view>
+      <view class="selected-chip" style="background: {{selectedHex}};"></view>
+    </view>
+
+    <view class="palette-grid">
+      <view
+        wx:for="{{palette}}"
+        wx:key="code"
+        class="{{selectedCode == item.code ? 'palette-item selected' : 'palette-item'}}"
+        data-code="{{item.code}}"
+        bindtap="selectPalette"
+      >
+        <view class="swatch" style="background: {{item.hex}};"></view>
+        <view class="palette-code">{{item.code}}</view>
+        <view class="palette-name">{{item.name}}</view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -3,9 +3,14 @@
     <view class="pattern-head">
       <view>
         <view class="section-title">{{pattern.name}}</view>
-        <view class="meta">{{pattern.size}} × {{pattern.size}} · {{pattern.brand}}</view>
+        <view class="meta">{{pattern.size}} × {{pattern.size}} · {{pattern.brand}} · {{pattern.stats.length}} 色</view>
       </view>
       <view class="badge">{{pattern.size * pattern.size}} 颗</view>
+    </view>
+
+    <view class="main-actions">
+      <button class="edit-btn" bindtap="goEditor">编辑图纸</button>
+      <button class="secondary-action" bindtap="previewExport">查看导出图</button>
     </view>
 
     <view class="toolbar">
@@ -14,7 +19,6 @@
       <button size="mini" bindtap="zoomIn">＋</button>
       <button size="mini" bindtap="toggleGrid">{{showGrid ? '隐藏网格' : '显示网格'}}</button>
       <button size="mini" bindtap="toggleCodes">{{showCodes ? '隐藏色号' : '显示色号'}}</button>
-      <button size="mini" bindtap="mirrorPattern">镜像</button>
     </view>
 
     <view class="highlight-tip" wx:if="{{highlightCode}}" bindtap="clearHighlight">
@@ -22,6 +26,7 @@
     </view>
 
     <bead-grid
+      id="patternGrid"
       matrix="{{pattern.matrix}}"
       palette="{{paletteMap}}"
       zoom="{{zoom}}"
@@ -29,6 +34,21 @@
       show-grid="{{showGrid}}"
       highlight-code="{{highlightCode}}"
     />
+  </view>
+
+  <view class="card summary-card">
+    <view class="summary-item">
+      <view class="summary-value">{{pattern.stats.length}}</view>
+      <view class="summary-label">使用颜色</view>
+    </view>
+    <view class="summary-item">
+      <view class="summary-value {{totalMissing > 0 ? 'missing' : 'enough'}}">{{totalMissing}}</view>
+      <view class="summary-label">缺少拼豆</view>
+    </view>
+    <view class="summary-item">
+      <view class="summary-value">{{pattern.completedCount || 0}}</view>
+      <view class="summary-label">已制作</view>
+    </view>
   </view>
 
   <view class="card">
@@ -63,9 +83,11 @@
       </view>
       <view>{{item.required}}</view>
       <view>{{item.stock}}</view>
-      <view class="{{item.missing > 0 ? 'missing' : 'enough'}}">
-        {{item.missing}}
-      </view>
+      <view class="{{item.missing > 0 ? 'missing' : 'enough'}}">{{item.missing}}</view>
     </view>
+
+    <button class="complete-btn" bindtap="completeWork">
+      {{totalMissing > 0 ? '库存不足，查看缺豆' : '完成作品并扣减库存'}}
+    </button>
   </view>
 </view>

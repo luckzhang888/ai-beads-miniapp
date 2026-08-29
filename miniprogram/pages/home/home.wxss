@@ -2,6 +2,51 @@
   padding-top: 34rpx;
 }
 
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+}
+
+.quick-card {
+  min-width: 0;
+  padding: 24rpx;
+}
+
+.quick-title {
+  font-size: 29rpx;
+  font-weight: 700;
+}
+
+.quick-desc {
+  margin-top: 10rpx;
+  color: #7a828e;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.quick-link {
+  margin-top: 16rpx;
+  color: #2563eb;
+  font-size: 23rpx;
+  font-weight: 600;
+}
+
+.recent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recent-head .section-title {
+  margin-bottom: 0;
+}
+
+.all-link {
+  color: #2563eb;
+  font-size: 23rpx;
+}
+
 .pattern-item {
   display: flex;
   align-items: center;
@@ -11,7 +56,7 @@
 }
 
 .pattern-item:first-of-type {
-  border-top: 0;
+  margin-top: 14rpx;
 }
 
 .pattern-name {

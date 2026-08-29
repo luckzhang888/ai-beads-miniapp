@@ -45,10 +45,40 @@ function mergeStatsWithInventory(stats) {
   })
 }
 
+function canConsumeStats(stats) {
+  const merged = mergeStatsWithInventory(stats)
+  return {
+    ok: merged.every((item) => item.missing === 0),
+    items: merged,
+    missing: merged.filter((item) => item.missing > 0)
+  }
+}
+
+function consumeStats(stats) {
+  const check = canConsumeStats(stats)
+  if (!check.ok) {
+    return check
+  }
+
+  const inventory = getInventory()
+  stats.forEach((item) => {
+    inventory[item.code] = normalizeStock((inventory[item.code] || 0) - item.required)
+  })
+  saveInventory(inventory)
+
+  return {
+    ok: true,
+    items: mergeStatsWithInventory(stats),
+    missing: []
+  }
+}
+
 module.exports = {
   getInventory,
   saveInventory,
   setStock,
   adjustStock,
-  mergeStatsWithInventory
+  mergeStatsWithInventory,
+  canConsumeStats,
+  consumeStats
 }

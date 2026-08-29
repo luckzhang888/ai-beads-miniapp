@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "编辑图纸",
+  "usingComponents": {
+    "bead-grid": "/components/bead-grid/bead-grid"
+  }
+}

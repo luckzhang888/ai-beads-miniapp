@@ -2,11 +2,14 @@
   class="grid-scroll"
   scroll-x
   scroll-y
+  enhanced
+  show-scrollbar="{{false}}"
   style="height: {{viewportSize}}px;"
 >
   <canvas
     id="beadCanvas"
     type="2d"
+    bindtap="handleTap"
     style="width: {{canvasSize}}px; height: {{canvasSize}}px;"
   />
 </scroll-view>
