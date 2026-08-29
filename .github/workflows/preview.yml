@@ -29,7 +29,6 @@ jobs:
         if: steps.wx-ci.outputs.enabled == 'true'
         with:
           node-version: 20
-          cache: npm
 
       - run: npm install
         if: steps.wx-ci.outputs.enabled == 'true'
