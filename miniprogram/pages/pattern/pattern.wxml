@@ -3,9 +3,9 @@
     <view class="pattern-head">
       <view>
         <view class="section-title">{{pattern.name}}</view>
-        <view class="meta">{{pattern.size}} × {{pattern.size}} · {{pattern.brand}} · {{pattern.stats.length}} 色</view>
+        <view class="meta">{{pattern.width || pattern.size}} × {{pattern.height || pattern.size}} · {{pattern.brand}} · {{pattern.stats.length}} 色</view>
       </view>
-      <view class="badge">{{pattern.size * pattern.size}} 颗</view>
+      <view class="badge">{{(pattern.width || pattern.size) * (pattern.height || pattern.size)}} 颗</view>
     </view>
 
     <view class="main-actions">
@@ -25,69 +25,31 @@
       当前高亮：{{highlightCode}} · 点击这里取消
     </view>
 
-    <bead-grid
-      id="patternGrid"
-      matrix="{{pattern.matrix}}"
-      palette="{{paletteMap}}"
-      zoom="{{zoom}}"
-      show-codes="{{showCodes}}"
-      show-grid="{{showGrid}}"
-      highlight-code="{{highlightCode}}"
-    />
+    <bead-grid id="patternGrid" matrix="{{pattern.matrix}}" palette="{{paletteMap}}" zoom="{{zoom}}" show-codes="{{showCodes}}" show-grid="{{showGrid}}" highlight-code="{{highlightCode}}" />
   </view>
 
   <view class="card summary-card">
-    <view class="summary-item">
-      <view class="summary-value">{{pattern.stats.length}}</view>
-      <view class="summary-label">使用颜色</view>
-    </view>
-    <view class="summary-item">
-      <view class="summary-value {{totalMissing > 0 ? 'missing' : 'enough'}}">{{totalMissing}}</view>
-      <view class="summary-label">缺少拼豆</view>
-    </view>
-    <view class="summary-item">
-      <view class="summary-value">{{pattern.completedCount || 0}}</view>
-      <view class="summary-label">已制作</view>
-    </view>
+    <view class="summary-item"><view class="summary-value">{{pattern.stats.length}}</view><view class="summary-label">使用颜色</view></view>
+    <view class="summary-item"><view class="summary-value {{totalMissing > 0 ? 'missing' : 'enough'}}">{{totalMissing}}</view><view class="summary-label">缺少拼豆</view></view>
+    <view class="summary-item"><view class="summary-value">{{pattern.completedCount || 0}}</view><view class="summary-label">已制作</view></view>
   </view>
 
   <view class="card">
     <view class="stats-head">
-      <view>
-        <view class="section-title">颜色统计</view>
-        <view class="meta">点击某个色号可在图纸中单色高亮。</view>
-      </view>
+      <view><view class="section-title">颜色统计</view><view class="meta">点击某个色号可在图纸中单色高亮。</view></view>
       <button size="mini" bindtap="goInventory">库存</button>
     </view>
 
-    <view class="stat-row stat-header">
-      <view class="stat-name">色号</view>
-      <view>需要</view>
-      <view>库存</view>
-      <view>缺少</view>
-    </view>
+    <view class="stat-row stat-header"><view class="stat-name">色号</view><view>需要</view><view>库存</view><view>缺少</view></view>
 
-    <view
-      wx:for="{{stats}}"
-      wx:key="code"
-      class="{{highlightCode == item.code ? 'stat-row active' : 'stat-row'}}"
-      data-code="{{item.code}}"
-      bindtap="selectColor"
-    >
+    <view wx:for="{{stats}}" wx:key="code" class="{{highlightCode == item.code ? 'stat-row active' : 'stat-row'}}" data-code="{{item.code}}" bindtap="selectColor">
       <view class="stat-name">
         <view class="color-dot" style="background: {{item.hex}};"></view>
-        <view>
-          <view class="code">{{item.code}}</view>
-          <view class="color-name">{{item.name}}</view>
-        </view>
+        <view><view class="code">{{item.code}}</view><view class="color-name">{{item.name}}</view></view>
       </view>
-      <view>{{item.required}}</view>
-      <view>{{item.stock}}</view>
-      <view class="{{item.missing > 0 ? 'missing' : 'enough'}}">{{item.missing}}</view>
+      <view>{{item.required}}</view><view>{{item.stock}}</view><view class="{{item.missing > 0 ? 'missing' : 'enough'}}">{{item.missing}}</view>
     </view>
 
-    <button class="complete-btn" bindtap="completeWork">
-      {{totalMissing > 0 ? '库存不足，查看缺豆' : '完成作品并扣减库存'}}
-    </button>
+    <button class="complete-btn" bindtap="completeWork">{{totalMissing > 0 ? '库存不足，查看缺豆' : '完成作品并扣减库存'}}</button>
   </view>
 </view>

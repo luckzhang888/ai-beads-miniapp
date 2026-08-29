@@ -1,23 +1,14 @@
 <view class="container">
   <view class="header-row">
-    <view>
-      <view class="title">我的图纸</view>
-      <view class="subtitle">已保存 {{patterns.length}} 张，本地最多保留 50 张。</view>
-    </view>
+    <view><view class="title">我的图纸</view><view class="subtitle">已保存 {{patterns.length}} 张，本地最多保留 50 张。</view></view>
     <button size="mini" class="create-btn" bindtap="goCreate">新建</button>
   </view>
 
   <view wx:if="{{patterns.length}}">
-    <view
-      class="card pattern-card"
-      wx:for="{{patterns}}"
-      wx:key="id"
-      data-id="{{item.id}}"
-      bindtap="openPattern"
-    >
+    <view class="card pattern-card" wx:for="{{patterns}}" wx:key="id" data-id="{{item.id}}" bindtap="openPattern">
       <view class="pattern-main">
         <view class="pattern-name">{{item.name}}</view>
-        <view class="pattern-meta">{{item.size}} × {{item.size}} · {{item.colorCount}} 色 · {{item.brand}}</view>
+        <view class="pattern-meta">{{item.width || item.size}} × {{item.height || item.size}} · {{item.colorCount}} 色 · {{item.brand}}</view>
         <view class="pattern-time">更新于 {{item.displayTime}}</view>
       </view>
       <view class="actions">

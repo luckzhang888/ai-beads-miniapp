@@ -1,82 +1,67 @@
 <view class="container">
   <view class="card">
     <view class="step-title">1. 选择图片</view>
-
     <view class="image-box" bindtap="chooseImage">
-      <image
-        wx:if="{{imagePath}}"
-        class="preview-image"
-        src="{{imagePath}}"
-        mode="{{imageMode}}"
-      />
+      <image wx:if="{{imagePath}}" class="preview-image" src="{{imagePath}}" mode="{{imageMode}}" />
       <view wx:else class="image-placeholder">
         <view class="plus">＋</view>
         <view>从相册或相机选择图片</view>
       </view>
     </view>
-
-    <button class="secondary-btn" bindtap="chooseImage">
-      {{imagePath ? '重新选择图片' : '选择图片'}}
-    </button>
+    <button class="secondary-btn" bindtap="chooseImage">{{imagePath ? '重新选择图片' : '选择图片'}}</button>
   </view>
 
   <view class="card">
-    <view class="step-title">2. 图片处理方式</view>
+    <view class="step-title">2. 构图与照片优化</view>
     <view class="option-label">构图</view>
-    <view class="choice-row">
-      <view class="{{cropMode == 'cover' ? 'choice active' : 'choice'}}" data-mode="cover" bindtap="selectCrop">居中裁剪</view>
-      <view class="{{cropMode == 'contain' ? 'choice active' : 'choice'}}" data-mode="contain" bindtap="selectCrop">完整保留</view>
+    <view class="choice-row three">
+      <view class="{{cropMode == 'ratio' ? 'choice active' : 'choice'}}" data-mode="ratio" bindtap="selectCrop">保持比例</view>
+      <view class="{{cropMode == 'cover' ? 'choice active' : 'choice'}}" data-mode="cover" bindtap="selectCrop">方形裁剪</view>
+      <view class="{{cropMode == 'contain' ? 'choice active' : 'choice'}}" data-mode="contain" bindtap="selectCrop">方形留白</view>
     </view>
-    <view class="hint">居中裁剪会铺满正方形；完整保留会用白色填充空白区域。</view>
+    <view class="hint">照片默认保持原始宽高比，避免竖图人物被裁掉。</view>
 
     <view class="option-label option-space">图像优化</view>
-    <view class="choice-row three">
-      <view
-        wx:for="{{optimizeOptions}}"
-        wx:key="value"
-        class="{{optimizePreset == item.value ? 'choice active' : 'choice'}}"
-        data-preset="{{item.value}}"
-        bindtap="selectOptimize"
-      >{{item.label}}</view>
+    <view class="choice-row">
+      <view wx:for="{{optimizeOptions}}" wx:key="value" class="{{optimizePreset == item.value ? 'choice active' : 'choice'}}" data-preset="{{item.value}}" bindtap="selectOptimize">{{item.label}}</view>
     </view>
-    <view class="hint">增强会略微提高对比度和饱和度，更适合轮廓明显的拼豆图。</view>
+    <view class="hint">“照片优化”会适度提亮暗部，让深色头发、盔甲等细节更容易映射到拼豆色。</view>
   </view>
 
   <view class="card">
-    <view class="step-title">3. 选择拼豆尺寸</view>
-    <view class="recommend" wx:if="{{imagePath}}">自动推荐：{{recommendedSize}}×{{recommendedSize}}</view>
+    <view class="step-title">3. 选择图纸精度</view>
+    <view class="recommend" wx:if="{{imagePath}}">自动推荐短边：{{recommendedSize}}，预计图纸：{{outputWidth}}×{{outputHeight}}</view>
     <view class="size-list">
-      <view
-        wx:for="{{sizes}}"
-        wx:key="*this"
-        class="{{selectedSize == item ? 'size-item active' : 'size-item'}}"
-        data-size="{{item}}"
-        bindtap="selectSize"
-      >
-        {{item}}×{{item}}
+      <view wx:for="{{sizes}}" wx:key="*this" class="{{selectedSize == item ? 'size-item active' : 'size-item'}}" data-size="{{item}}" bindtap="selectSize">
+        短边 {{item}}
         <view class="recommend-tag" wx:if="{{recommendedSize == item}}">推荐</view>
       </view>
     </view>
-    <view class="hint">尺寸越大细节越多，同时处理和制作需要的拼豆数量也越多。</view>
+    <view class="hint">例如竖版 800×1172 照片，短边 80 会生成约 80×117，而不是强制裁成 80×80。</view>
   </view>
 
   <view class="card">
-    <view class="step-title">4. MARD 色卡</view>
+    <view class="step-title">4. 出图策略</view>
+    <view class="choice-row">
+      <view wx:for="{{qualityOptions}}" wx:key="value" class="{{qualityMode == item.value ? 'choice active' : 'choice'}}" data-mode="{{item.value}}" bindtap="selectQuality">
+        {{item.label}} · {{item.hint}}
+      </view>
+    </view>
+    <view class="hint">平衡模式会限制零碎色并清理孤立豆点；高还原保留更多颜色；易制作优先减少色号。</view>
+  </view>
+
+  <view class="card">
+    <view class="step-title">5. 色卡</view>
     <view class="palette-row">
       <view>
         <view class="palette-name">{{paletteName}}</view>
-        <view class="hint">A/B/C/D/E/F/G/H/M 共 221 色，生成后可直接用于豆仓库存统计。</view>
+        <view class="hint">MARD 基础系列 A/B/C/D/E/F/G/H/M，共 221 色。</view>
       </view>
       <view class="badge">Lab / ΔE2000</view>
     </view>
   </view>
 
-  <button
-    class="primary-btn generate-btn"
-    loading="{{generating}}"
-    disabled="{{generating}}"
-    bindtap="generatePattern"
-  >
-    {{generating ? '正在匹配 MARD 色号…' : '生成 MARD 拼豆图纸'}}
+  <button class="primary-btn generate-btn" loading="{{generating}}" disabled="{{generating}}" bindtap="generatePattern">
+    {{generating ? '正在生成…' : '生成拼豆图纸'}}
   </button>
 </view>

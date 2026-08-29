@@ -4,12 +4,12 @@
   scroll-y
   enhanced
   show-scrollbar="{{false}}"
-  style="height: {{viewportSize}}px;"
+  style="height: {{viewportHeight}}px; width: {{viewportSize}}px;"
 >
   <canvas
     id="beadCanvas"
     type="2d"
     bindtap="handleTap"
-    style="width: {{canvasSize}}px; height: {{canvasSize}}px;"
+    style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
   />
 </scroll-view>

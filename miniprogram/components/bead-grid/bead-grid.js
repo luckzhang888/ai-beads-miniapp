@@ -1,38 +1,19 @@
 Component({
   properties: {
-    matrix: {
-      type: Array,
-      value: []
-    },
-    palette: {
-      type: Object,
-      value: {}
-    },
-    showCodes: {
-      type: Boolean,
-      value: false
-    },
-    showGrid: {
-      type: Boolean,
-      value: true
-    },
-    highlightCode: {
-      type: String,
-      value: ''
-    },
-    zoom: {
-      type: Number,
-      value: 1
-    },
-    interactive: {
-      type: Boolean,
-      value: false
-    }
+    matrix: { type: Array, value: [] },
+    palette: { type: Object, value: {} },
+    showCodes: { type: Boolean, value: false },
+    showGrid: { type: Boolean, value: true },
+    highlightCode: { type: String, value: '' },
+    zoom: { type: Number, value: 1 },
+    interactive: { type: Boolean, value: false }
   },
 
   data: {
-    canvasSize: 320,
-    viewportSize: 320
+    canvasWidth: 320,
+    canvasHeight: 320,
+    viewportSize: 320,
+    viewportHeight: 320
   },
 
   observers: {
@@ -42,122 +23,116 @@ Component({
   },
 
   lifetimes: {
-    ready() {
-      this.scheduleDraw()
-    },
+    ready() { this.scheduleDraw() },
     detached() {
-      if (this._drawTimer) {
-        clearTimeout(this._drawTimer)
-      }
+      if (this._drawTimer) clearTimeout(this._drawTimer)
     }
   },
 
   methods: {
     scheduleDraw() {
-      if (this._drawTimer) {
-        clearTimeout(this._drawTimer)
-      }
-      this._drawTimer = setTimeout(() => {
-        this.draw()
-      }, 30)
+      if (this._drawTimer) clearTimeout(this._drawTimer)
+      this._drawTimer = setTimeout(() => this.draw(), 30)
     },
 
     draw() {
       const matrix = this.data.matrix
-      if (!Array.isArray(matrix) || !matrix.length) {
-        return
-      }
+      if (!Array.isArray(matrix) || !matrix.length || !matrix[0] || !matrix[0].length) return
 
+      const rows = matrix.length
+      const cols = matrix[0].length
       const system = wx.getSystemInfoSync()
       const base = Math.max(280, Math.min(system.windowWidth - 24, 680))
       const zoom = Math.max(1, Math.min(Number(this.data.zoom) || 1, 3))
-      const canvasSize = Math.round(base * zoom)
+      const canvasWidth = Math.round(base * zoom)
+      const canvasHeight = Math.max(1, Math.round(canvasWidth * rows / cols))
       const viewportSize = base
+      const viewportHeight = Math.min(
+        Math.max(280, Math.round(base * 1.25)),
+        Math.max(320, Math.round((system.windowHeight || 700) * 0.62))
+      )
 
-      this.setData({
-        canvasSize,
-        viewportSize
-      }, () => {
+      this.setData({ canvasWidth, canvasHeight, viewportSize, viewportHeight }, () => {
         this.createSelectorQuery()
           .select('#beadCanvas')
           .fields({ node: true, size: true })
           .exec((result) => {
             const res = result && result[0]
-            if (!res || !res.node) {
-              return
-            }
+            if (!res || !res.node) return
             this._canvasNode = res.node
-            this.paint(res.node, res.width || canvasSize, matrix)
+            this.paint(res.node, res.width || canvasWidth, res.height || canvasHeight, matrix)
           })
       })
     },
 
-    paint(canvas, cssSize, matrix) {
-      const n = matrix.length
+    paint(canvas, cssWidth, cssHeight, matrix) {
+      const rows = matrix.length
+      const cols = matrix[0].length
       const system = wx.getSystemInfoSync()
-      const maxDpr = n >= 96 ? 1.25 : 2
+      const cells = rows * cols
+      const maxDpr = cells >= 12000 ? 1.15 : (cells >= 7000 ? 1.4 : 2)
       const dpr = Math.min(system.pixelRatio || 1, maxDpr)
-      const width = Math.max(1, Math.floor(cssSize))
+      const width = Math.max(1, Math.floor(cssWidth))
+      const height = Math.max(1, Math.floor(cssHeight))
 
       canvas.width = Math.floor(width * dpr)
-      canvas.height = Math.floor(width * dpr)
+      canvas.height = Math.floor(height * dpr)
 
       const ctx = canvas.getContext('2d')
       ctx.scale(dpr, dpr)
-      ctx.clearRect(0, 0, width, width)
+      ctx.clearRect(0, 0, width, height)
 
-      const cell = width / n
+      const cellX = width / cols
+      const cellY = height / rows
       const palette = this.data.palette || {}
       const highlight = this.data.highlightCode
 
-      for (let y = 0; y < n; y += 1) {
+      for (let y = 0; y < rows; y += 1) {
         const row = matrix[y]
-        for (let x = 0; x < row.length; x += 1) {
+        for (let x = 0; x < cols; x += 1) {
           const code = row[x]
           const color = palette[code]
           ctx.globalAlpha = highlight && code !== highlight ? 0.14 : 1
           ctx.fillStyle = color && color.hex ? color.hex : '#dddddd'
-          ctx.fillRect(x * cell, y * cell, cell + 0.5, cell + 0.5)
+          ctx.fillRect(x * cellX, y * cellY, cellX + 0.5, cellY + 0.5)
         }
       }
 
       ctx.globalAlpha = 1
 
-      if (this.data.showGrid && cell >= 2.2) {
+      if (this.data.showGrid && Math.min(cellX, cellY) >= 2.2) {
         ctx.beginPath()
         ctx.strokeStyle = 'rgba(0,0,0,0.20)'
         ctx.lineWidth = 0.5
-
-        for (let i = 0; i <= n; i += 1) {
-          const pos = Math.min(width, i * cell)
+        for (let x = 0; x <= cols; x += 1) {
+          const pos = Math.min(width, x * cellX)
           ctx.moveTo(pos, 0)
-          ctx.lineTo(pos, width)
+          ctx.lineTo(pos, height)
+        }
+        for (let y = 0; y <= rows; y += 1) {
+          const pos = Math.min(height, y * cellY)
           ctx.moveTo(0, pos)
           ctx.lineTo(width, pos)
         }
         ctx.stroke()
       }
 
-      if (this.data.showCodes && cell >= 13) {
+      if (this.data.showCodes && Math.min(cellX, cellY) >= 13) {
+        const cell = Math.min(cellX, cellY)
         const fontSize = Math.max(7, Math.min(11, cell * 0.33))
         ctx.font = fontSize + 'px sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
 
-        for (let y = 0; y < n; y += 1) {
-          for (let x = 0; x < matrix[y].length; x += 1) {
+        for (let y = 0; y < rows; y += 1) {
+          for (let x = 0; x < cols; x += 1) {
             const code = matrix[y][x]
             const color = palette[code]
             const rgb = color && color.rgb ? color.rgb : [220, 220, 220]
             const luminance = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114
             ctx.globalAlpha = highlight && code !== highlight ? 0.2 : 0.92
             ctx.fillStyle = luminance > 150 ? '#111111' : '#ffffff'
-            ctx.fillText(
-              code,
-              x * cell + cell / 2,
-              y * cell + cell / 2,
-              cell * 0.94
-            )
+            ctx.fillText(code, x * cellX + cellX / 2, y * cellY + cellY / 2, cellX * 0.94)
           }
         }
         ctx.globalAlpha = 1
@@ -165,9 +140,8 @@ Component({
     },
 
     handleTap(event) {
-      if (!this.data.interactive || !this.data.matrix.length) {
-        return
-      }
+      const matrix = this.data.matrix
+      if (!this.data.interactive || !matrix.length || !matrix[0] || !matrix[0].length) return
 
       const touch = event.changedTouches && event.changedTouches[0]
       const clientX = touch ? touch.clientX : event.detail.x
@@ -178,25 +152,17 @@ Component({
         .boundingClientRect()
         .exec((result) => {
           const rect = result && result[0]
-          if (!rect || typeof clientX !== 'number' || typeof clientY !== 'number') {
-            return
-          }
+          if (!rect || typeof clientX !== 'number' || typeof clientY !== 'number') return
 
           const localX = clientX - rect.left
           const localY = clientY - rect.top
-          const n = this.data.matrix.length
-          const x = Math.floor((localX / rect.width) * n)
-          const y = Math.floor((localY / rect.height) * n)
+          const rows = matrix.length
+          const cols = matrix[0].length
+          const x = Math.floor((localX / rect.width) * cols)
+          const y = Math.floor((localY / rect.height) * rows)
 
-          if (x < 0 || y < 0 || x >= n || y >= n) {
-            return
-          }
-
-          this.triggerEvent('celltap', {
-            x,
-            y,
-            code: this.data.matrix[y][x]
-          })
+          if (x < 0 || y < 0 || x >= cols || y >= rows) return
+          this.triggerEvent('celltap', { x, y, code: matrix[y][x] })
         })
     },
 

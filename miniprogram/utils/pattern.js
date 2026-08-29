@@ -9,6 +9,12 @@ function cloneMatrix(matrix) {
   return Array.isArray(matrix) ? matrix.map((row) => row.slice()) : []
 }
 
+function getDimensions(matrix) {
+  const height = Array.isArray(matrix) ? matrix.length : 0
+  const width = height && Array.isArray(matrix[0]) ? matrix[0].length : 0
+  return { width, height }
+}
+
 function countMatrix(matrix) {
   const counts = Object.create(null)
   matrix.forEach((row) => {
@@ -27,14 +33,18 @@ function createPattern(options) {
   const matrix = cloneMatrix(options.matrix || [])
   const palette = options.palette || mardPalette
   const stats = options.stats || rebuildStats(matrix, palette)
+  const dims = getDimensions(matrix)
 
   return {
     id: options.id || ('pattern-' + Date.now()),
     name: options.name || ('拼豆图纸 ' + new Date().toLocaleString()),
     createdAt: options.createdAt || Date.now(),
     updatedAt: Date.now(),
-    size: matrix.length,
+    size: Math.min(dims.width, dims.height),
+    width: Number(options.width) || dims.width,
+    height: Number(options.height) || dims.height,
     brand: options.brand || 'MARD',
+    qualityMode: options.qualityMode || 'balanced',
     matrix,
     stats,
     completedCount: Number(options.completedCount || 0)
@@ -50,9 +60,7 @@ function createDemoPattern(size) {
     for (let x = 0; x < n; x += 1) {
       const nx = (x / (n - 1)) * 2 - 1
       const ny = ((n - 1 - y) / (n - 1)) * 2 - 1
-      const heart = Math.pow(nx * nx + ny * ny - 0.72, 3) -
-        nx * nx * Math.pow(ny, 3)
-
+      const heart = Math.pow(nx * nx + ny * ny - 0.72, 3) - nx * nx * Math.pow(ny, 3)
       let code = 'D26'
       if (heart <= 0) code = 'F5'
       if (x < 2 || y < 2 || x >= n - 2 || y >= n - 2) code = 'H2'
@@ -83,16 +91,23 @@ function getSavedPatterns() {
   return Array.isArray(patterns) ? patterns : []
 }
 
-function savePattern(pattern, palette) {
-  const patterns = getSavedPatterns()
-  const index = patterns.findIndex((item) => item.id === pattern.id)
-  const matrix = cloneMatrix(pattern.matrix)
-  const next = Object.assign({}, pattern, {
+function normalizePattern(pattern, palette) {
+  const matrix = cloneMatrix(pattern.matrix || [])
+  const dims = getDimensions(matrix)
+  return Object.assign({}, pattern, {
     matrix,
-    size: matrix.length,
+    size: Math.min(dims.width, dims.height),
+    width: dims.width,
+    height: dims.height,
     stats: rebuildStats(matrix, palette || mardPalette),
     updatedAt: Date.now()
   })
+}
+
+function savePattern(pattern, palette) {
+  const patterns = getSavedPatterns()
+  const index = patterns.findIndex((item) => item.id === pattern.id)
+  const next = normalizePattern(pattern, palette)
 
   if (index >= 0) patterns.splice(index, 1)
   patterns.unshift(next)
@@ -130,6 +145,7 @@ function duplicatePattern(id) {
     name: pattern.name + ' 副本',
     matrix: pattern.matrix,
     brand: pattern.brand || 'MARD',
+    qualityMode: pattern.qualityMode || 'balanced',
     completedCount: 0
   }), mardPalette)
 }
@@ -144,12 +160,14 @@ function mirrorVertical(matrix) {
 
 function rotate90(matrix) {
   const source = cloneMatrix(matrix)
-  const n = source.length
-  if (!n) return []
-  const result = Array.from({ length: n }, () => new Array(n))
-  for (let y = 0; y < n; y += 1) {
-    for (let x = 0; x < n; x += 1) {
-      result[x][n - 1 - y] = source[y][x]
+  const height = source.length
+  const width = height && source[0] ? source[0].length : 0
+  if (!height || !width) return []
+
+  const result = Array.from({ length: width }, () => new Array(height))
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      result[x][height - 1 - y] = source[y][x]
     }
   }
   return result
@@ -200,6 +218,7 @@ function floodFill(matrix, x, y, toCode) {
 
 module.exports = {
   cloneMatrix,
+  getDimensions,
   countMatrix,
   rebuildStats,
   createPattern,
