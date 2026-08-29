@@ -1,4 +1,4 @@
-const demoPalette = require('../../data/colors/demo')
+const mardPalette = require('../../data/colors/mard')
 const { createPaletteMap } = require('../../utils/color-match')
 const {
   cloneMatrix,
@@ -20,10 +20,10 @@ Page({
   data: {
     pattern: null,
     matrix: [],
-    palette: demoPalette,
-    paletteMap: createPaletteMap(demoPalette),
-    selectedCode: demoPalette[0].code,
-    selectedHex: demoPalette[0].hex,
+    palette: mardPalette,
+    paletteMap: createPaletteMap(mardPalette),
+    selectedCode: mardPalette[0].code,
+    selectedHex: mardPalette[0].hex,
     tool: 'paint',
     toolName: '画笔',
     zoom: 1,
@@ -108,9 +108,7 @@ Page({
     const selected = this.data.selectedCode
     const current = detail.code
 
-    if (!selected || !Number.isFinite(x) || !Number.isFinite(y)) {
-      return
-    }
+    if (!selected || !Number.isFinite(x) || !Number.isFinite(y)) return
 
     let next
     if (this.data.tool === 'fill') {
@@ -121,18 +119,13 @@ Page({
       next = setCell(this.data.matrix, x, y, selected)
     }
 
-    if (current === selected && this.data.tool !== 'replace') {
-      return
-    }
-
+    if (current === selected && this.data.tool !== 'replace') return
     this.applyMatrix(next)
   },
 
   applyMatrix(next) {
     this.undoStack.push(cloneMatrix(this.data.matrix))
-    if (this.undoStack.length > HISTORY_LIMIT) {
-      this.undoStack.shift()
-    }
+    if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift()
     this.redoStack = []
     this.setData({
       matrix: next,
@@ -143,9 +136,7 @@ Page({
   },
 
   undo() {
-    if (!this.undoStack.length) {
-      return
-    }
+    if (!this.undoStack.length) return
     this.redoStack.push(cloneMatrix(this.data.matrix))
     const matrix = this.undoStack.pop()
     this.setData({
@@ -157,9 +148,7 @@ Page({
   },
 
   redo() {
-    if (!this.redoStack.length) {
-      return
-    }
+    if (!this.redoStack.length) return
     this.undoStack.push(cloneMatrix(this.data.matrix))
     const matrix = this.redoStack.pop()
     this.setData({
@@ -187,20 +176,14 @@ Page({
   },
 
   persist(showToast) {
-    if (!this.data.pattern) {
-      return null
-    }
+    if (!this.data.pattern) return null
     const saved = savePattern(Object.assign({}, this.data.pattern, {
-      matrix: this.data.matrix
-    }), demoPalette)
+      matrix: this.data.matrix,
+      brand: 'MARD'
+    }), mardPalette)
     setCurrentPattern(saved)
-    this.setData({
-      pattern: saved,
-      dirty: false
-    })
-    if (showToast) {
-      wx.showToast({ title: '图纸已保存', icon: 'success' })
-    }
+    this.setData({ pattern: saved, dirty: false })
+    if (showToast) wx.showToast({ title: '图纸已保存', icon: 'success' })
     return saved
   }
 })
