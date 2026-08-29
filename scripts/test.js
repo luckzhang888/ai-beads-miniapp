@@ -66,5 +66,22 @@ inventoryUtils.setStock('B7', 12)
 assert.strictEqual(inventoryUtils.consumeStats([{ code: 'B7', required: 8 }]).ok, true)
 assert.strictEqual(inventoryUtils.getInventory().B7, 4)
 
+let beadGridDefinition
+global.Component = (definition) => { beadGridDefinition = definition }
+require('../miniprogram/components/bead-grid/bead-grid')
+delete global.Component
+const zoomEvents = []
+const beadGrid = Object.assign({
+  data: { compact: false, locked: false, zoom: 2, maxZoom: 6 },
+  triggerEvent(name, detail) { zoomEvents.push({ name, detail }) }
+}, beadGridDefinition.methods)
+beadGrid.handleTouchStart({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 100, clientY: 0 }] })
+beadGrid.handleTouchMove({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 150, clientY: 0 }] })
+assert.deepStrictEqual(zoomEvents[0], { name: 'zoomchange', detail: { zoom: 3 } })
+beadGrid.handleTouchMove({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 1000, clientY: 0 }] })
+assert.strictEqual(zoomEvents[1].detail.zoom, 6)
+beadGrid.handleTouchEnd({ touches: [] })
+assert.strictEqual(beadGrid._pinching, false)
+
 delete global.wx
-console.log('All unit tests passed: palette, color matching, image sizing, pattern persistence and inventory.')
+console.log('All unit tests passed: palette, color matching, image sizing, pattern persistence, inventory and pinch zoom.')

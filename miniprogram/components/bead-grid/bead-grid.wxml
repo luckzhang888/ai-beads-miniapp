@@ -10,6 +10,10 @@
     id="beadCanvas"
     type="2d"
     bindtap="handleTap"
+    bindtouchstart="handleTouchStart"
+    bindtouchmove="handleTouchMove"
+    bindtouchend="handleTouchEnd"
+    bindtouchcancel="handleTouchEnd"
     style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
   />
 </scroll-view>

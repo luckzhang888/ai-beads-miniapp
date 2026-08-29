@@ -10,6 +10,17 @@ const {
   makeShareCode
 } = require('../../utils/pattern')
 
+const MIN_ZOOM = 1
+const MAX_ZOOM = 6
+
+function recommendedZoom(pattern) {
+  const system = wx.getSystemInfoSync()
+  const viewport = Math.max(280, Math.min(Number(system.windowWidth || 375) - 24, 680))
+  const columns = Math.max(1, Number(pattern && pattern.width) || 1)
+  const target = columns * 10 / viewport
+  return Math.max(1.5, Math.min(4, Math.ceil(target * 2) / 2))
+}
+
 Page({
   data: {
     pattern: null,
@@ -63,13 +74,18 @@ Page({
     const view = Object.assign({}, pattern, {
       status: pattern.status || (Number(pattern.completedCount || 0) > 0 ? '已拼' : '待拼')
     })
-    this.setData({
+    const changes = {
       pattern: view,
       displayMatrix: this.data.mirrored ? mirrorHorizontal(pattern.matrix) : pattern.matrix,
       stats,
       totalMissing,
       progress
-    }, () => {
+    }
+    if (!this.hasInitialZoom) {
+      changes.zoom = recommendedZoom(pattern)
+      this.hasInitialZoom = true
+    }
+    this.setData(changes, () => {
       this.updateWorkButton()
       if (this.autoExport) {
         this.autoExport = false
@@ -101,11 +117,17 @@ Page({
   },
 
   zoomIn() {
-    this.setData({ zoom: Math.min(3, Math.round((this.data.zoom + 0.5) * 10) / 10) })
+    this.setData({ zoom: Math.min(MAX_ZOOM, Math.round((this.data.zoom + 0.5) * 20) / 20) })
   },
 
   zoomOut() {
-    this.setData({ zoom: Math.max(1, Math.round((this.data.zoom - 0.5) * 10) / 10) })
+    this.setData({ zoom: Math.max(MIN_ZOOM, Math.round((this.data.zoom - 0.5) * 20) / 20) })
+  },
+
+  handleZoomChange(event) {
+    const value = event.detail && Number(event.detail.zoom)
+    if (!Number.isFinite(value)) return
+    this.setData({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value)) })
   },
 
   selectColor(event) {
@@ -165,12 +187,13 @@ Page({
   },
 
   resetView() {
+    const zoom = recommendedZoom(this.data.pattern)
     this.setData({
       highlightCode: '',
       working: false,
       mirrored: false,
       locked: false,
-      zoom: 1.5
+      zoom
     }, () => {
       this.setPattern(this.data.pattern)
       this.updateWorkButton()

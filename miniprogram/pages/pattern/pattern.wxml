@@ -27,11 +27,14 @@
       major-grid="{{majorGrid}}"
       highlight-code="{{highlightCode}}"
       locked="{{locked}}"
+      max-zoom="{{6}}"
       interactive="{{true}}"
       bind:celltap="handleCellTap"
+      bind:zoomchange="handleZoomChange"
     />
   </view>
 
+  <view class="gesture-hint">双指缩放 · 单指拖动 · 放大后显示色号</view>
   <view class="zoom-control"><view bindtap="zoomIn">＋</view><text>{{zoom}}×</text><view bindtap="zoomOut">－</view></view>
   <button class="work-button" bindtap="toggleWorking">{{workButtonText}}</button>
 

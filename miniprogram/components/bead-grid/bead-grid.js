@@ -10,7 +10,8 @@ Component({
     majorGrid: { type: Boolean, value: false },
     compact: { type: Boolean, value: false },
     previewSize: { type: Number, value: 148 },
-    locked: { type: Boolean, value: false }
+    locked: { type: Boolean, value: false },
+    maxZoom: { type: Number, value: 6 }
   },
 
   data: {
@@ -39,6 +40,44 @@ Component({
       this._drawTimer = setTimeout(() => this.draw(), 30)
     },
 
+    touchDistance(touches) {
+      if (!touches || touches.length < 2) return 0
+      const first = touches[0]
+      const second = touches[1]
+      const dx = Number(first.clientX) - Number(second.clientX)
+      const dy = Number(first.clientY) - Number(second.clientY)
+      return Math.sqrt(dx * dx + dy * dy)
+    },
+
+    handleTouchStart(event) {
+      if (this.data.compact || this.data.locked || !event.touches || event.touches.length !== 2) return
+      const distance = this.touchDistance(event.touches)
+      if (!distance) return
+      this._pinching = true
+      this._pinchStartDistance = distance
+      this._pinchStartZoom = Number(this.data.zoom) || 1
+      this._lastPinchZoom = this._pinchStartZoom
+    },
+
+    handleTouchMove(event) {
+      if (!this._pinching || !event.touches || event.touches.length !== 2) return
+      const distance = this.touchDistance(event.touches)
+      if (!distance || !this._pinchStartDistance) return
+      const maxZoom = Math.max(1, Number(this.data.maxZoom) || 6)
+      const rawZoom = this._pinchStartZoom * distance / this._pinchStartDistance
+      const nextZoom = Math.max(1, Math.min(maxZoom, Math.round(rawZoom * 20) / 20))
+      if (Math.abs(nextZoom - this._lastPinchZoom) < 0.05) return
+      this._lastPinchZoom = nextZoom
+      this.triggerEvent('zoomchange', { zoom: nextZoom })
+    },
+
+    handleTouchEnd(event) {
+      if (!event.touches || event.touches.length < 2) {
+        this._pinching = false
+        this._pinchStartDistance = 0
+      }
+    },
+
     draw() {
       const matrix = this.data.matrix
       if (!Array.isArray(matrix) || !matrix.length || !matrix[0] || !matrix[0].length) return
@@ -49,7 +88,8 @@ Component({
       const base = this.data.compact
         ? Math.max(88, Number(this.data.previewSize) || 148)
         : Math.max(280, Math.min(system.windowWidth - 24, 680))
-      const zoom = this.data.compact ? 1 : Math.max(1, Math.min(Number(this.data.zoom) || 1, 3))
+      const maxZoom = Math.max(1, Number(this.data.maxZoom) || 6)
+      const zoom = this.data.compact ? 1 : Math.max(1, Math.min(Number(this.data.zoom) || 1, maxZoom))
       const canvasWidth = Math.round(base * zoom)
       const canvasHeight = Math.max(1, Math.round(canvasWidth * rows / cols))
       const viewportSize = base
@@ -142,10 +182,10 @@ Component({
         }
       }
 
-      if (this.data.showCodes && Math.min(cellX, cellY) >= 13) {
+      if (this.data.showCodes && Math.min(cellX, cellY) >= 8) {
         const cell = Math.min(cellX, cellY)
-        const fontSize = Math.max(7, Math.min(11, cell * 0.33))
-        ctx.font = fontSize + 'px sans-serif'
+        const fontSize = Math.max(4.5, Math.min(12, cell * 0.48))
+        ctx.font = '600 ' + fontSize + 'px sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
 
