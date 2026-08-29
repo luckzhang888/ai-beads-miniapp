@@ -1,4 +1,4 @@
-const { rgbToLab, deltaE76 } = require('./lab')
+const { rgbToLab, deltaE2000 } = require('./lab')
 
 function preparePalette(colors) {
   return colors.map((item) => {
@@ -14,7 +14,7 @@ function findNearestColor(rgb, palette) {
   let bestDistance = Infinity
 
   for (let i = 0; i < palette.length; i += 1) {
-    const distance = deltaE76(lab, palette[i].lab)
+    const distance = deltaE2000(lab, palette[i].lab)
     if (distance < bestDistance) {
       bestDistance = distance
       best = palette[i]
@@ -46,6 +46,7 @@ function matchImageData(imageData, width, height, rawPalette) {
         b = 255
       }
 
+      // 5 bit/channel cache keeps conversion fast while retaining enough precision.
       const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)
       let color = cache[key]
       if (!color) {
@@ -79,6 +80,7 @@ function buildStats(counts, palette) {
         code,
         name: color ? color.name : code,
         brand: color ? color.brand : '',
+        series: color ? color.series : code.replace(/[0-9]/g, ''),
         rgb: color ? color.rgb : [0, 0, 0],
         hex: color ? color.hex : '#000000',
         required: counts[code]
