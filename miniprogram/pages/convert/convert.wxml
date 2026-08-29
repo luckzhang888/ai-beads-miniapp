@@ -37,9 +37,7 @@
         class="{{optimizePreset == item.value ? 'choice active' : 'choice'}}"
         data-preset="{{item.value}}"
         bindtap="selectOptimize"
-      >
-        {{item.label}}
-      </view>
+      >{{item.label}}</view>
     </view>
     <view class="hint">增强会略微提高对比度和饱和度，更适合轮廓明显的拼豆图。</view>
   </view>
@@ -59,19 +57,17 @@
         <view class="recommend-tag" wx:if="{{recommendedSize == item}}">推荐</view>
       </view>
     </view>
-    <view class="hint">
-      尺寸越大细节越多，同时处理和制作需要的拼豆数量也越多。
-    </view>
+    <view class="hint">尺寸越大细节越多，同时处理和制作需要的拼豆数量也越多。</view>
   </view>
 
   <view class="card">
-    <view class="step-title">4. 色卡</view>
+    <view class="step-title">4. MARD 色卡</view>
     <view class="palette-row">
       <view>
         <view class="palette-name">{{paletteName}}</view>
-        <view class="hint">当前用于验证完整流程，后续替换真实品牌色卡。</view>
+        <view class="hint">A/B/C/D/E/F/G/H/M 共 221 色，生成后可直接用于豆仓库存统计。</view>
       </view>
-      <view class="badge">Lab / ΔE76</view>
+      <view class="badge">Lab / ΔE2000</view>
     </view>
   </view>
 
@@ -81,6 +77,6 @@
     disabled="{{generating}}"
     bindtap="generatePattern"
   >
-    {{generating ? '正在生成…' : '生成拼豆图纸'}}
+    {{generating ? '正在匹配 MARD 色号…' : '生成 MARD 拼豆图纸'}}
   </button>
 </view>
