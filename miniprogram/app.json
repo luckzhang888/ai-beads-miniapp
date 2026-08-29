@@ -6,11 +6,13 @@
     "pages/inventory/inventory"
   ],
   "window": {
-    "navigationBarTitleText": "AI豆仓",
+    "navigationBarTitleText": "AI 豆仓",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f6f7f9"
+    "backgroundColor": "#f5f6f8",
+    "backgroundTextStyle": "light"
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
 }

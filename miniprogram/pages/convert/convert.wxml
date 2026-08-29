@@ -1,20 +1,60 @@
 <view class="container">
   <view class="card">
-    <button bindtap="chooseImage">选择图片</button>
-    <image wx:if="{{imagePath}}" class="preview" src="{{imagePath}}" mode="aspectFit" />
+    <view class="step-title">1. 选择图片</view>
+
+    <view class="image-box" bindtap="chooseImage">
+      <image
+        wx:if="{{imagePath}}"
+        class="preview-image"
+        src="{{imagePath}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="image-placeholder">
+        <view class="plus">＋</view>
+        <view>从相册或相机选择图片</view>
+      </view>
+    </view>
+
+    <button class="secondary-btn" bindtap="chooseImage">
+      {{imagePath ? '重新选择图片' : '选择图片'}}
+    </button>
   </view>
 
   <view class="card">
-    <view class="label">拼豆尺寸</view>
-    <picker mode="selector" range="{{sizes}}" value="{{sizeIndex}}" bindchange="onSizeChange">
-      <view class="picker">{{sizes[sizeIndex]}} × {{sizes[sizeIndex]}}</view>
-    </picker>
+    <view class="step-title">2. 选择拼豆尺寸</view>
+    <view class="size-list">
+      <view
+        wx:for="{{sizes}}"
+        wx:key="*this"
+        class="{{selectedSize == item ? 'size-item active' : 'size-item'}}"
+        data-size="{{item}}"
+        bindtap="selectSize"
+      >
+        {{item}}×{{item}}
+      </view>
+    </view>
+    <view class="hint">
+      尺寸越大细节越多，同时处理和制作需要的拼豆数量也越多。
+    </view>
   </view>
 
   <view class="card">
-    <view class="label">色卡</view>
-    <view>DEMO 演示色卡</view>
+    <view class="step-title">3. 色卡</view>
+    <view class="palette-row">
+      <view>
+        <view class="palette-name">{{paletteName}}</view>
+        <view class="hint">当前用于验证完整流程，后续替换真实品牌色卡。</view>
+      </view>
+      <view class="badge">ΔE76</view>
+    </view>
   </view>
 
-  <button class="primary-button" bindtap="generate">生成图纸</button>
+  <button
+    class="primary-btn generate-btn"
+    loading="{{generating}}"
+    disabled="{{generating}}"
+    bindtap="generatePattern"
+  >
+    {{generating ? '正在生成…' : '生成拼豆图纸'}}
+  </button>
 </view>

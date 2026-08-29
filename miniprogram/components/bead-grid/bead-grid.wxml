@@ -1,1 +1,12 @@
-<canvas type="2d" id="beadCanvas" class="bead-canvas"></canvas>
+<scroll-view
+  class="grid-scroll"
+  scroll-x
+  scroll-y
+  style="height: {{viewportSize}}px;"
+>
+  <canvas
+    id="beadCanvas"
+    type="2d"
+    style="width: {{canvasSize}}px; height: {{canvasSize}}px;"
+  />
+</scroll-view>

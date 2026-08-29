@@ -36,9 +36,9 @@ jobs:
       - name: Write WeChat private key
         if: steps.wx-ci.outputs.enabled == 'true'
         shell: bash
-        run: printf '%s' "$WX_PRIVATE_KEY" > private.key
         env:
           WX_PRIVATE_KEY: ${{ secrets.WX_PRIVATE_KEY }}
+        run: printf '%s' "$WX_PRIVATE_KEY" > private.key
 
       - name: Generate preview QR code
         if: steps.wx-ci.outputs.enabled == 'true'
@@ -52,3 +52,5 @@ jobs:
         with:
           name: wechat-preview-qrcode
           path: preview-qrcode.png
+          if-no-files-found: error
+          retention-days: 7

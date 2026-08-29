@@ -1,4 +1,9 @@
 {
-  "desc": "AI豆仓 sitemap",
-  "rules": [{ "action": "allow", "page": "*" }]
+  "desc": "AI 豆仓",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
 }

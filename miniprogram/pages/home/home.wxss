@@ -1,5 +1,38 @@
-.hero { margin-top: 20rpx; }
-.title { font-size: 48rpx; font-weight: 700; margin-bottom: 16rpx; }
-.subtitle { color: #667085; line-height: 1.7; }
-.grid { display: flex; gap: 20rpx; margin-top: 24rpx; }
-.entry { flex: 1; text-align: center; }
+.hero {
+  padding-top: 34rpx;
+}
+
+.pattern-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 0;
+  border-top: 1rpx solid #eef0f2;
+}
+
+.pattern-item:first-of-type {
+  border-top: 0;
+}
+
+.pattern-name {
+  font-size: 29rpx;
+  font-weight: 600;
+}
+
+.pattern-meta {
+  margin-top: 6rpx;
+  color: #8a919f;
+  font-size: 24rpx;
+}
+
+.arrow {
+  color: #a0a7b3;
+  font-size: 46rpx;
+}
+
+.notice {
+  padding: 8rpx 8rpx 32rpx;
+  color: #8a919f;
+  font-size: 23rpx;
+  line-height: 1.55;
+}

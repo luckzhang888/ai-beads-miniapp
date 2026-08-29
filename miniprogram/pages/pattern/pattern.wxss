@@ -1,2 +1,99 @@
-.title { font-size: 36rpx; font-weight: 600; margin-bottom: 20rpx; }
-.placeholder { height: 500rpx; display: flex; align-items: center; justify-content: center; background: #eef0f3; color: #667085; text-align: center; }
+.pattern-head,
+.stats-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.meta {
+  color: #8a919f;
+  font-size: 23rpx;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12rpx;
+  margin: 24rpx 0 20rpx;
+}
+
+.toolbar button {
+  margin: 0;
+}
+
+.zoom-text {
+  min-width: 68rpx;
+  text-align: center;
+  color: #59606b;
+  font-size: 24rpx;
+}
+
+.highlight-tip {
+  margin-bottom: 16rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 14rpx;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 24rpx;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(3, 0.72fr);
+  align-items: center;
+  min-height: 86rpx;
+  border-top: 1rpx solid #eef0f2;
+  font-size: 25rpx;
+  text-align: center;
+}
+
+.stat-row.active {
+  background: #eff6ff;
+}
+
+.stat-header {
+  min-height: 58rpx;
+  color: #8a919f;
+  font-size: 22rpx;
+}
+
+.stat-name {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  min-width: 0;
+  text-align: left;
+}
+
+.color-dot {
+  flex: 0 0 auto;
+  width: 34rpx;
+  height: 34rpx;
+  border: 1rpx solid rgba(0, 0, 0, 0.14);
+  border-radius: 8rpx;
+}
+
+.code {
+  font-weight: 700;
+}
+
+.color-name {
+  margin-top: 2rpx;
+  overflow: hidden;
+  color: #8a919f;
+  font-size: 21rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.missing {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.enough {
+  color: #16803a;
+  font-weight: 600;
+}

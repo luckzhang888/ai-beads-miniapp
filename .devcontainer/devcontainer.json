@@ -1,7 +1,7 @@
 {
   "name": "AI Beads Miniapp",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
-  "postCreateCommand": "npm install",
+  "postCreateCommand": "npm install && npm run check",
   "customizations": {
     "vscode": {
       "extensions": [

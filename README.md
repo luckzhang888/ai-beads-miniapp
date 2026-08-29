@@ -1,64 +1,105 @@
 # AI 豆仓微信小程序
 
-微信原生小程序 MVP，目标闭环：
+微信原生小程序 MVP。当前 `develop` 分支已实现第一条完整闭环：
 
-> 图片导入 → 像素化 → 色号匹配 → 拼豆图纸 → 数量统计 → 库存缺口
+> 图片导入 → 中心裁剪/像素化 → RGB 转 Lab → ΔE76 色差匹配 → 拼豆格子图 → 色号统计 → 本地库存 → 缺豆计算
 
-## 当前阶段
+## 已实现
 
-这是第一版项目框架，已经包含：
+- 微信原生 WXML / WXSS / JavaScript
+- 图片从相册或相机导入
+- 32×32 / 48×48 / 64×64 / 128×128
+- Canvas 2D 离屏图片缩放与像素读取
+- RGB → XYZ → CIELAB
+- ΔE76 最近色匹配
+- DEMO 独立色卡
+- Canvas 拼豆图
+- 1× / 1.5× / 2× 查看
+- 网格开关
+- 色号显示（格子足够大时）
+- 单色高亮
+- 水平镜像
+- 颜色数量统计
+- 本地库存增减和直接修改
+- 自动计算库存、缺少、剩余
+- 自动保存最近 20 张图纸
+- 无图片也可用“快速体验示例图”验证界面
 
-- 微信原生小程序目录
-- 首页、创建图纸、图纸、库存页面骨架
-- Canvas 拼豆组件骨架
-- 独立色卡目录
-- 图片/颜色/Lab/库存算法模块目录
-- GitHub Codespaces 配置
-- GitHub Actions 基础检查
-- miniprogram-ci 预览流程
-- GitHub Secrets 私钥方案
+> 注意：仓库里的 DEMO 色卡仅用于验证产品流程，不代表任何拼豆品牌的官方色号。
 
 ## Codespaces
 
-在 GitHub 仓库页面点击：
+仓库页面：
 
 `Code -> Codespaces -> Create codespace`
 
-容器创建后会自动执行：
+创建后自动执行：
 
 ```bash
 npm install
-```
-
-项目结构检查：
-
-```bash
 npm run check
 ```
 
-## 微信配置
+## 本地/云端静态检查
 
-`project.config.json` 当前使用 `touristappid`，用于框架占位。
+```bash
+npm install
+npm run check
+```
 
-正式 CI 需要在 GitHub 仓库 Secrets 中配置：
+## 微信真机预览
+
+项目使用 `miniprogram-ci`。需要在微信公众平台的小程序后台取得：
+
+1. 小程序 AppID
+2. 代码上传密钥
+
+然后在 GitHub 仓库 Settings → Secrets and variables → Actions 中增加：
 
 - `WX_APPID`
 - `WX_PRIVATE_KEY`
 
-私钥禁止提交到 Git。
+把代码推到 `develop` 后，GitHub Actions 的 `wechat-preview` 会：
 
-## 分支建议
+1. 安装依赖
+2. 临时写入上传私钥
+3. 调用 `miniprogram-ci preview`
+4. 生成 `preview-qrcode.png`
+5. 上传为名为 `wechat-preview-qrcode` 的 Actions Artifact
 
-- `main`：稳定版本
-- `develop`：日常开发、自动预览
+下载 Artifact 后，用具有该小程序开发/体验权限的微信扫码即可打开。
+
+私钥文件不会提交到 Git。
+
+## 项目结构
+
+```text
+miniprogram/
+├── pages/
+│   ├── home/
+│   ├── convert/
+│   ├── pattern/
+│   └── inventory/
+├── components/
+│   └── bead-grid/
+├── data/
+│   └── colors/
+│       └── demo.js
+└── utils/
+    ├── image.js
+    ├── lab.js
+    ├── color-match.js
+    ├── inventory.js
+    └── pattern.js
+```
 
 ## 下一阶段
 
-1. Canvas 读取图片像素
-2. RGB -> XYZ -> Lab
-3. ΔE76 色差匹配
-4. 生成二维色号矩阵
-5. Canvas 绘制拼豆网格
-6. 色号数量统计
-7. 本地库存 CRUD
-8. 缺豆数量计算
+- 替换真实品牌色卡
+- ΔE2000
+- 自定义裁剪区域
+- 颜色替换
+- 撤销/重做
+- 图纸导出
+- 云同步
+- AI 抠图与图像优化

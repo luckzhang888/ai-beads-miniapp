@@ -4,4 +4,5 @@ private.key
 .env
 secrets/
 preview-qrcode.png
+project.private.config.json
 .DS_Store

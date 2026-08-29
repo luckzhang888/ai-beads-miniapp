@@ -1,6 +1,62 @@
 <view class="container">
-  <view class="card" wx:for="{{items}}" wx:key="code">
-    <view>{{item.code}} · {{item.name}}</view>
-    <view>库存：{{item.count}}</view>
+  <view class="card intro">
+    <view class="section-title">我的库存</view>
+    <view class="subtitle">
+      当前使用 DEMO 色卡。库存保存在微信小程序本地，不需要登录。
+    </view>
+    <input
+      class="search"
+      placeholder="搜索色号或颜色名称"
+      value="{{query}}"
+      bindinput="onSearchInput"
+    />
+  </view>
+
+  <view class="inventory-list">
+    <view class="inventory-row" wx:for="{{rows}}" wx:key="code">
+      <view class="color-info">
+        <view class="color-dot" style="background: {{item.hex}};"></view>
+        <view>
+          <view class="code">{{item.code}}</view>
+          <view class="name">{{item.name}}</view>
+        </view>
+      </view>
+
+      <view class="stock-editor">
+        <button
+          size="mini"
+          data-code="{{item.code}}"
+          data-delta="-10"
+          bindtap="adjust"
+        >-10</button>
+        <button
+          size="mini"
+          data-code="{{item.code}}"
+          data-delta="-1"
+          bindtap="adjust"
+        >-1</button>
+
+        <input
+          class="stock-input"
+          type="number"
+          value="{{item.stock}}"
+          data-code="{{item.code}}"
+          bindblur="setExactStock"
+        />
+
+        <button
+          size="mini"
+          data-code="{{item.code}}"
+          data-delta="1"
+          bindtap="adjust"
+        >+1</button>
+        <button
+          size="mini"
+          data-code="{{item.code}}"
+          data-delta="10"
+          bindtap="adjust"
+        >+10</button>
+      </view>
+    </view>
   </view>
 </view>

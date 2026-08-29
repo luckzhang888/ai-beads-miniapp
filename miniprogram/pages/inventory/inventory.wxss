@@ -1,1 +1,80 @@
-/* MVP inventory styles */
+.intro {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.search {
+  box-sizing: border-box;
+  margin-top: 22rpx;
+  height: 82rpx;
+  padding: 0 22rpx;
+  border: 1rpx solid #dfe3e8;
+  border-radius: 16rpx;
+  background: #f8f9fb;
+  font-size: 28rpx;
+}
+
+.inventory-list {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1rpx solid #e8eaed;
+  border-radius: 24rpx;
+}
+
+.inventory-row {
+  padding: 22rpx;
+  border-top: 1rpx solid #eef0f2;
+}
+
+.inventory-row:first-child {
+  border-top: 0;
+}
+
+.color-info {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.color-dot {
+  width: 42rpx;
+  height: 42rpx;
+  border: 1rpx solid rgba(0, 0, 0, 0.15);
+  border-radius: 9rpx;
+}
+
+.code {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.name {
+  margin-top: 2rpx;
+  color: #8a919f;
+  font-size: 22rpx;
+}
+
+.stock-editor {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 18rpx;
+}
+
+.stock-editor button {
+  flex: 0 0 auto;
+  min-width: 76rpx;
+  margin: 0;
+  padding: 0 12rpx;
+}
+
+.stock-input {
+  flex: 1;
+  min-width: 90rpx;
+  height: 58rpx;
+  border: 1rpx solid #dfe3e8;
+  border-radius: 10rpx;
+  text-align: center;
+  font-size: 26rpx;
+}
