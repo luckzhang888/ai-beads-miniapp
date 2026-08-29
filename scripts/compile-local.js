@@ -53,6 +53,7 @@ async function run() {
     return sum + (Buffer.isBuffer(value) ? value.length : Buffer.byteLength(String(value)))
   }, 0)
   console.log('Local Mini Program compile passed: ' + entries.length + ' outputs, ' + bytes + ' bytes.')
+  process.exit(0)
 }
 
 run().catch((error) => {
