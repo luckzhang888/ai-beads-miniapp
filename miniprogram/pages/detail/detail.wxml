@@ -1,0 +1,65 @@
+<view wx:if="{{pattern}}" class="detail-page">
+  <view class="preview-card">
+    <view class="detail-tabs">
+      <view class="detail-tab {{tab === 'main' ? 'active' : ''}}" data-tab="main" bindtap="chooseTab">主图</view>
+      <view class="detail-tab {{tab === 'effect' ? 'active' : ''}}" data-tab="effect" bindtap="chooseTab">色号效果</view>
+    </view>
+    <view class="main-preview">
+      <bead-grid
+        matrix="{{pattern.matrix}}"
+        palette="{{paletteMap}}"
+        zoom="{{1}}"
+        show-grid="{{tab === 'effect'}}"
+        major-grid="{{tab === 'effect'}}"
+        highlight-code="{{tab === 'effect' ? effectCode : ''}}"
+      />
+    </view>
+    <scroll-view wx:if="{{tab === 'effect'}}" scroll-x class="effect-scroll" enhanced show-scrollbar="false">
+      <view class="effect-inner">
+        <view
+          wx:for="{{stats}}"
+          wx:key="code"
+          class="effect-chip {{effectCode === item.code ? 'active' : ''}}"
+          data-code="{{item.code}}"
+          bindtap="chooseEffectCode"
+          style="background: {{item.hex}};"
+        >{{item.code}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="info-card">
+    <view class="title-row">
+      <view><view class="pattern-title">{{pattern.name}}</view><view class="pattern-time">更新于 {{pattern.displayTime}}</view></view>
+      <view class="status-chip {{pattern.status === '已拼' ? 'done' : ''}}">{{pattern.status}}</view>
+    </view>
+    <view class="meta-row">
+      <view class="meta-item"><text>◉</text><view><view class="meta-value">{{stats.length}}</view><view class="meta-label">颜色</view></view></view>
+      <view class="meta-item"><text>◎</text><view><view class="meta-value">{{beadCount}}</view><view class="meta-label">豆数</view></view></view>
+      <view class="meta-item"><text>▦</text><view><view class="meta-value">{{pattern.width || pattern.size}}×{{pattern.height || pattern.size}}</view><view class="meta-label">尺寸</view></view></view>
+    </view>
+    <view class="tag-row"><view class="tag" wx:for="{{pattern.tags}}" wx:key="*this"># {{item}}</view></view>
+  </view>
+
+  <view class="stats-card">
+    <view class="stats-head">
+      <view><view class="stats-title">色号清单</view><view class="stats-note">按用量从高到低排列</view></view>
+      <view class="stock-state {{totalMissing ? 'short' : ''}}">{{totalMissing ? '缺 ' + totalMissing + ' 颗' : '库存充足'}}</view>
+    </view>
+    <view class="color-grid">
+      <view class="color-item" wx:for="{{stats}}" wx:key="code">
+        <view class="color-dot" style="background: {{item.hex}};"></view>
+        <text class="color-code">{{item.code}}</text>
+        <text class="color-count">{{item.required}}</text>
+        <text wx:if="{{item.missing}}" class="color-gap">缺{{item.missing}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="safe-bottom"></view>
+  <view class="detail-actions">
+    <button class="ghost-button" bindtap="editPattern">编辑图纸</button>
+    <button class="primary-button" bindtap="enterPattern">进入图纸</button>
+    <button class="more-button" bindtap="moreActions">•••</button>
+  </view>
+</view>

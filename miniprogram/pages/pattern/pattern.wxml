@@ -1,55 +1,55 @@
-<view class="container" wx:if="{{pattern}}">
-  <view class="card">
-    <view class="pattern-head">
-      <view>
-        <view class="section-title">{{pattern.name}}</view>
-        <view class="meta">{{pattern.width || pattern.size}} × {{pattern.height || pattern.size}} · {{pattern.brand}} · {{pattern.stats.length}} 色</view>
-      </view>
-      <view class="badge">{{(pattern.width || pattern.size) * (pattern.height || pattern.size)}} 颗</view>
+<view wx:if="{{pattern}}" class="assistant-page">
+  <scroll-view scroll-x class="tool-scroll" enhanced show-scrollbar="false">
+    <view class="tool-inner">
+      <view class="tool-item active" bindtap="resetView"><text>▦</text><view>电子图纸</view></view>
+      <view class="tool-item {{majorGrid ? 'active' : ''}}" bindtap="toggleGrid"><text>╬</text><view>辅助线</view></view>
+      <view class="tool-item {{mirrored ? 'active' : ''}}" bindtap="toggleMirror"><text>⇆</text><view>镜像</view></view>
+      <view class="tool-item {{showCodes ? 'active' : ''}}" bindtap="toggleCodes"><text>A1</text><view>色号</view></view>
+      <view class="tool-item {{locked ? 'active' : ''}}" bindtap="toggleLock"><text>{{locked ? '●' : '○'}}</text><view>锁定</view></view>
+      <view class="tool-item" bindtap="previewExport"><text>⇩</text><view>导出</view></view>
+      <view class="tool-item" bindtap="openSettings"><text>⚙</text><view>设置</view></view>
     </view>
+  </scroll-view>
 
-    <view class="main-actions">
-      <button class="edit-btn" bindtap="goEditor">编辑图纸</button>
-      <button class="secondary-action" bindtap="previewExport">查看导出图</button>
-    </view>
-
-    <view class="toolbar">
-      <button size="mini" bindtap="zoomOut">－</button>
-      <view class="zoom-text">{{zoom}}×</view>
-      <button size="mini" bindtap="zoomIn">＋</button>
-      <button size="mini" bindtap="toggleGrid">{{showGrid ? '隐藏网格' : '显示网格'}}</button>
-      <button size="mini" bindtap="toggleCodes">{{showCodes ? '隐藏色号' : '显示色号'}}</button>
-    </view>
-
-    <view class="highlight-tip" wx:if="{{highlightCode}}" bindtap="clearHighlight">
-      当前高亮：{{highlightCode}} · 点击这里取消
-    </view>
-
-    <bead-grid id="patternGrid" matrix="{{pattern.matrix}}" palette="{{paletteMap}}" zoom="{{zoom}}" show-codes="{{showCodes}}" show-grid="{{showGrid}}" highlight-code="{{highlightCode}}" />
+  <view class="progress-bar">
+    <view class="progress-copy"><text>{{pattern.name}}</text><text class="progress-number">{{progress}}% 完成</text></view>
+    <view class="progress-track"><view class="progress-fill" style="width: {{progress}}%;"></view></view>
   </view>
 
-  <view class="card summary-card">
-    <view class="summary-item"><view class="summary-value">{{pattern.stats.length}}</view><view class="summary-label">使用颜色</view></view>
-    <view class="summary-item"><view class="summary-value {{totalMissing > 0 ? 'missing' : 'enough'}}">{{totalMissing}}</view><view class="summary-label">缺少拼豆</view></view>
-    <view class="summary-item"><view class="summary-value">{{pattern.completedCount || 0}}</view><view class="summary-label">已制作</view></view>
+  <view class="canvas-shell">
+    <bead-grid
+      id="patternGrid"
+      matrix="{{displayMatrix}}"
+      palette="{{paletteMap}}"
+      zoom="{{zoom}}"
+      show-codes="{{showCodes}}"
+      show-grid="{{showGrid}}"
+      major-grid="{{majorGrid}}"
+      highlight-code="{{highlightCode}}"
+      locked="{{locked}}"
+      interactive="{{true}}"
+      bind:celltap="handleCellTap"
+    />
   </view>
 
-  <view class="card">
-    <view class="stats-head">
-      <view><view class="section-title">颜色统计</view><view class="meta">点击某个色号可在图纸中单色高亮。</view></view>
-      <button size="mini" bindtap="goInventory">库存</button>
-    </view>
+  <view class="zoom-control"><view bindtap="zoomIn">＋</view><text>{{zoom}}×</text><view bindtap="zoomOut">－</view></view>
+  <button class="work-button" bindtap="toggleWorking">{{workButtonText}}</button>
 
-    <view class="stat-row stat-header"><view class="stat-name">色号</view><view>需要</view><view>库存</view><view>缺少</view></view>
-
-    <view wx:for="{{stats}}" wx:key="code" class="{{highlightCode == item.code ? 'stat-row active' : 'stat-row'}}" data-code="{{item.code}}" bindtap="selectColor">
-      <view class="stat-name">
-        <view class="color-dot" style="background: {{item.hex}};"></view>
-        <view><view class="code">{{item.code}}</view><view class="color-name">{{item.name}}</view></view>
+  <view class="palette-dock">
+    <scroll-view scroll-x class="palette-scroll" enhanced show-scrollbar="false">
+      <view class="palette-inner">
+        <view class="palette-all {{!highlightCode ? 'active' : ''}}" data-code="" bindtap="selectColor">全部</view>
+        <view
+          class="palette-item {{highlightCode === item.code ? 'active' : ''}} {{item.completed ? 'completed' : ''}}"
+          wx:for="{{stats}}"
+          wx:key="code"
+          data-code="{{item.code}}"
+          bindtap="selectColor"
+        >
+          <view class="palette-color" style="background: {{item.hex}};"><text>{{item.completed ? '✓' : item.code}}</text></view>
+          <view class="palette-count">{{item.required}}</view>
+        </view>
       </view>
-      <view>{{item.required}}</view><view>{{item.stock}}</view><view class="{{item.missing > 0 ? 'missing' : 'enough'}}">{{item.missing}}</view>
-    </view>
-
-    <button class="complete-btn" bindtap="completeWork">{{totalMissing > 0 ? '库存不足，查看缺豆' : '完成作品并扣减库存'}}</button>
+    </scroll-view>
   </view>
 </view>

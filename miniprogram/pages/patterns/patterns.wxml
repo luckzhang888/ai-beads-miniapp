@@ -1,27 +1,79 @@
-<view class="container">
-  <view class="header-row">
-    <view><view class="title">我的图纸</view><view class="subtitle">已保存 {{patterns.length}} 张，本地最多保留 50 张。</view></view>
-    <button size="mini" class="create-btn" bindtap="goCreate">新建</button>
+<view class="library-page">
+  <view class="brand-bar">
+    <view class="brand">
+      <view class="brand-mark">豆</view>
+      <view><view class="brand-name">AI 豆仓</view><view class="brand-note">MARD 221 标准色</view></view>
+    </view>
+    <view class="inventory-link" bindtap="goInventory">◫ 豆仓</view>
   </view>
 
-  <view wx:if="{{patterns.length}}">
-    <view class="card pattern-card" wx:for="{{patterns}}" wx:key="id" data-id="{{item.id}}" bindtap="openPattern">
-      <view class="pattern-main">
-        <view class="pattern-name">{{item.name}}</view>
-        <view class="pattern-meta">{{item.width || item.size}} × {{item.height || item.size}} · {{item.colorCount}} 色 · {{item.brand}}</view>
-        <view class="pattern-time">更新于 {{item.displayTime}}</view>
+  <scroll-view scroll-x class="top-nav" enhanced show-scrollbar="false">
+    <view class="top-nav-inner">
+      <view class="nav-item" bindtap="goInventory">豆仓</view>
+      <view class="nav-item active">图纸册</view>
+      <view class="nav-item" data-name="灵感库" bindtap="showComingSoon">灵感库</view>
+      <view class="nav-item" data-name="记录" bindtap="showComingSoon">记录</view>
+      <view class="nav-item" data-name="我的" bindtap="showComingSoon">我的</view>
+    </view>
+  </scroll-view>
+
+  <view class="summary-card">
+    <view class="summary-item"><text>{{stats.folders}}</text><view>图纸夹</view></view>
+    <view class="summary-line"></view>
+    <view class="summary-item"><text>{{stats.working}}</text><view>正在拼</view></view>
+    <view class="summary-line"></view>
+    <view class="summary-item"><text>{{stats.pending}}</text><view>待拼图纸</view></view>
+    <view class="summary-line"></view>
+    <view class="summary-item"><text>{{stats.total}}</text><view>累计图纸</view></view>
+  </view>
+
+  <view class="search-box">
+    <text class="search-icon">⌕</text>
+    <input value="{{query}}" bindinput="onSearch" placeholder="搜索图纸或标签" />
+    <text class="search-tool">⌘</text>
+  </view>
+
+  <scroll-view scroll-x class="filter-scroll" enhanced show-scrollbar="false">
+    <view class="filter-inner">
+      <view
+        wx:for="{{statuses}}"
+        wx:key="*this"
+        class="filter-pill {{selectedStatus === item ? 'active' : ''}}"
+        data-status="{{item}}"
+        bindtap="selectStatus"
+      >{{item}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="section-head"><view class="section-name">文件夹</view><view class="create-folder" data-name="文件夹" bindtap="showComingSoon">＋ 创建</view></view>
+  <scroll-view scroll-x class="folder-scroll" enhanced show-scrollbar="false">
+    <view class="folder-inner">
+      <view class="folder-card" wx:for="{{folders}}" wx:key="id" data-id="{{item.cover.id}}" bindtap="openPattern">
+        <view class="folder-count">{{item.count}} 图纸</view>
+        <view class="folder-preview">
+          <bead-grid matrix="{{item.cover.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{146}}" show-grid="{{false}}" />
+        </view>
+        <view class="folder-name">{{item.title}}</view>
       </view>
-      <view class="actions">
-        <button size="mini" data-id="{{item.id}}" catchtap="rename">重命名</button>
-        <button size="mini" data-id="{{item.id}}" catchtap="duplicate">复制</button>
-        <button size="mini" class="danger" data-id="{{item.id}}" catchtap="remove">删除</button>
+    </view>
+  </scroll-view>
+
+  <view class="section-head"><view class="section-name">我的图纸</view><view class="section-count">{{visiblePatterns.length}} 张</view></view>
+  <view wx:if="{{visiblePatterns.length}}" class="pattern-grid">
+    <view class="pattern-card" wx:for="{{visiblePatterns}}" wx:key="id" data-id="{{item.id}}" bindtap="openPattern">
+      <view class="status-badge {{item.status === '已拼' ? 'done' : ''}}">{{item.status}}</view>
+      <view class="pattern-preview">
+        <bead-grid matrix="{{item.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{164}}" show-grid="{{false}}" />
+      </view>
+      <view class="pattern-copy">
+        <view class="pattern-name">{{item.name}}</view>
+        <view class="pattern-meta">◉ {{item.colorCount}}　◎ {{item.beadCount}}</view>
+        <view class="pattern-meta">▦ {{item.width || item.size}}×{{item.height || item.size}} · {{item.displayTime}}</view>
       </view>
     </view>
   </view>
+  <view wx:else class="empty-state">没有匹配的图纸，换个关键词试试。</view>
 
-  <view class="empty card" wx:else>
-    <view class="empty-title">还没有保存的图纸</view>
-    <view class="subtitle">从一张图片开始创建你的第一张拼豆图纸。</view>
-    <button class="primary-btn" bindtap="goCreate">创建图纸</button>
-  </view>
+  <view class="safe-bottom"></view>
+  <button class="upload-button" bindtap="goCreate">＋ 上传图纸</button>
 </view>

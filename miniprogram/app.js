@@ -1,7 +1,7 @@
 App({
   globalData: {
     appName: 'AI 豆仓',
-    paletteName: 'DEMO'
+    paletteName: 'MARD 221'
   },
 
   onLaunch() {

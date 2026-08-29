@@ -47,7 +47,10 @@ function createPattern(options) {
     qualityMode: options.qualityMode || 'balanced',
     matrix,
     stats,
-    completedCount: Number(options.completedCount || 0)
+    completedCount: Number(options.completedCount || 0),
+    status: options.status || '待拼',
+    tags: Array.isArray(options.tags) ? options.tags.slice(0, 8) : [],
+    completedCodes: Array.isArray(options.completedCodes) ? options.completedCodes.slice() : []
   }
 }
 
@@ -100,6 +103,9 @@ function normalizePattern(pattern, palette) {
     width: dims.width,
     height: dims.height,
     stats: rebuildStats(matrix, palette || mardPalette),
+    status: pattern.status || (Number(pattern.completedCount || 0) > 0 ? '已拼' : '待拼'),
+    tags: Array.isArray(pattern.tags) ? pattern.tags.slice(0, 8) : [],
+    completedCodes: Array.isArray(pattern.completedCodes) ? pattern.completedCodes.slice() : [],
     updatedAt: Date.now()
   })
 }
@@ -216,6 +222,15 @@ function floodFill(matrix, x, y, toCode) {
   return next
 }
 
+function makeShareCode(pattern) {
+  return pattern && pattern.id ? 'DC1-' + pattern.id : ''
+}
+
+function getPatternByShareCode(code) {
+  const match = /^DC1-(.+)$/i.exec(String(code || '').trim())
+  return match ? getPatternById(match[1]) : null
+}
+
 module.exports = {
   cloneMatrix,
   getDimensions,
@@ -236,5 +251,7 @@ module.exports = {
   rotate90,
   setCell,
   replaceColor,
-  floodFill
+  floodFill,
+  makeShareCode,
+  getPatternByShareCode
 }

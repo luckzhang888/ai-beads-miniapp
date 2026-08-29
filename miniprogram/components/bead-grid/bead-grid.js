@@ -6,7 +6,11 @@ Component({
     showGrid: { type: Boolean, value: true },
     highlightCode: { type: String, value: '' },
     zoom: { type: Number, value: 1 },
-    interactive: { type: Boolean, value: false }
+    interactive: { type: Boolean, value: false },
+    majorGrid: { type: Boolean, value: false },
+    compact: { type: Boolean, value: false },
+    previewSize: { type: Number, value: 148 },
+    locked: { type: Boolean, value: false }
   },
 
   data: {
@@ -17,7 +21,7 @@ Component({
   },
 
   observers: {
-    'matrix,palette,showCodes,showGrid,highlightCode,zoom': function () {
+    'matrix,palette,showCodes,showGrid,highlightCode,zoom,majorGrid,compact,previewSize,locked': function () {
       this.scheduleDraw()
     }
   },
@@ -42,15 +46,19 @@ Component({
       const rows = matrix.length
       const cols = matrix[0].length
       const system = wx.getSystemInfoSync()
-      const base = Math.max(280, Math.min(system.windowWidth - 24, 680))
-      const zoom = Math.max(1, Math.min(Number(this.data.zoom) || 1, 3))
+      const base = this.data.compact
+        ? Math.max(88, Number(this.data.previewSize) || 148)
+        : Math.max(280, Math.min(system.windowWidth - 24, 680))
+      const zoom = this.data.compact ? 1 : Math.max(1, Math.min(Number(this.data.zoom) || 1, 3))
       const canvasWidth = Math.round(base * zoom)
       const canvasHeight = Math.max(1, Math.round(canvasWidth * rows / cols))
       const viewportSize = base
-      const viewportHeight = Math.min(
-        Math.max(280, Math.round(base * 1.25)),
-        Math.max(320, Math.round((system.windowHeight || 700) * 0.62))
-      )
+      const viewportHeight = this.data.compact
+        ? base
+        : Math.min(
+          Math.max(280, Math.round(base * 1.25)),
+          Math.max(320, Math.round((system.windowHeight || 700) * 0.62))
+        )
 
       this.setData({ canvasWidth, canvasHeight, viewportSize, viewportHeight }, () => {
         this.createSelectorQuery()
@@ -115,6 +123,23 @@ Component({
           ctx.lineTo(width, pos)
         }
         ctx.stroke()
+
+        if (this.data.majorGrid && Math.min(cellX, cellY) >= 3) {
+          ctx.beginPath()
+          ctx.strokeStyle = 'rgba(210, 35, 62, 0.82)'
+          ctx.lineWidth = Math.min(cellX, cellY) >= 9 ? 1.4 : 0.9
+          for (let x = 0; x <= cols; x += 5) {
+            const pos = Math.min(width, x * cellX)
+            ctx.moveTo(pos, 0)
+            ctx.lineTo(pos, height)
+          }
+          for (let y = 0; y <= rows; y += 5) {
+            const pos = Math.min(height, y * cellY)
+            ctx.moveTo(0, pos)
+            ctx.lineTo(width, pos)
+          }
+          ctx.stroke()
+        }
       }
 
       if (this.data.showCodes && Math.min(cellX, cellY) >= 13) {

@@ -1,4 +1,26 @@
-<view class="container">
+<view wx:if="{{stage === 'methods'}}" class="journey-page">
+  <view class="journey-head">
+    <view><view class="journey-title">开始创作之旅</view><view class="journey-note">选择一种导入方式，我们会自动整理色号</view></view>
+    <view class="journey-orb">✦</view>
+  </view>
+  <view
+    class="method-card"
+    wx:for="{{methods}}"
+    wx:key="id"
+    data-id="{{item.id}}"
+    bindtap="selectMethod"
+  >
+    <view class="method-icon">{{item.icon}}</view>
+    <view class="method-copy">
+      <view class="method-title-row"><text class="method-title">{{item.title}}</text><text wx:if="{{item.badge}}" class="method-badge">{{item.badge}}</text></view>
+      <view class="method-description">{{item.description}}</view>
+    </view>
+    <view class="method-arrow">›</view>
+  </view>
+</view>
+
+<view wx:elif="{{stage === 'config'}}" class="container config-page">
+  <view class="config-head"><view><view class="config-title">{{selectedMethodTitle || '图纸导入'}}</view><view class="config-note">使用 MARD 221 标准色与 CIEDE2000 匹配</view></view><view class="back-methods" bindtap="resetMethods">更换方式</view></view>
   <view class="card">
     <view class="step-title">1. 选择图片</view>
     <view class="image-box" bindtap="chooseImage">
@@ -64,4 +86,27 @@
   <button class="primary-btn generate-btn" loading="{{generating}}" disabled="{{generating}}" bindtap="generatePattern">
     {{generating ? '正在生成…' : '生成拼豆图纸'}}
   </button>
+</view>
+
+<view wx:elif="{{stage === 'pdf'}}" class="pdf-page">
+  <view class="pdf-card">
+    <view class="pdf-icon">PDF</view>
+    <view class="pdf-name">{{pdfFile.name}}</view>
+    <view class="pdf-size">已选择 {{pdfFile.size}} 字节</view>
+    <view class="pdf-note">PDF 导入已完成文件选择入口。微信小程序端无法直接栅格化 PDF，正式识别需要接入安全的服务端转换接口。</view>
+    <button class="primary-btn" bindtap="previewPdf">预览 PDF</button>
+    <button class="secondary-btn" bindtap="resetMethods">返回导入方式</button>
+  </view>
+</view>
+
+<view wx:if="{{showShareDialog}}" class="dialog-mask" bindtap="closeShareDialog">
+  <view class="share-dialog" catchtap="noop">
+    <view class="share-title">分享口令导入</view>
+    <view class="share-note">输入以 DC1- 开头的图纸口令</view>
+    <input class="share-input" value="{{shareCode}}" bindinput="onShareInput" placeholder="例如 DC1-pattern-123" />
+    <view class="dialog-actions">
+      <button class="secondary-btn" bindtap="closeShareDialog">取消</button>
+      <button class="primary-btn" bindtap="importShareCode">立即导入</button>
+    </view>
+  </view>
 </view>

@@ -1,11 +1,12 @@
 {
   "pages": [
-    "pages/home/home",
-    "pages/convert/convert",
     "pages/patterns/patterns",
+    "pages/convert/convert",
+    "pages/detail/detail",
     "pages/pattern/pattern",
     "pages/editor/editor",
-    "pages/inventory/inventory"
+    "pages/inventory/inventory",
+    "pages/home/home"
   ],
   "window": {
     "navigationBarTitleText": "AI 豆仓",

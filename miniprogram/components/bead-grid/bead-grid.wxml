@@ -1,7 +1,7 @@
 <scroll-view
-  class="grid-scroll"
-  scroll-x
-  scroll-y
+  class="grid-scroll {{compact ? 'compact' : ''}}"
+  scroll-x="{{!compact && !locked}}"
+  scroll-y="{{!compact && !locked}}"
   enhanced
   show-scrollbar="{{false}}"
   style="height: {{viewportHeight}}px; width: {{viewportSize}}px;"

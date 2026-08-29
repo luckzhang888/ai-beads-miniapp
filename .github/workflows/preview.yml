@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: 20
 
-      - run: npm install
+      - run: npm ci
         if: steps.wx-ci.outputs.enabled == 'true'
 
       - name: Write WeChat private key

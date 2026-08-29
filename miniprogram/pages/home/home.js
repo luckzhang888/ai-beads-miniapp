@@ -52,7 +52,7 @@ Page({
 
     setCurrentPattern(pattern)
     wx.navigateTo({
-      url: '/pages/pattern/pattern?id=' + encodeURIComponent(id)
+      url: '/pages/detail/detail?id=' + encodeURIComponent(id)
     })
   },
 
@@ -60,7 +60,7 @@ Page({
     const pattern = savePattern(createDemoPattern(32))
     setCurrentPattern(pattern)
     wx.navigateTo({
-      url: '/pages/pattern/pattern?id=' + encodeURIComponent(pattern.id)
+      url: '/pages/detail/detail?id=' + encodeURIComponent(pattern.id)
     })
   }
 })

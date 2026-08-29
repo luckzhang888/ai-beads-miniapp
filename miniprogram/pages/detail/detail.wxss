@@ -1,0 +1,40 @@
+.detail-page { min-height: 100vh; padding: 24rpx; box-sizing: border-box; color: #261f2e; background: radial-gradient(circle at 10% 5%, rgba(214,244,235,.34), transparent 25%), radial-gradient(circle at 95% 18%, rgba(221,207,250,.32), transparent 28%), #f8f7fb; }
+.preview-card, .info-card, .stats-card { margin-bottom: 22rpx; padding: 16rpx; border: 1rpx solid rgba(94,76,121,.08); border-radius: 27rpx; background: white; box-shadow: 0 12rpx 36rpx rgba(73,49,105,.07); }
+.detail-tabs { display: flex; height: 72rpx; margin-bottom: 17rpx; padding: 6rpx; border-radius: 20rpx; background: #f3f0f7; box-sizing: border-box; }
+.detail-tab { flex: 1; display: flex; align-items: center; justify-content: center; color: #918899; border-radius: 16rpx; font-size: 24rpx; }
+.detail-tab.active { color: #39323f; background: white; font-weight: 700; box-shadow: 0 6rpx 16rpx rgba(72,54,93,.08); }
+.main-preview { min-height: 540rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 21rpx; background: linear-gradient(145deg, #effaf6, #f6f0fb); }
+.effect-scroll { margin-top: 16rpx; white-space: nowrap; }
+.effect-inner { display: inline-flex; gap: 11rpx; padding: 4rpx; }
+.effect-chip { width: 67rpx; height: 67rpx; display: flex; align-items: center; justify-content: center; border: 4rpx solid white; border-radius: 50%; box-sizing: border-box; color: #28232d; text-shadow: 0 1rpx 2rpx white; font-size: 17rpx; font-weight: 700; box-shadow: 0 4rpx 13rpx rgba(54,42,68,.13); }
+.effect-chip.active { border-color: #704dde; transform: scale(1.08); }
+.info-card, .stats-card { padding: 27rpx; }
+.title-row, .stats-head { display: flex; align-items: flex-start; justify-content: space-between; }
+.pattern-title { font-size: 35rpx; font-weight: 800; }
+.pattern-time { margin-top: 8rpx; color: #9b92a4; font-size: 20rpx; }
+.status-chip { padding: 10rpx 18rpx; border-radius: 999rpx; color: #c97b06; background: #fff1cd; font-size: 20rpx; }
+.status-chip.done { color: #16936d; background: #daf7ec; }
+.meta-row { display: flex; margin-top: 27rpx; padding: 21rpx 0; border-top: 1rpx solid #eeeaf1; border-bottom: 1rpx solid #eeeaf1; }
+.meta-item { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8rpx; }
+.meta-item > text { color: #7658d4; }
+.meta-value { font-size: 25rpx; font-weight: 700; }
+.meta-label { color: #a097a8; font-size: 18rpx; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 11rpx; margin-top: 20rpx; }
+.tag { padding: 9rpx 15rpx; border-radius: 999rpx; color: #6847cd; background: #f2edfb; font-size: 20rpx; }
+.stats-title { font-size: 30rpx; font-weight: 750; }
+.stats-note { margin-top: 6rpx; color: #9d94a5; font-size: 19rpx; }
+.stock-state { padding: 10rpx 16rpx; border-radius: 999rpx; color: #178b69; background: #ddf7ee; font-size: 19rpx; }
+.stock-state.short { color: #c67512; background: #fff0d6; }
+.color-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11rpx; margin-top: 22rpx; }
+.color-item { min-width: 0; height: 57rpx; display: flex; align-items: center; padding: 0 12rpx; border: 1rpx solid #e7e1eb; border-radius: 15rpx; box-sizing: border-box; background: #fdfcfd; }
+.color-dot { width: 27rpx; height: 27rpx; flex: none; margin-right: 9rpx; border: 1rpx solid rgba(50,40,60,.08); border-radius: 50%; }
+.color-code { font-size: 21rpx; }
+.color-count { margin-left: auto; color: #9d95a5; font-size: 20rpx; }
+.color-gap { margin-left: 7rpx; color: #d97820; font-size: 16rpx; }
+.safe-bottom { height: calc(120rpx + env(safe-area-inset-bottom)); }
+.detail-actions { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr 90rpx; gap: 13rpx; padding: 17rpx 23rpx calc(17rpx + env(safe-area-inset-bottom)); background: rgba(255,255,255,.94); border-top: 1rpx solid #eee9f1; backdrop-filter: blur(20rpx); }
+.detail-actions button { height: 81rpx; margin: 0; border-radius: 21rpx; font-size: 26rpx; }
+.ghost-button { color: #5f43bd; background: white; border: 1rpx solid #d9cfee; }
+.primary-button { color: white; background: linear-gradient(135deg, #7b57e8, #6341d6); box-shadow: 0 10rpx 24rpx rgba(101,67,211,.24); }
+.more-button { padding: 0; color: #5f5668; background: white; border: 1rpx solid #ddd6e4; }
+.detail-actions button::after { border: 0; }

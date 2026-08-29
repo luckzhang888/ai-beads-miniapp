@@ -1,3 +1,35 @@
+.journey-page,
+.pdf-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 28rpx;
+  color: #261f2e;
+  background: radial-gradient(circle at 50% 0, rgba(216, 207, 250, .48), transparent 34%), #f8f7fb;
+}
+
+.journey-head,
+.config-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.journey-head { padding: 20rpx 8rpx 34rpx; }
+.journey-title, .config-title { font-size: 39rpx; font-weight: 800; }
+.journey-note, .config-note { margin-top: 9rpx; color: #948b9e; font-size: 23rpx; }
+.journey-orb { width: 75rpx; height: 75rpx; display: flex; align-items: center; justify-content: center; border-radius: 23rpx; color: #6949d1; background: linear-gradient(145deg, #e4dbfb, #cff1e9); font-size: 33rpx; }
+.method-card { display: flex; align-items: center; min-height: 124rpx; margin-bottom: 17rpx; padding: 18rpx 20rpx; box-sizing: border-box; border: 1rpx solid #ddd6e6; border-radius: 24rpx; background: rgba(255,255,255,.94); box-shadow: 0 10rpx 28rpx rgba(73,56,97,.06); }
+.method-icon { width: 69rpx; height: 69rpx; flex: none; display: flex; align-items: center; justify-content: center; margin-right: 19rpx; border-radius: 20rpx; color: #6c48d4; background: #f1ecfc; font-size: 31rpx; font-weight: 800; }
+.method-copy { flex: 1; min-width: 0; }
+.method-title-row { display: flex; align-items: center; }
+.method-title { font-size: 28rpx; font-weight: 700; }
+.method-badge { margin-left: 11rpx; padding: 4rpx 10rpx; border-radius: 999rpx; color: #6847cf; background: #eee8fc; font-size: 17rpx; }
+.method-description { margin-top: 8rpx; color: #9a929f; font-size: 20rpx; line-height: 1.5; }
+.method-arrow { color: #b5adbd; font-size: 41rpx; }
+.config-page { background: radial-gradient(circle at 80% 0, rgba(218, 208, 251, .32), transparent 26%), #f7f6fa; }
+.config-head { padding: 3rpx 2rpx 23rpx; }
+.back-methods { padding: 11rpx 18rpx; border: 1rpx solid #cbbbea; border-radius: 999rpx; color: #6847ce; font-size: 21rpx; }
+
 .step-title {
   margin-bottom: 22rpx;
   font-size: 30rpx;
@@ -65,9 +97,9 @@
 }
 
 .choice.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: #7352d7;
+  background: #f1ecfb;
+  color: #6040c1;
   font-weight: 600;
 }
 
@@ -96,9 +128,9 @@
 }
 
 .size-item.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: #7352d7;
+  background: #f1ecfb;
+  color: #6040c1;
 }
 
 .recommend-tag {
@@ -133,4 +165,22 @@
 
 .generate-btn {
   margin-bottom: 42rpx;
+  background: linear-gradient(135deg, #7b57e8, #6341d6);
+  box-shadow: 0 12rpx 28rpx rgba(101, 67, 211, .26);
 }
+
+.pdf-page { display: flex; align-items: flex-start; justify-content: center; }
+.pdf-card { width: 100%; margin-top: 90rpx; padding: 34rpx; box-sizing: border-box; border-radius: 28rpx; background: white; text-align: center; box-shadow: 0 14rpx 40rpx rgba(72, 53, 96, .09); }
+.pdf-icon { width: 110rpx; height: 110rpx; margin: 8rpx auto 23rpx; display: flex; align-items: center; justify-content: center; border-radius: 28rpx; color: white; background: linear-gradient(145deg, #8260e5, #6041c5); font-weight: 800; }
+.pdf-name { font-size: 30rpx; font-weight: 700; word-break: break-all; }
+.pdf-size { margin-top: 8rpx; color: #a197a8; font-size: 21rpx; }
+.pdf-note { margin: 27rpx 0; padding: 21rpx; border-radius: 18rpx; color: #756c7e; background: #f5f1fa; text-align: left; line-height: 1.65; font-size: 22rpx; }
+.dialog-mask { position: fixed; z-index: 50; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; padding: 40rpx; background: rgba(35,28,42,.45); backdrop-filter: blur(10rpx); }
+.share-dialog { width: 100%; padding: 33rpx; border-radius: 28rpx; background: white; box-sizing: border-box; }
+.share-title { font-size: 33rpx; font-weight: 800; }
+.share-note { margin-top: 9rpx; color: #958c9e; font-size: 22rpx; }
+.share-input { height: 87rpx; margin: 27rpx 0; padding: 0 21rpx; border: 1rpx solid #e4ddec; border-radius: 18rpx; background: #f6f3f8; }
+.dialog-actions { display: flex; gap: 17rpx; }
+.dialog-actions button { flex: 1; height: 81rpx; margin: 0; }
+.dialog-actions .primary-btn { background: linear-gradient(135deg, #7b57e8, #6341d6); }
+.dialog-actions button::after { border: 0; }

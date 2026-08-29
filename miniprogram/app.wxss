@@ -1,8 +1,8 @@
 page {
   min-height: 100%;
-  background: #f5f6f8;
-  color: #1f2329;
-  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  background: #f8f7fb;
+  color: #261f2e;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
 }
 
 .container {
@@ -40,7 +40,8 @@ page {
 
 .primary-btn {
   color: #ffffff;
-  background: #2563eb;
+  background: linear-gradient(135deg, #7b57e8, #6341d6);
+  box-shadow: 0 10rpx 24rpx rgba(101, 67, 211, .22);
 }
 
 .secondary-btn {
@@ -62,7 +63,7 @@ page {
   display: inline-block;
   padding: 4rpx 12rpx;
   border-radius: 999rpx;
-  background: #eef2ff;
-  color: #4f46e5;
+  background: #f1ecfb;
+  color: #6847ce;
   font-size: 22rpx;
 }

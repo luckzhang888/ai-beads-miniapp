@@ -5,50 +5,77 @@ const {
   getCurrentPattern,
   getPatternById,
   savePattern,
-  setCurrentPattern
+  setCurrentPattern,
+  mirrorHorizontal,
+  makeShareCode
 } = require('../../utils/pattern')
 
 Page({
   data: {
     pattern: null,
+    displayMatrix: [],
     stats: [],
     paletteMap: createPaletteMap(mardPalette),
-    zoom: 1,
-    showCodes: false,
+    zoom: 1.5,
+    showCodes: true,
     showGrid: true,
+    majorGrid: true,
     highlightCode: '',
-    totalMissing: 0
+    totalMissing: 0,
+    locked: false,
+    mirrored: false,
+    working: false,
+    progress: 0,
+    workButtonText: '选择色号开始拼豆'
   },
 
   onLoad(options) {
     this.patternId = options && options.id ? decodeURIComponent(options.id) : ''
+    this.autoExport = Boolean(options && options.export === '1')
   },
 
   onShow() {
     let pattern = this.patternId ? getPatternById(this.patternId) : null
     if (!pattern) pattern = getCurrentPattern()
-
     if (!pattern) {
       wx.showModal({
         title: '没有图纸',
         content: '请先创建一张图纸。',
         showCancel: false,
-        success() {
-          wx.navigateBack()
-        }
+        success() { wx.navigateBack() }
       })
       return
     }
-
     this.patternId = pattern.id
     setCurrentPattern(pattern)
     this.setPattern(pattern)
   },
 
   setPattern(pattern) {
-    const stats = mergeStatsWithInventory(pattern.stats || [])
+    const completedCodes = Array.isArray(pattern.completedCodes) ? pattern.completedCodes : []
+    const stats = mergeStatsWithInventory(pattern.stats || []).map((item) => Object.assign({}, item, {
+      completed: completedCodes.indexOf(item.code) >= 0
+    }))
     const totalMissing = stats.reduce((sum, item) => sum + item.missing, 0)
-    this.setData({ pattern, stats, totalMissing })
+    const totalBeads = stats.reduce((sum, item) => sum + Number(item.required || 0), 0)
+    const completedBeads = stats.reduce((sum, item) => sum + (item.completed ? Number(item.required || 0) : 0), 0)
+    const progress = totalBeads ? Math.round(completedBeads / totalBeads * 100) : 0
+    const view = Object.assign({}, pattern, {
+      status: pattern.status || (Number(pattern.completedCount || 0) > 0 ? '已拼' : '待拼')
+    })
+    this.setData({
+      pattern: view,
+      displayMatrix: this.data.mirrored ? mirrorHorizontal(pattern.matrix) : pattern.matrix,
+      stats,
+      totalMissing,
+      progress
+    }, () => {
+      this.updateWorkButton()
+      if (this.autoExport) {
+        this.autoExport = false
+        setTimeout(() => this.previewExport(), 500)
+      }
+    })
   },
 
   toggleCodes() {
@@ -56,32 +83,102 @@ Page({
   },
 
   toggleGrid() {
-    this.setData({ showGrid: !this.data.showGrid })
+    this.setData({ majorGrid: !this.data.majorGrid, showGrid: true })
+  },
+
+  toggleMirror() {
+    const mirrored = !this.data.mirrored
+    this.setData({
+      mirrored,
+      displayMatrix: mirrored ? mirrorHorizontal(this.data.pattern.matrix) : this.data.pattern.matrix
+    })
+  },
+
+  toggleLock() {
+    const locked = !this.data.locked
+    this.setData({ locked })
+    wx.showToast({ title: locked ? '画布已锁定' : '画布已解锁', icon: 'none' })
   },
 
   zoomIn() {
-    const next = Math.min(3, Math.round((this.data.zoom + 0.5) * 10) / 10)
-    this.setData({ zoom: next })
+    this.setData({ zoom: Math.min(3, Math.round((this.data.zoom + 0.5) * 10) / 10) })
   },
 
   zoomOut() {
-    const next = Math.max(1, Math.round((this.data.zoom - 0.5) * 10) / 10)
-    this.setData({ zoom: next })
+    this.setData({ zoom: Math.max(1, Math.round((this.data.zoom - 0.5) * 10) / 10) })
   },
 
   selectColor(event) {
-    const code = event.currentTarget.dataset.code
-    this.setData({ highlightCode: this.data.highlightCode === code ? '' : code })
+    const code = event.currentTarget.dataset.code || ''
+    this.setData({ highlightCode: code, working: false }, () => this.updateWorkButton())
+  },
+
+  handleCellTap(event) {
+    if (this.data.locked) return
+    const code = event.detail && event.detail.code
+    if (!code) return
+    this.setData({ highlightCode: code, working: false }, () => this.updateWorkButton())
   },
 
   clearHighlight() {
-    this.setData({ highlightCode: '' })
+    this.setData({ highlightCode: '', working: false }, () => this.updateWorkButton())
+  },
+
+  updateWorkButton() {
+    let workButtonText = '选择色号开始拼豆'
+    if (this.data.highlightCode && !this.data.working) workButtonText = '开始拼 ' + this.data.highlightCode
+    if (this.data.highlightCode && this.data.working) workButtonText = '完成 ' + this.data.highlightCode
+    this.setData({ workButtonText })
+  },
+
+  toggleWorking() {
+    if (!this.data.highlightCode) {
+      wx.showToast({ title: '请先选择底部色号', icon: 'none' })
+      return
+    }
+    if (!this.data.working) {
+      const pattern = getPatternById(this.patternId)
+      const saved = savePattern(Object.assign({}, pattern, { status: '正在拼' }), mardPalette)
+      setCurrentPattern(saved)
+      this.setData({ pattern: saved, working: true }, () => this.updateWorkButton())
+      return
+    }
+    this.completeSelectedColor()
+  },
+
+  completeSelectedColor() {
+    const pattern = getPatternById(this.patternId)
+    const completedCodes = Array.isArray(pattern.completedCodes) ? pattern.completedCodes.slice() : []
+    if (completedCodes.indexOf(this.data.highlightCode) < 0) completedCodes.push(this.data.highlightCode)
+    const remaining = (pattern.stats || []).find((item) => completedCodes.indexOf(item.code) < 0)
+    const saved = savePattern(Object.assign({}, pattern, {
+      completedCodes,
+      status: remaining ? '正在拼' : '已拼'
+    }), mardPalette)
+    setCurrentPattern(saved)
+    this.setData({
+      highlightCode: remaining ? remaining.code : '',
+      working: false
+    })
+    this.setPattern(saved)
+    wx.showToast({ title: remaining ? '已完成本色' : '图纸已完成', icon: 'success' })
+  },
+
+  resetView() {
+    this.setData({
+      highlightCode: '',
+      working: false,
+      mirrored: false,
+      locked: false,
+      zoom: 1.5
+    }, () => {
+      this.setPattern(this.data.pattern)
+      this.updateWorkButton()
+    })
   },
 
   goEditor() {
-    wx.navigateTo({
-      url: '/pages/editor/editor?id=' + encodeURIComponent(this.data.pattern.id)
-    })
+    wx.navigateTo({ url: '/pages/editor/editor?id=' + encodeURIComponent(this.data.pattern.id) })
   },
 
   goInventory() {
@@ -94,32 +191,38 @@ Page({
       wx.showToast({ title: '画布尚未准备好', icon: 'none' })
       return
     }
-
     wx.showLoading({ title: '生成图片' })
-    grid.exportImage()
-      .then((path) => {
-        wx.hideLoading()
-        wx.previewImage({ current: path, urls: [path] })
-      })
-      .catch(() => {
-        wx.hideLoading()
-        wx.showToast({ title: '生成失败，请重试', icon: 'none' })
-      })
+    grid.exportImage().then((path) => {
+      wx.hideLoading()
+      wx.previewImage({ current: path, urls: [path] })
+    }).catch(() => {
+      wx.hideLoading()
+      wx.showToast({ title: '生成失败，请重试', icon: 'none' })
+    })
+  },
+
+  openSettings() {
+    wx.showActionSheet({
+      itemList: ['完成作品并扣库存', '打开图纸编辑器', '查看库存', '复制分享口令'],
+      success: (result) => {
+        if (result.tapIndex === 0) this.completeWork()
+        if (result.tapIndex === 1) this.goEditor()
+        if (result.tapIndex === 2) this.goInventory()
+        if (result.tapIndex === 3) wx.setClipboardData({ data: makeShareCode(this.data.pattern) })
+      }
+    })
   },
 
   completeWork() {
     if (this.data.totalMissing > 0) {
       wx.showModal({
         title: '库存不足',
-        content: '当前还缺少 ' + this.data.totalMissing + ' 颗拼豆，请先补充库存后再完成制作。',
+        content: '当前还缺少 ' + this.data.totalMissing + ' 颗拼豆，请先补充库存。',
         confirmText: '去库存',
-        success: (result) => {
-          if (result.confirm) this.goInventory()
-        }
+        success: (result) => { if (result.confirm) this.goInventory() }
       })
       return
     }
-
     wx.showModal({
       title: '完成作品',
       content: '将按照本图纸用量从 MARD 库存中扣减拼豆。确定继续吗？',
@@ -133,8 +236,8 @@ Page({
           return
         }
         const saved = savePattern(Object.assign({}, this.data.pattern, {
-          brand: 'MARD',
-          completedCount: Number(this.data.pattern.completedCount || 0) + 1
+          completedCount: Number(this.data.pattern.completedCount || 0) + 1,
+          status: '已拼'
         }), mardPalette)
         setCurrentPattern(saved)
         this.setPattern(saved)
