@@ -1,62 +1,106 @@
-<view class="container">
-  <view class="card intro">
-    <view class="section-title">我的库存</view>
-    <view class="subtitle">
-      当前使用 DEMO 色卡。库存保存在微信小程序本地，不需要登录。
+<view class="warehouse-page">
+  <view class="warehouse-header">
+    <view>
+      <view class="warehouse-title">我的豆仓</view>
+      <view class="warehouse-subtitle">MARD 221 标准色库存</view>
     </view>
+    <view class="header-actions">
+      <button class="outline-btn" data-direction="-1" bindtap="quickTransaction">－ 手动出库</button>
+      <button class="outline-btn" data-direction="1" bindtap="quickTransaction">＋ 补豆入库</button>
+    </view>
+  </view>
+
+  <view class="summary-row">
+    <view class="summary-label">总库存</view>
+    <view class="summary-pill">
+      <text class="summary-number">{{totalStock}}</text>
+      <text class="summary-unit"> 粒 · </text>
+      <text class="summary-number">{{colorCount}}</text>
+      <text class="summary-unit"> 色号</text>
+    </view>
+    <view class="low-pill">⚠ {{lowCount}} 不足</view>
+  </view>
+
+  <view class="search-wrap">
+    <text class="search-icon">⌕</text>
     <input
-      class="search"
-      placeholder="搜索色号或颜色名称"
+      class="search-input"
+      placeholder="搜索色号，例如 A18、M12"
       value="{{query}}"
       bindinput="onSearchInput"
     />
   </view>
 
-  <view class="inventory-list">
-    <view class="inventory-row" wx:for="{{rows}}" wx:key="code">
-      <view class="color-info">
-        <view class="color-dot" style="background: {{item.hex}};"></view>
-        <view>
-          <view class="code">{{item.code}}</view>
-          <view class="name">{{item.name}}</view>
-        </view>
+  <scroll-view class="series-scroll" scroll-x enhanced show-scrollbar="false">
+    <view class="series-tabs">
+      <view
+        wx:for="{{seriesOptions}}"
+        wx:key="*this"
+        class="{{activeSeries === item ? 'series-tab active' : 'series-tab'}}"
+        data-series="{{item}}"
+        bindtap="selectSeries"
+      >{{item === 'ALL' ? '全部' : item}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="toolbar">
+    <view class="sort-options">
+      <view class="{{sortMode === 'default' ? 'tool-pill active' : 'tool-pill'}}" data-sort="default" bindtap="setSort">↕ 默认</view>
+      <view class="{{sortMode === 'asc' ? 'tool-pill active' : 'tool-pill'}}" data-sort="asc" bindtap="setSort">由少到多</view>
+      <view class="{{sortMode === 'desc' ? 'tool-pill active' : 'tool-pill'}}" data-sort="desc" bindtap="setSort">由多到少</view>
+    </view>
+    <view class="view-switch">
+      <view class="{{viewMode === 'series' ? 'view-button active' : 'view-button'}}" data-view="series" bindtap="setView">☷</view>
+      <view class="{{viewMode === 'grid' ? 'view-button active' : 'view-button'}}" data-view="grid" bindtap="setView">▦</view>
+    </view>
+  </view>
+
+  <view wx:if="{{viewMode === 'series'}}" class="series-list">
+    <view class="series-block" wx:for="{{groups}}" wx:key="series">
+      <view class="series-header" data-series="{{item.series}}" bindtap="toggleSeries">
+        <view class="series-name">{{item.series}}系列</view>
+        <view class="series-meta">{{item.colorCount}} 色号 · {{item.totalStock}} 粒　{{item.expanded ? '⌄' : '›'}}</view>
       </view>
 
-      <view class="stock-editor">
-        <button
-          size="mini"
-          data-code="{{item.code}}"
-          data-delta="-10"
-          bindtap="adjust"
-        >-10</button>
-        <button
-          size="mini"
-          data-code="{{item.code}}"
-          data-delta="-1"
-          bindtap="adjust"
-        >-1</button>
-
-        <input
-          class="stock-input"
-          type="number"
-          value="{{item.stock}}"
-          data-code="{{item.code}}"
-          bindblur="setExactStock"
-        />
-
-        <button
-          size="mini"
-          data-code="{{item.code}}"
-          data-delta="1"
-          bindtap="adjust"
-        >+1</button>
-        <button
-          size="mini"
-          data-code="{{item.code}}"
-          data-delta="10"
-          bindtap="adjust"
-        >+10</button>
+      <view wx:if="{{item.expanded}}" class="stock-grid">
+        <view class="stock-card" wx:for="{{item.items}}" wx:key="code" wx:for-item="color">
+          <view class="stock-card-top">
+            <text class="stock-code">{{color.code}}</text>
+            <text class="{{color.low ? 'status low' : 'status'}}">{{color.low ? '库存不足' : '库存充足'}}</text>
+          </view>
+          <view class="color-panel" style="background: {{color.hex}};">
+            <input
+              class="stock-value"
+              type="number"
+              value="{{color.stock}}"
+              data-code="{{color.code}}"
+              bindblur="setExactStock"
+            />
+            <text class="stock-unit">粒</text>
+          </view>
+          <view class="mini-actions">
+            <view data-code="{{color.code}}" data-delta="-10" bindtap="adjust">-10</view>
+            <view data-code="{{color.code}}" data-delta="10" bindtap="adjust">+10</view>
+          </view>
+        </view>
       </view>
     </view>
   </view>
+
+  <view wx:else class="color-grid">
+    <view class="color-tile" wx:for="{{rows}}" wx:key="code">
+      <view class="tile-color" style="background: {{item.hex}};">
+        <text class="tile-code">{{item.code}}</text>
+      </view>
+      <input
+        class="tile-stock"
+        type="number"
+        value="{{item.stock}}"
+        data-code="{{item.code}}"
+        bindblur="setExactStock"
+      />
+    </view>
+  </view>
+
+  <view class="page-note">低于 100 粒暂标记为“库存不足”，后续会增加可自定义安全库存。</view>
 </view>
