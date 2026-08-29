@@ -1,4 +1,4 @@
-const demoPalette = require('../../data/colors/demo')
+const mardPalette = require('../../data/colors/mard')
 const { imageToPattern, recommendPatternSize } = require('../../utils/image')
 const { createPattern, savePattern } = require('../../utils/pattern')
 
@@ -9,7 +9,7 @@ Page({
     recommendedSize: 64,
     imagePath: '',
     generating: false,
-    paletteName: 'DEMO 演示色卡',
+    paletteName: 'MARD 221 标准色',
     cropMode: 'cover',
     imageMode: 'aspectFill',
     optimizePreset: 'natural',
@@ -85,25 +85,19 @@ Page({
   async generatePattern() {
     if (!this.data.imagePath || this.data.generating) {
       if (!this.data.imagePath) {
-        wx.showToast({
-          title: '请先选择图片',
-          icon: 'none'
-        })
+        wx.showToast({ title: '请先选择图片', icon: 'none' })
       }
       return
     }
 
     this.setData({ generating: true })
-    wx.showLoading({
-      title: '生成图纸中',
-      mask: true
-    })
+    wx.showLoading({ title: 'MARD 匹配中', mask: true })
 
     try {
       const result = await imageToPattern(
         this.data.imagePath,
         this.data.selectedSize,
-        demoPalette,
+        mardPalette,
         {
           cropMode: this.data.cropMode,
           optimizePreset: this.data.optimizePreset
@@ -111,12 +105,12 @@ Page({
       )
 
       const pattern = savePattern(createPattern({
-        name: '图片图纸 ' + this.data.selectedSize + '×' + this.data.selectedSize,
+        name: 'MARD 图纸 ' + this.data.selectedSize + '×' + this.data.selectedSize,
         matrix: result.matrix,
         stats: result.stats,
-        palette: result.palette,
-        brand: 'DEMO'
-      }))
+        palette: mardPalette,
+        brand: 'MARD'
+      }), mardPalette)
 
       wx.navigateTo({
         url: '/pages/pattern/pattern?id=' + encodeURIComponent(pattern.id)
