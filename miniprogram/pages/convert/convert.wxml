@@ -1,0 +1,20 @@
+<view class="container">
+  <view class="card">
+    <button bindtap="chooseImage">选择图片</button>
+    <image wx:if="{{imagePath}}" class="preview" src="{{imagePath}}" mode="aspectFit" />
+  </view>
+
+  <view class="card">
+    <view class="label">拼豆尺寸</view>
+    <picker mode="selector" range="{{sizes}}" value="{{sizeIndex}}" bindchange="onSizeChange">
+      <view class="picker">{{sizes[sizeIndex]}} × {{sizes[sizeIndex]}}</view>
+    </picker>
+  </view>
+
+  <view class="card">
+    <view class="label">色卡</view>
+    <view>DEMO 演示色卡</view>
+  </view>
+
+  <button class="primary-button" bindtap="generate">生成图纸</button>
+</view>

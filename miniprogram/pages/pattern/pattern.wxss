@@ -1,0 +1,2 @@
+.title { font-size: 36rpx; font-weight: 600; margin-bottom: 20rpx; }
+.placeholder { height: 500rpx; display: flex; align-items: center; justify-content: center; background: #eef0f3; color: #667085; text-align: center; }

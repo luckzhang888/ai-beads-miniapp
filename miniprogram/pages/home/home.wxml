@@ -1,0 +1,12 @@
+<view class="container">
+  <view class="hero card">
+    <view class="title">AI豆仓</view>
+    <view class="subtitle">把图片转换成拼豆图纸，并计算颜色数量与库存缺口。</view>
+  </view>
+
+  <button class="primary-button" bindtap="goCreate">创建图纸</button>
+  <view class="grid">
+    <view class="entry card" bindtap="goPatterns">我的图纸</view>
+    <view class="entry card" bindtap="goInventory">我的库存</view>
+  </view>
+</view>

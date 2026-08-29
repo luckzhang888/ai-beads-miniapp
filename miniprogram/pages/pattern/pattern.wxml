@@ -1,0 +1,7 @@
+<view class="container">
+  <view class="card">
+    <view class="title">{{size}} × {{size}} 图纸</view>
+    <view class="placeholder">Canvas 拼豆格子组件将在下一阶段接入</view>
+  </view>
+  <view class="card">{{status}}</view>
+</view>

@@ -1,0 +1,6 @@
+[
+  { "brand": "DEMO", "code": "A01", "name": "白色", "rgb": [255, 255, 255] },
+  { "brand": "DEMO", "code": "A02", "name": "黑色", "rgb": [0, 0, 0] },
+  { "brand": "DEMO", "code": "A03", "name": "红色", "rgb": [220, 60, 60] },
+  { "brand": "DEMO", "code": "A04", "name": "蓝色", "rgb": [65, 105, 225] }
+]

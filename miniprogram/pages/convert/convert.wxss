@@ -1,0 +1,3 @@
+.preview { width: 100%; height: 420rpx; margin-top: 20rpx; background: #eef0f3; }
+.label { color: #667085; margin-bottom: 12rpx; }
+.picker { padding: 20rpx; background: #f6f7f9; border-radius: 12rpx; }

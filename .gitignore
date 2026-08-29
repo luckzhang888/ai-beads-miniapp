@@ -1,0 +1,7 @@
+node_modules/
+private.*.key
+private.key
+.env
+secrets/
+preview-qrcode.png
+.DS_Store

@@ -1,0 +1,13 @@
+{
+  "description": "AI豆仓类微信小程序",
+  "miniprogramRoot": "miniprogram/",
+  "projectname": "ai-beads-miniapp",
+  "appid": "touristappid",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true
+  },
+  "compileType": "miniprogram"
+}

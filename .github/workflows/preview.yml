@@ -1,0 +1,55 @@
+name: wechat-preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check WeChat CI secrets
+        id: wx-ci
+        shell: bash
+        env:
+          WX_APPID: ${{ secrets.WX_APPID }}
+          WX_PRIVATE_KEY: ${{ secrets.WX_PRIVATE_KEY }}
+        run: |
+          if [ -n "$WX_APPID" ] && [ -n "$WX_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "WX_APPID/WX_PRIVATE_KEY not configured; skip preview."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.wx-ci.outputs.enabled == 'true'
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm install
+        if: steps.wx-ci.outputs.enabled == 'true'
+
+      - name: Write WeChat private key
+        if: steps.wx-ci.outputs.enabled == 'true'
+        shell: bash
+        run: printf '%s' "$WX_PRIVATE_KEY" > private.key
+        env:
+          WX_PRIVATE_KEY: ${{ secrets.WX_PRIVATE_KEY }}
+
+      - name: Generate preview QR code
+        if: steps.wx-ci.outputs.enabled == 'true'
+        run: npm run preview
+        env:
+          WX_APPID: ${{ secrets.WX_APPID }}
+          WX_PRIVATE_KEY_PATH: private.key
+
+      - uses: actions/upload-artifact@v4
+        if: steps.wx-ci.outputs.enabled == 'true'
+        with:
+          name: wechat-preview-qrcode
+          path: preview-qrcode.png

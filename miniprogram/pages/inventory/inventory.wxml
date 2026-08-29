@@ -1,0 +1,6 @@
+<view class="container">
+  <view class="card" wx:for="{{items}}" wx:key="code">
+    <view>{{item.code}} · {{item.name}}</view>
+    <view>库存：{{item.count}}</view>
+  </view>
+</view>
