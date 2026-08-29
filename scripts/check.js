@@ -3,6 +3,7 @@ const path = require('path')
 const vm = require('vm')
 
 const root = path.resolve(__dirname, '..')
+const ignoredDirectories = new Set(['node_modules', '.git'])
 
 const requiredFiles = [
   'project.config.json',
@@ -13,8 +14,12 @@ const requiredFiles = [
   'miniprogram/pages/home/home.wxml',
   'miniprogram/pages/convert/convert.js',
   'miniprogram/pages/convert/convert.wxml',
+  'miniprogram/pages/patterns/patterns.js',
+  'miniprogram/pages/patterns/patterns.wxml',
   'miniprogram/pages/pattern/pattern.js',
   'miniprogram/pages/pattern/pattern.wxml',
+  'miniprogram/pages/editor/editor.js',
+  'miniprogram/pages/editor/editor.wxml',
   'miniprogram/pages/inventory/inventory.js',
   'miniprogram/pages/inventory/inventory.wxml',
   'miniprogram/components/bead-grid/bead-grid.js',
@@ -39,6 +44,9 @@ requiredFiles.forEach((relativePath) => {
 
 function walk(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory() && ignoredDirectories.has(entry.name)) {
+      return []
+    }
     const fullPath = path.join(dir, entry.name)
     if (entry.isDirectory()) {
       return walk(fullPath)
@@ -47,7 +55,9 @@ function walk(dir) {
   })
 }
 
-walk(root)
+const projectFiles = walk(root)
+
+projectFiles
   .filter((file) => file.endsWith('.json'))
   .forEach((file) => {
     try {
@@ -57,8 +67,8 @@ walk(root)
     }
   })
 
-walk(root)
-  .filter((file) => file.endsWith('.js') && file.indexOf('node_modules') < 0)
+projectFiles
+  .filter((file) => file.endsWith('.js'))
   .forEach((file) => {
     try {
       new vm.Script(fs.readFileSync(file, 'utf8'), {
