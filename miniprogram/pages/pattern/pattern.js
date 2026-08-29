@@ -1,4 +1,4 @@
-const demoPalette = require('../../data/colors/demo')
+const mardPalette = require('../../data/colors/mard')
 const { createPaletteMap } = require('../../utils/color-match')
 const { mergeStatsWithInventory, consumeStats } = require('../../utils/inventory')
 const {
@@ -12,7 +12,7 @@ Page({
   data: {
     pattern: null,
     stats: [],
-    paletteMap: createPaletteMap(demoPalette),
+    paletteMap: createPaletteMap(mardPalette),
     zoom: 1,
     showCodes: false,
     showGrid: true,
@@ -26,9 +26,7 @@ Page({
 
   onShow() {
     let pattern = this.patternId ? getPatternById(this.patternId) : null
-    if (!pattern) {
-      pattern = getCurrentPattern()
-    }
+    if (!pattern) pattern = getCurrentPattern()
 
     if (!pattern) {
       wx.showModal({
@@ -50,11 +48,7 @@ Page({
   setPattern(pattern) {
     const stats = mergeStatsWithInventory(pattern.stats || [])
     const totalMissing = stats.reduce((sum, item) => sum + item.missing, 0)
-    this.setData({
-      pattern,
-      stats,
-      totalMissing
-    })
+    this.setData({ pattern, stats, totalMissing })
   },
 
   toggleCodes() {
@@ -77,9 +71,7 @@ Page({
 
   selectColor(event) {
     const code = event.currentTarget.dataset.code
-    this.setData({
-      highlightCode: this.data.highlightCode === code ? '' : code
-    })
+    this.setData({ highlightCode: this.data.highlightCode === code ? '' : code })
   },
 
   clearHighlight() {
@@ -93,9 +85,7 @@ Page({
   },
 
   goInventory() {
-    wx.navigateTo({
-      url: '/pages/inventory/inventory'
-    })
+    wx.navigateTo({ url: '/pages/inventory/inventory' })
   },
 
   previewExport() {
@@ -124,9 +114,7 @@ Page({
         content: '当前还缺少 ' + this.data.totalMissing + ' 颗拼豆，请先补充库存后再完成制作。',
         confirmText: '去库存',
         success: (result) => {
-          if (result.confirm) {
-            this.goInventory()
-          }
+          if (result.confirm) this.goInventory()
         }
       })
       return
@@ -134,12 +122,10 @@ Page({
 
     wx.showModal({
       title: '完成作品',
-      content: '将按照本图纸用量从库存中扣减拼豆。确定继续吗？',
+      content: '将按照本图纸用量从 MARD 库存中扣减拼豆。确定继续吗？',
       confirmText: '确认扣减',
       success: (result) => {
-        if (!result.confirm) {
-          return
-        }
+        if (!result.confirm) return
         const consumed = consumeStats(this.data.pattern.stats || [])
         if (!consumed.ok) {
           this.setPattern(this.data.pattern)
@@ -147,8 +133,9 @@ Page({
           return
         }
         const saved = savePattern(Object.assign({}, this.data.pattern, {
+          brand: 'MARD',
           completedCount: Number(this.data.pattern.completedCount || 0) + 1
-        }), demoPalette)
+        }), mardPalette)
         setCurrentPattern(saved)
         this.setPattern(saved)
         wx.showToast({ title: '库存已扣减', icon: 'success' })
