@@ -8,7 +8,7 @@
   <view class="menu-card">
     <view data-route="import" bindtap="openRoute"><text>▧</text><text class="menu-label">图纸导入</text><text class="menu-arrow">›</text></view>
     <view data-route="inventory" bindtap="openRoute"><text>▦</text><text class="menu-label">库存管理</text><text class="menu-arrow">›</text></view>
-    <view data-route="records" bindtap="openRoute"><text>↕</text><text class="menu-label">出入库记录</text><text class="menu-arrow">›</text></view>
+    <view data-route="records" bindtap="openRoute"><text>◷</text><text class="menu-label">全部记录</text><text class="menu-arrow">›</text></view>
     <view bindtap="setLowStock"><text>⚠</text><text class="menu-label">低库存阈值</text><text class="menu-value">{{lowStock}}</text><text class="menu-arrow">›</text></view>
     <view bindtap="showAbout"><text>ⓘ</text><text class="menu-label">关于 {{appName}}</text><text class="menu-arrow">›</text></view>
   </view>

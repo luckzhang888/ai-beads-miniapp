@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "出入库记录",
+  "navigationBarTitleText": "记录",
   "enablePullDownRefresh": false,
   "usingComponents": {
     "bead-grid": "/components/bead-grid/bead-grid",

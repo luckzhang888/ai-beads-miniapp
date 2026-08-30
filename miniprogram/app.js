@@ -2,8 +2,8 @@ const { getInventory } = require('./utils/inventory')
 
 App({
   globalData: {
-    appName: 'AI豆仓',
-    paletteName: 'MARD 221'
+    appName: '豆仓助手',
+    paletteName: 'MARD 295'
   },
 
   onLaunch() {

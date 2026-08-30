@@ -9,6 +9,7 @@ const {
   deletePattern,
   makeShareCode
 } = require('../../utils/pattern')
+const { recordActivity } = require('../../utils/activity')
 
 function formatTime(timestamp) {
   const date = new Date(Number(timestamp) || Date.now())
@@ -89,6 +90,12 @@ Page({
           wx.showToast({ title: '名称不能为空', icon: 'none' })
           return
         }
+        recordActivity('pattern-status', {
+          patternId: saved.id,
+          patternName: saved.name,
+          title: '重命名图纸',
+          description: '图纸名称已更新'
+        })
         this.refresh()
       }
     })
@@ -111,6 +118,12 @@ Page({
     if (!pattern) return
     const saved = savePattern(Object.assign({}, pattern, { status: '正在拼' }), mardPalette)
     setCurrentPattern(saved)
+    recordActivity('pattern-status', {
+      patternId: saved.id,
+      patternName: saved.name,
+      title: '开始拼豆',
+      description: '图纸状态改为正在拼'
+    })
     this.refresh()
     wx.showToast({ title: '已开始拼豆', icon: 'success' })
   },
@@ -123,6 +136,12 @@ Page({
       confirmColor: '#d94f5c',
       success: (result) => {
         if (!result.confirm) return
+        recordActivity('pattern-status', {
+          patternId: this.data.pattern.id,
+          patternName: this.data.pattern.name,
+          title: '删除图纸',
+          description: '已从图纸册删除'
+        })
         deletePattern(this.patternId)
         wx.navigateBack()
       }

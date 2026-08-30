@@ -7,6 +7,7 @@
       <view class="tool-item {{showCodes ? 'active' : ''}}" bindtap="toggleCodes"><text>A1</text><view>色号</view></view>
       <view class="tool-item {{locked ? 'active' : ''}}" bindtap="toggleLock"><text>{{locked ? '●' : '○'}}</text><view>锁定</view></view>
       <view class="tool-item {{working ? 'active' : ''}}" bindtap="chooseProgressTool"><text>✓</text><view>{{progressToolName}}</view></view>
+      <view class="tool-item {{timerActive ? 'active timer-active' : ''}}" bindtap="toggleTimer"><text>{{timerActive ? 'Ⅱ' : '▶'}}</text><view>{{timerActive ? timerText : '计时'}}</view></view>
       <view class="tool-item" bindtap="previewExport"><text>⇩</text><view>导出</view></view>
       <view class="tool-item" bindtap="goEditor"><text>◉</text><view>色号整理</view></view>
       <view class="tool-item" bindtap="openSettings"><text>⚙</text><view>设置</view></view>

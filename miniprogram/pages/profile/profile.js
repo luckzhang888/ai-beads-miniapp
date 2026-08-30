@@ -1,10 +1,11 @@
 const { getSavedPatterns } = require('../../utils/pattern')
 const { getInventory, getTransactions, getInventorySettings, saveInventorySettings } = require('../../utils/inventory')
+const { getActivities } = require('../../utils/activity')
 
 Page({
   data: {
-    appName: 'AI豆仓',
-    version: '0.4.6',
+    appName: '豆仓助手',
+    version: '0.5.0',
     patternCount: 0,
     totalStock: 0,
     recordCount: 0,
@@ -16,10 +17,10 @@ Page({
     const inventory = getInventory('MARD')
     const settings = getInventorySettings()
     this.setData({
-      appName: app && app.globalData && app.globalData.appName ? app.globalData.appName : 'AI豆仓',
+      appName: app && app.globalData && app.globalData.appName ? app.globalData.appName : '豆仓助手',
       patternCount: getSavedPatterns().length,
       totalStock: Object.keys(inventory).reduce((sum, code) => sum + Number(inventory[code] || 0), 0),
-      recordCount: getTransactions().length,
+      recordCount: getTransactions().length + getActivities().length,
       lowStock: Number(settings.lowStock) || 0
     })
   },
@@ -52,7 +53,7 @@ Page({
   showAbout() {
     wx.showModal({
       title: this.data.appName + ' v' + this.data.version,
-      content: '本地保存图纸、库存和出入库记录。图片识别在设备端完成，不上传微信私钥或 GitHub 凭据。',
+      content: '本地保存图纸、库存、拼豆计时和操作记录。图片识别在设备端完成，不上传微信私钥或 GitHub 凭据。',
       showCancel: false
     })
   }

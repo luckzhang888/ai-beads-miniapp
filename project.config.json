@@ -1,7 +1,7 @@
 {
-  "description": "AI豆仓类微信小程序",
+  "description": "豆仓助手微信小程序",
   "miniprogramRoot": "miniprogram/",
-  "projectname": "ai-beads-miniapp",
+  "projectname": "豆仓助手",
   "appid": "touristappid",
   "compileType": "miniprogram",
   "setting": {

@@ -48,6 +48,7 @@ async function main() {
   const palette = require('../miniprogram/data/colors/mard')
   const patternUtils = require('../miniprogram/utils/pattern')
   const inventoryUtils = require('../miniprogram/utils/inventory')
+  const activityUtils = require('../miniprogram/utils/activity')
 
   const library = loadPage('../miniprogram/pages/patterns/patterns')
   library.onShow()
@@ -111,7 +112,7 @@ async function main() {
   inventory.openAiEntry()
   assert.strictEqual(navigationLog[navigationLog.length - 1], '/pages/convert/convert?mode=recognize')
   inventory.openStockEntry({ currentTarget: { dataset: { tab: 'batch', direction: 1 } } })
-  assert.strictEqual(inventory.data.batchRows.length, 221)
+  assert.strictEqual(inventory.data.batchRows.length, 295)
   inventory.inputBatchAmount({ currentTarget: { dataset: { code: 'A1' } }, detail: { value: '500' } })
   inventory.quickBatchAmount({ currentTarget: { dataset: { code: 'A2', amount: '1000' } } })
   assert.strictEqual(inventory.data.batchSelectedCount, 2)
@@ -124,16 +125,16 @@ async function main() {
   assert.strictEqual(inventoryUtils.undoTransaction(batchTransaction.id).ok, true)
 
   inventory.openStockEntry({ currentTarget: { dataset: { tab: 'package', direction: 1 } } })
-  assert.strictEqual(inventory.data.packageOptions.find((item) => item.count === 295).unavailable, true)
+  assert.strictEqual(inventory.data.packageOptions.find((item) => item.count === 295).unavailable, false)
   inventory.selectPackage({ currentTarget: { dataset: { count: 295 } } })
-  assert.strictEqual(inventory.data.selectedPackage, 221)
-  inventory.setData({ selectedPackage: 221, packageAmount: 500, entryDirection: 1 })
+  assert.strictEqual(inventory.data.selectedPackage, 295)
+  inventory.setData({ selectedPackage: 295, packageAmount: 500, entryDirection: 1 })
   inventory.confirmStockEntry()
   const stocked = inventoryUtils.getInventory('MARD')
-  assert.strictEqual(Object.keys(stocked).length, 221)
+  assert.strictEqual(Object.keys(stocked).length, 295)
   assert.ok(palette.every((item) => stocked[item.code] === 500))
   const transaction = inventoryUtils.getTransactions()[0]
-  assert.strictEqual(transaction.items.length, 221)
+  assert.strictEqual(transaction.items.length, 295)
   assert.strictEqual(inventoryUtils.undoTransaction(transaction.id).ok, true)
   assert.ok(palette.every((item) => inventoryUtils.getInventory('MARD')[item.code] === 0))
 
@@ -144,11 +145,16 @@ async function main() {
   assert.strictEqual(inventory.data.showShortageSheet, true)
   assert.ok(inventory.data.shortageRows.length >= 3)
 
+  activityUtils.recordActivity('bead-session', { patternId: p1.id, patternName: p1.name, durationMs: 125000, title: '拼豆计时' })
+  activityUtils.recordActivity('pattern-progress', { patternId: p1.id, patternName: p1.name, title: '更新拼豆进度', description: '完成度 25%' })
   const records = loadPage('../miniprogram/pages/records/records')
   records.onShow()
   assert.ok(records.data.recordCount >= 2)
   records.selectFilter({ currentTarget: { dataset: { value: 'in' } } })
   assert.ok(records.data.visibleRecords.every((item) => item.direction === 'in'))
+  records.selectFilter({ currentTarget: { dataset: { value: 'timer' } } })
+  assert.strictEqual(records.data.visibleRecords.length, 1)
+  assert.strictEqual(records.data.visibleRecords[0].durationLabel, '2分05秒')
 
   let beadGridDefinition
   global.Component = (definition) => { beadGridDefinition = definition }

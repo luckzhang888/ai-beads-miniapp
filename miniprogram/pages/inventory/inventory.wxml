@@ -3,7 +3,7 @@
   <view class="warehouse-header">
     <view>
       <view class="warehouse-title">我的豆仓</view>
-      <view class="warehouse-subtitle">MARD 221 标准色库存</view>
+      <view class="warehouse-subtitle">MARD 295 标准色库存</view>
     </view>
     <view class="warehouse-header-actions">
       <view class="header-stock-action out" data-tab="batch" data-direction="-1" bindtap="openStockEntry">⊖ 手动出库</view>
@@ -31,7 +31,7 @@
   <view class="inventory-quick-actions four">
     <view class="quick-action" bindtap="showShortageList">缺豆清单 <text>{{shortageCount}}</text></view>
     <view class="quick-action" bindtap="openConsumptionCalculator">消耗计算</view>
-    <view class="quick-action" bindtap="goRecords">出入库记录</view>
+    <view class="quick-action" bindtap="goRecords">全部记录</view>
     <view class="quick-action" bindtap="setLowStockThreshold">低库存阈值 <text>{{lowStock}}</text></view>
   </view>
 
@@ -49,11 +49,11 @@
     <view class="series-tabs">
       <view
         wx:for="{{seriesOptions}}"
-        wx:key="*this"
-        class="{{activeSeries === item ? 'series-tab active' : 'series-tab'}}"
-        data-series="{{item}}"
+        wx:key="code"
+        class="{{activeSeries === item.code ? 'series-tab active' : 'series-tab'}}"
+        data-series="{{item.code}}"
         bindtap="selectSeries"
-      >{{item === 'ALL' ? '全部' : item}}</view>
+      >{{item.label}}</view>
     </view>
   </scroll-view>
 
@@ -72,7 +72,7 @@
   <view wx:if="{{viewMode === 'series'}}" class="series-list">
     <view class="series-block" wx:for="{{groups}}" wx:key="series">
       <view class="series-header" data-series="{{item.series}}" bindtap="toggleSeries">
-        <view class="series-name">{{item.series}}系列</view>
+        <view class="series-name">{{item.label}}</view>
         <view class="series-meta">{{item.colorCount}} 色号 · {{item.totalStock}} 粒　{{item.expanded ? '⌄' : '›'}}</view>
       </view>
 
@@ -126,7 +126,7 @@
     </view>
   </view>
 
-  <view class="page-note">库存按品牌隔离保存；当前已接入 MARD 221 色，新增品牌色卡后可直接扩展。</view>
+  <view class="page-note">库存按品牌隔离保存；当前已接入完整 MARD 295 色卡。</view>
 
   <view wx:if="{{showStockEntry}}" class="full-mask">
     <view class="stock-entry-page">

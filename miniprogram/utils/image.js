@@ -1,4 +1,5 @@
 const { matchImageData } = require('./color-match')
+const { recognizeGuideGrid, sampleGridCells, classifySampleRows } = require('./grid-recognition')
 
 function getImageInfo(src) {
   return new Promise((resolve, reject) => {
@@ -214,8 +215,82 @@ async function imageToPattern(imagePath, shortSide, palette, options) {
 
   result.width = width
   result.height = height
-  result.blankCount = width * height - result.stats.reduce((sum, item) => sum + Number(item.required || 0), 0)
+  result.beadCount = result.stats.reduce((sum, item) => sum + Number(item.required || 0), 0)
+  result.blankCount = width * height - result.beadCount
+  result.recognitionMode = 'pixel'
+  result.confidence = 0.45
   return result
+}
+
+async function gridImageToPattern(imagePath, shortSide, palette, options) {
+  const settings = options || {}
+  const info = await getImageInfo(imagePath)
+  const longestSide = Math.max(info.width, info.height)
+  const recognitionMaxSide = Math.max(1200, Number(settings.recognitionMaxSide) || 2000)
+  const scale = longestSide > recognitionMaxSide ? recognitionMaxSide / longestSide : 1
+  const width = Math.max(1, Math.round(info.width * scale))
+  const height = Math.max(1, Math.round(info.height * scale))
+  const canvas = createProcessorCanvas(width, height)
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  const image = await loadCanvasImage(canvas, info.path)
+
+  ctx.clearRect(0, 0, width, height)
+  ctx.imageSmoothingEnabled = true
+  if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(image, 0, 0, info.width, info.height, 0, 0, width, height)
+
+  const detected = recognizeGuideGrid(ctx.getImageData(0, 0, width, height), width, height, palette, settings)
+  if (detected.ok) {
+    const sourceCellWidth = detected.grid.cellWidth / scale
+    const sourceCellHeight = detected.grid.cellHeight / scale
+    const sampleCellSize = Math.max(24, Math.min(64, Math.round(Math.min(sourceCellWidth, sourceCellHeight))))
+    const rowCanvas = createProcessorCanvas(detected.width * sampleCellSize, sampleCellSize)
+    rowCanvas.width = detected.width * sampleCellSize
+    rowCanvas.height = sampleCellSize
+    const rowContext = rowCanvas.getContext('2d')
+    const rowImage = await loadCanvasImage(rowCanvas, info.path)
+    rowContext.imageSmoothingEnabled = false
+    const sourceX = detected.grid.x / scale
+    const sourceY = detected.grid.y / scale
+    const sampleRows = []
+    for (let row = 0; row < detected.height; row += 1) {
+      rowContext.clearRect(0, 0, rowCanvas.width, rowCanvas.height)
+      rowContext.drawImage(
+        rowImage,
+        sourceX,
+        sourceY + row * sourceCellHeight,
+        detected.width * sourceCellWidth,
+        sourceCellHeight,
+        0,
+        0,
+        rowCanvas.width,
+        rowCanvas.height
+      )
+      sampleRows.push(sampleGridCells(
+        rowContext.getImageData(0, 0, rowCanvas.width, rowCanvas.height),
+        rowCanvas.width,
+        rowCanvas.height,
+        { x: 0, y: 0, cellWidth: sampleCellSize, cellHeight: sampleCellSize, columns: detected.width, rows: 1 }
+      )[0])
+    }
+    const precise = classifySampleRows(sampleRows, palette, settings, {
+      confidence: detected.confidence,
+      grid: detected.grid
+    })
+    precise.sourceWidth = info.width
+    precise.sourceHeight = info.height
+    precise.recognitionScale = scale
+    precise.sampleCellSize = sampleCellSize
+    return precise
+  }
+
+  const fallback = await imageToPattern(imagePath, shortSide, palette, settings)
+  fallback.recognitionMode = 'pixel-fallback'
+  fallback.recognitionReason = detected.reason || 'guide-grid-not-detected'
+  fallback.warning = '未检测到规则网格，已按普通图片生成；可在下一步校准尺寸和色号。'
+  return fallback
 }
 
 function recommendPatternSize(width, height) {
@@ -229,6 +304,7 @@ function recommendPatternSize(width, height) {
 
 module.exports = {
   imageToPattern,
+  gridImageToPattern,
   recommendPatternSize,
   calculatePatternDimensions,
   normalizeTransform,

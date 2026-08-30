@@ -15,9 +15,24 @@ const {
   toggleProgressIndices,
   calculateProgress
 } = require('../../utils/pattern')
+const {
+  recordActivity,
+  getActiveSession,
+  startBeadSession,
+  pauseBeadSession
+} = require('../../utils/activity')
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 6
+
+function formatClock(durationMs) {
+  const total = Math.max(0, Math.floor((Number(durationMs) || 0) / 1000))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const seconds = total % 60
+  return (hours ? String(hours).padStart(2, '0') + ':' : '') +
+    String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0')
+}
 
 function recommendedZoom(pattern) {
   const system = wx.getSystemInfoSync()
@@ -76,7 +91,9 @@ Page({
     scrollTop: 0,
     performanceHint: '',
     axisX: [],
-    axisY: []
+    axisY: [],
+    timerActive: false,
+    timerText: '00:00'
   },
 
   onLoad(options) {
@@ -99,10 +116,17 @@ Page({
     this.patternId = pattern.id
     setCurrentPattern(pattern)
     this.setPattern(pattern)
+    const session = getActiveSession()
+    if (session && session.patternId === pattern.id) this.resumeTimerDisplay(session)
+  },
+
+  onHide() {
+    this.pauseTimer('离开图纸')
   },
 
   onUnload() {
     this.persistViewState()
+    this.pauseTimer('离开图纸')
   },
 
   setPattern(pattern) {
@@ -279,6 +303,7 @@ Page({
   persistProgress(completedIndices) {
     const current = getPatternById(this.patternId) || this.data.pattern
     const info = calculateProgress(current.matrix, completedIndices)
+    const previousPercent = Number(this.data.progress) || 0
     const saved = savePattern(Object.assign({}, current, {
       completedCellIndices: completedIndices,
       completedCodes: info.completedCodes,
@@ -287,6 +312,55 @@ Page({
     }), mardPalette)
     setCurrentPattern(saved)
     this.setPattern(saved)
+    const previousMilestone = Math.floor(previousPercent / 25)
+    const nextMilestone = Math.floor(info.percent / 25)
+    if (nextMilestone > previousMilestone || info.percent >= 100) {
+      recordActivity('pattern-progress', {
+        patternId: saved.id,
+        patternName: saved.name,
+        title: info.percent >= 100 ? '图纸进度完成' : '更新拼豆进度',
+        description: '完成度 ' + info.percent + '%',
+        metadata: { percent: info.percent, completed: info.completed, total: info.total }
+      })
+    }
+  },
+
+  resumeTimerDisplay(session) {
+    clearInterval(this.timerInterval)
+    const update = () => {
+      const active = getActiveSession()
+      if (!active || active.id !== session.id) {
+        clearInterval(this.timerInterval)
+        this.setData({ timerActive: false, timerText: '00:00' })
+        return
+      }
+      this.setData({ timerActive: true, timerText: formatClock(Date.now() - Number(active.startedAt)) })
+    }
+    update()
+    this.timerInterval = setInterval(update, 1000)
+  },
+
+  startTimer() {
+    if (!this.data.pattern) return
+    const session = startBeadSession(this.data.pattern, { source: 'pattern-workspace' })
+    this.resumeTimerDisplay(session)
+  },
+
+  pauseTimer(reason) {
+    clearInterval(this.timerInterval)
+    const active = getActiveSession()
+    if (active && active.patternId === this.patternId) pauseBeadSession(reason || '手动暂停')
+    if (this.data.timerActive) this.setData({ timerActive: false, timerText: '00:00' })
+  },
+
+  toggleTimer() {
+    if (this.data.timerActive) {
+      this.pauseTimer('手动暂停')
+      wx.showToast({ title: '计时已保存到记录', icon: 'none' })
+      return
+    }
+    this.startTimer()
+    wx.showToast({ title: '开始记录拼豆时间', icon: 'none' })
   },
 
   currentViewState() {
@@ -330,6 +404,13 @@ Page({
       const saved = savePattern(Object.assign({}, pattern, { status: '正在拼' }), mardPalette)
       setCurrentPattern(saved)
       this.setData({ pattern: saved, working: true }, () => this.updateWorkButton())
+      this.startTimer()
+      recordActivity('pattern-status', {
+        patternId: saved.id,
+        patternName: saved.name,
+        title: '开始拼豆',
+        description: this.data.highlightCode ? ('当前色号 ' + this.data.highlightCode) : '进入拼豆状态'
+      })
       return
     }
     this.completeSelectedColor()
@@ -456,6 +537,13 @@ Page({
           lastConsumeTransactionId: consumed.transactionId
         }), mardPalette)
         setCurrentPattern(saved)
+        this.pauseTimer('完成作品')
+        recordActivity('pattern-complete', {
+          patternId: saved.id,
+          patternName: saved.name,
+          title: '完成作品',
+          description: '完成并扣减库存'
+        })
         this.setPattern(saved)
         wx.showToast({ title: '库存已扣减', icon: 'success' })
       }

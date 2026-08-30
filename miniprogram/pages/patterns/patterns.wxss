@@ -88,6 +88,14 @@
 .folder-manager-sheet { max-height: 78vh; }
 .folder-manage-note { margin: 18rpx 0; padding: 16rpx 18rpx; border-radius: 15rpx; color: #807686; background: #f5f2f8; font-size: 20rpx; line-height: 1.55; }
 .folder-manage-list { overflow-y: auto; max-height: 650rpx; }
+
+@media (min-width: 768px) {
+  .pattern-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+  .pattern-preview { height: 260px; }
+  .upload-button { right: 38px; width: 210px; }
+  .selection-bar { left: 220px; padding-left: 42px; padding-right: 42px; }
+  .filter-sheet { max-width: 760px; margin: 0 auto; }
+}
 .folder-manage-row { min-height: 105rpx; display: grid; grid-template-columns: 60rpx minmax(0,1fr) 242rpx; align-items: center; gap: 14rpx; border-bottom: 1rpx solid #ece8f0; }
 .folder-manage-icon { width: 55rpx; height: 55rpx; display: flex; align-items: center; justify-content: center; border-radius: 16rpx; color: #6849d1; background: #eee8fa; }
 .folder-manage-copy { min-width: 0; }

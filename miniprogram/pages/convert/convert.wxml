@@ -32,7 +32,7 @@
     <view class="variant-row">
       <view wx:for="{{sourceVariants}}" wx:key="value" class="variant-item {{sourceVariant === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectSourceVariant"><view>{{sourceVariant === item.value ? '●' : '○'}}</view><text>{{item.label}}</text></view>
     </view>
-    <button class="primary-btn classify-confirm" bindtap="confirmSourceVariant">{{selectedMethod === 'recognize' || selectedMethod === 'link' ? '确认并智能识别' : '确认并继续设置'}}</button>
+    <button class="primary-btn classify-confirm" bindtap="confirmSourceVariant">{{selectedMethod === 'recognize' || selectedMethod === 'diagram' || selectedMethod === 'link' ? '确认并智能识别' : '确认并继续设置'}}</button>
     <button class="secondary-btn" bindtap="chooseImage">重新选择图片</button>
   </view>
 </view>
@@ -45,8 +45,10 @@
   </view>
   <view wx:if="{{recognitionResult}}" class="recognition-summary">
     <view><text>网格</text><b>{{recognitionResult.width}} × {{recognitionResult.height}}</b></view>
-    <view><text>图例</text><b>{{recognitionResult.usedColorCount}} 色 · {{recognitionResult.stats.length}} 项</b></view>
+    <view><text>图例</text><b>{{recognitionResult.usedColorCount}} 色 · {{recognitionResult.beadCount}} 颗</b></view>
+    <view><text>方式</text><b>{{recognitionResult.recognitionModeText}} · {{recognitionResult.confidencePercent}}%</b></view>
   </view>
+  <view wx:if="{{recognitionResult.warning}}" class="recognition-warning">{{recognitionResult.warning}}</view>
   <view class="recognition-progress-card">
     <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 对齐网格</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 统计图例</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 识别色号</text></view>
     <view class="recognition-step"><b>{{recognitionStep}}</b><text>{{recognitionProgress}}%</text></view>
@@ -59,7 +61,7 @@
 </view>
 
 <view wx:elif="{{stage === 'config'}}" class="container config-page">
-  <view class="config-head"><view><view class="config-title">{{selectedMethodTitle || '图纸导入'}}</view><view class="config-note">使用 MARD 221 标准色与 CIEDE2000 匹配</view></view><view class="config-actions"><view class="batch-import" bindtap="chooseBatchImages">▧ 批量导入</view><view class="back-methods" bindtap="resetMethods">更换方式</view></view></view>
+  <view class="config-head"><view><view class="config-title">{{selectedMethodTitle || '图纸导入'}}</view><view class="config-note">使用 MARD 295 标准色与 CIEDE2000 匹配</view></view><view class="config-actions"><view class="batch-import" bindtap="chooseBatchImages">▧ 批量导入</view><view class="back-methods" bindtap="resetMethods">更换方式</view></view></view>
   <view class="card">
     <view class="step-title">1. 选择图片</view>
     <view
@@ -140,7 +142,7 @@
     <view class="palette-row">
       <view>
         <view class="palette-name">{{paletteName}}</view>
-        <view class="hint">MARD 基础系列 A/B/C/D/E/F/G/H/M，共 221 色。</view>
+        <view class="hint">MARD A–M 基础色与 P/Q/R/T/Y/Z 特效色，共 295 色。</view>
       </view>
       <view class="badge">Lab / ΔE2000</view>
     </view>

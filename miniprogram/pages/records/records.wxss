@@ -1,10 +1,11 @@
 .records-page { min-height: 100vh; box-sizing: border-box; padding: 24rpx 24rpx 70rpx; color: #26212b; background: linear-gradient(180deg,#f5f2ff,#f7fafc 360rpx,#f8f9fb); }
-.record-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 24rpx 10rpx; border-radius: 26rpx; background: white; box-shadow: 0 12rpx 32rpx rgba(70,56,91,.07); }
+.record-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); padding: 24rpx 10rpx; border-radius: 26rpx; background: white; box-shadow: 0 12rpx 32rpx rgba(70,56,91,.07); }
 .record-summary > view { display: flex; flex-direction: column; align-items: center; gap: 6rpx; }
 .record-summary > view + view { border-left: 1rpx solid #ece8f0; }
 .summary-value { font-size: 32rpx; font-weight: 800; }
 .summary-value.in { color: #15916b; }
 .summary-value.out { color: #dc5867; }
+.summary-value.timer { color: #6b4fd4; font-size: 25rpx; }
 .summary-label { color: #9991a0; font-size: 19rpx; }
 .filter-scroll { margin: 22rpx 0; white-space: nowrap; }
 .filter-row { display: inline-flex; gap: 12rpx; }
@@ -18,11 +19,13 @@
 .direction-icon { width: 57rpx; height: 57rpx; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 18rpx; color: #756d7c; background: #f1eff4; font-size: 32rpx; font-weight: 700; }
 .direction-icon.in { color: #168a68; background: #e0f7ee; }
 .direction-icon.out { color: #d84f60; background: #fff0f2; }
+.direction-icon.activity { color: #684bd0; background: #eee9ff; }
 .heading-copy { min-width: 0; }
 .heading-copy view { overflow: hidden; font-size: 25rpx; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
 .heading-copy > text { display: block; margin-top: 6rpx; color: #9d96a2; font-size: 18rpx; }
 .record-type.in { color: #168a68; }
 .record-type.out { color: #d84f60; }
+.record-type.activity, .record-amount.activity { color: #684bd0; }
 .record-amount { flex: none; color: #746c7b; font-size: 25rpx; font-weight: 800; }
 .record-amount.in { color: #168a68; }
 .record-amount.out { color: #d84f60; }
@@ -30,6 +33,7 @@
 .pattern-record-thumb { width: 72rpx; height: 72rpx; flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 14rpx; background: white; }
 .pattern-record > view:last-child view { font-size: 22rpx; font-weight: 700; }
 .pattern-record > view:last-child text { display: block; margin-top: 5rpx; color: #7863c9; font-size: 18rpx; }
+.activity-description { margin-top: 16rpx; padding: 15rpx 17rpx; border-radius: 16rpx; color: #665d6d; background: #f7f4fc; font-size: 21rpx; }
 .change-list { display: flex; flex-wrap: wrap; gap: 9rpx; margin-top: 19rpx; }
 .change-chip { min-width: 112rpx; padding: 8rpx 11rpx; display: flex; align-items: center; gap: 7rpx; box-sizing: border-box; border: 1rpx solid #e7e2eb; border-radius: 12rpx; background: #fdfcfd; font-size: 18rpx; }
 .change-dot { width: 22rpx; height: 22rpx; flex: none; border: 1rpx solid rgba(55,45,62,.12); border-radius: 50%; }
@@ -41,3 +45,8 @@
 .record-footer button { margin: 0 0 0 auto; color: #6549ca; border-radius: 13rpx; background: #f0ecfa; }
 .undone-label { margin-left: auto; color: #9e97a3; font-size: 20rpx; }
 .empty-records { padding: 130rpx 20rpx; color: #9d96a2; text-align: center; }
+
+@media (min-width: 768px) {
+  .record-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+  .record-card { margin-bottom: 0; }
+}

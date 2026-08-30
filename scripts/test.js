@@ -4,6 +4,7 @@ const { rgbToLab, deltaE2000 } = require('../miniprogram/utils/lab')
 const { preparePalette, findNearestColor, cleanupMatrix, shouldTreatAsBlank, matchImageData, mergeSimilarColors } = require('../miniprogram/utils/color-match')
 const { calculatePatternDimensions, recommendPatternSize, normalizeTransform } = require('../miniprogram/utils/image')
 const { buildPageRanges } = require('../miniprogram/utils/export')
+const { recognizeGuideGrid, prepareRecognitionPalette } = require('../miniprogram/utils/grid-recognition')
 
 const storage = new Map()
 global.wx = {
@@ -23,12 +24,17 @@ global.wx = {
 
 const patternUtils = require('../miniprogram/utils/pattern')
 const inventoryUtils = require('../miniprogram/utils/inventory')
+const activityUtils = require('../miniprogram/utils/activity')
 
 function approximately(actual, expected, tolerance) {
   assert.ok(Math.abs(actual - expected) <= tolerance, actual + ' is not within ' + tolerance + ' of ' + expected)
 }
 
-assert.strictEqual(palette.length, 221)
+assert.strictEqual(palette.length, 295)
+assert.deepStrictEqual(
+  ['P', 'Q', 'R', 'T', 'Y', 'Z'].map((series) => palette.filter((item) => item.code[0] === series).length),
+  [23, 5, 28, 1, 9, 8]
+)
 const white = rgbToLab([255, 255, 255])
 approximately(white[0], 100, 0.02)
 approximately(white[1], 0, 0.03)
@@ -47,6 +53,61 @@ assert.strictEqual(shouldTreatAsBlank(20, 20, 20, 0, {}), true)
 assert.deepStrictEqual(normalizeTransform({ scale: 10, offsetX: -4, rotation: 90, mirrored: true }), {
   scale: 4, offsetX: -1, offsetY: 0, rotation: 90, mirrored: true
 })
+const recognitionPalette = prepareRecognitionPalette(palette)
+assert.strictEqual(findNearestColor([210, 176, 180], recognitionPalette).code, 'E21')
+assert.strictEqual(findNearestColor([240, 240, 240], recognitionPalette).code, 'H17')
+
+function syntheticGuideChart() {
+  const columns = 22
+  const rows = 22
+  const cell = 10
+  const x0 = 20
+  const y0 = 20
+  const width = 250
+  const height = 260
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let offset = 0; offset < data.length; offset += 4) {
+    data[offset] = 255
+    data[offset + 1] = 255
+    data[offset + 2] = 255
+    data[offset + 3] = 255
+  }
+  const fillRect = (left, top, right, bottom, rgb) => {
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        const offset = (y * width + x) * 4
+        data[offset] = rgb[0]
+        data[offset + 1] = rgb[1]
+        data[offset + 2] = rgb[2]
+      }
+    }
+  }
+  const chartColors = [[210, 176, 180], [240, 240, 240], [71, 69, 76]]
+  for (let index = 0; index < 60; index += 1) {
+    const x = index % columns
+    const y = Math.floor(index / columns)
+    const rgb = chartColors[index % chartColors.length]
+    fillRect(x0 + x * cell + 1, y0 + y * cell + 1, x0 + (x + 1) * cell, y0 + (y + 1) * cell, rgb)
+    const ink = Math.max.apply(null, rgb) < 130 ? [255, 255, 255] : [45, 45, 45]
+    fillRect(x0 + x * cell + 4, y0 + y * cell + 4, x0 + x * cell + 6, y0 + y * cell + 7, ink)
+  }
+  for (let x = 0; x < columns; x += 1) {
+    fillRect(x0 + x * cell + 4, y0 + rows * cell + 3, x0 + x * cell + 7, y0 + rows * cell + 7, [40, 40, 40])
+  }
+  for (let index = 1; index <= 21; index += 5) {
+    fillRect(x0 + index * cell, 0, x0 + index * cell + 1, height, [230, 35, 35])
+    fillRect(0, y0 + index * cell, width, y0 + index * cell + 1, [230, 35, 35])
+  }
+  return { imageData: { data }, width, height }
+}
+
+const guideFixture = syntheticGuideChart()
+const guideResult = recognizeGuideGrid(guideFixture.imageData, guideFixture.width, guideFixture.height, palette)
+assert.strictEqual(guideResult.ok, true)
+assert.strictEqual(guideResult.width, 22)
+assert.strictEqual(guideResult.height, 22)
+assert.strictEqual(guideResult.beadCount, 60)
+assert.strictEqual(guideResult.usedColorCount, 3)
 const blankResult = matchImageData({ data: new Uint8ClampedArray([
   255, 255, 255, 255,
   61, 175, 128, 255
@@ -114,6 +175,11 @@ assert.deepStrictEqual(inventoryUtils.summarizeTransaction({ type: 'consume', it
 })
 assert.deepStrictEqual(inventoryUtils.summarizeTransaction({ type: 'batch', items: [{ code: 'A1', delta: 50 }, { code: 'B7', delta: -20 }] }), {
   direction: 'adjust', typeLabel: '库存调整', inbound: 50, outbound: 20, amountLabel: '+50 / -20'
+})
+activityUtils.recordActivity('bead-session', { patternId: 'unit-pattern', patternName: '单测图纸', durationMs: 65000 })
+assert.strictEqual(activityUtils.formatDuration(65000), '1分05秒')
+assert.deepStrictEqual(activityUtils.summarizeActivities(activityUtils.getActivities()), {
+  count: 1, sessionCount: 1, durationMs: 65000
 })
 inventoryUtils.setStock('B7', 12)
 assert.strictEqual(inventoryUtils.consumeStats([{ code: 'B7', required: 8 }]).ok, true)
@@ -212,7 +278,7 @@ assert.strictEqual(editorPage.data.candidates.length, 6)
 
 const inventoryPage = loadPage('../miniprogram/pages/inventory/inventory')
 inventoryPage.onShow()
-assert.strictEqual(inventoryPage.data.colorCount, 221)
+assert.strictEqual(inventoryPage.data.colorCount, 295)
 assert.ok(Array.isArray(inventoryPage.data.transactions))
 
 const convertPage = loadPage('../miniprogram/pages/convert/convert')

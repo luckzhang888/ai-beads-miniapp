@@ -1,6 +1,6 @@
 <view class="container">
   <view class="hero card">
-    <view class="badge">AI豆仓 MVP</view>
+    <view class="badge">豆仓助手</view>
     <view class="title">把图片变成拼豆图纸</view>
     <view class="subtitle">
       导入图片，选择 32 / 48 / 64 / 128 尺寸，自动匹配色号并统计库存缺口。

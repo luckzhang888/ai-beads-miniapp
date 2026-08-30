@@ -441,3 +441,10 @@
   .manual-row { grid-template-columns: 40rpx 1fr 1fr; padding: 12rpx 0; }
   .manual-row .row-preset { display: none; }
 }
+
+@media (min-width: 768px) {
+  .stock-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 18px; }
+  .color-grid { grid-template-columns: repeat(8,minmax(0,1fr)); }
+  .stock-entry-sheet, .consumption-sheet { max-width: 980px; margin: 0 auto; }
+  .package-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
+}

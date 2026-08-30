@@ -2,6 +2,7 @@ const mardPalette = require('../../data/colors/mard')
 const { createPaletteMap } = require('../../utils/color-match')
 const { getSavedPatterns } = require('../../utils/pattern')
 const { getTransactions, summarizeTransaction, undoTransaction } = require('../../utils/inventory')
+const { getActivities, summarizeActivities, formatDuration } = require('../../utils/activity')
 
 function pad(value) {
   return Number(value) < 10 ? ('0' + value) : String(value)
@@ -28,11 +29,24 @@ function sourceLabel(source) {
   return value ? '库存操作' : '作品库存联动'
 }
 
+function activityPresentation(record) {
+  const types = {
+    'bead-session': { category: 'timer', icon: '◷', label: '拼豆计时' },
+    'pattern-import': { category: 'pattern', icon: '▧', label: '导入图纸' },
+    'pattern-status': { category: 'pattern', icon: '▶', label: '图纸动态' },
+    'pattern-progress': { category: 'pattern', icon: '✓', label: '拼豆进度' },
+    'pattern-complete': { category: 'pattern', icon: '★', label: '完成作品' }
+  }
+  return types[record.type] || { category: 'pattern', icon: '•', label: record.title || '图纸动态' }
+}
+
 Page({
   data: {
     paletteMap: createPaletteMap(mardPalette),
     filters: [
       { value: 'all', label: '全部' },
+      { value: 'timer', label: '拼豆计时' },
+      { value: 'pattern', label: '图纸动态' },
       { value: 'in', label: '入库' },
       { value: 'out', label: '出库' },
       { value: 'adjust', label: '调整' }
@@ -42,6 +56,8 @@ Page({
     visibleRecords: [],
     inboundTotal: 0,
     outboundTotal: 0,
+    totalTimeText: '0秒',
+    sessionCount: 0,
     recordCount: 0,
     expandedId: ''
   },
@@ -57,7 +73,7 @@ Page({
       return result
     }, {})
     const colorMap = this.data.paletteMap
-    const records = getTransactions().map((transaction) => {
+    const inventoryRecords = getTransactions().map((transaction) => {
       const summary = summarizeTransaction(transaction)
       const metadata = transaction.metadata || {}
       const pattern = metadata.patternId ? patternMap[metadata.patternId] : null
@@ -70,7 +86,10 @@ Page({
       }))
       const expanded = this.data.expandedId === transaction.id
       return Object.assign({}, summary, {
+        kind: 'inventory',
+        category: summary.direction,
         id: transaction.id,
+        createdAt: transaction.createdAt,
         timeLabel: formatTime(transaction.createdAt),
         sourceLabel: sourceLabel(metadata.source),
         patternId: metadata.patternId || '',
@@ -83,18 +102,48 @@ Page({
         undone: Boolean(transaction.undone)
       })
     })
-    const activeRecords = records.filter((item) => !item.undone)
+    const activities = getActivities()
+    const activityRecords = activities.map((record) => {
+      const presentation = activityPresentation(record)
+      const pattern = record.patternId ? patternMap[record.patternId] : null
+      return {
+        id: record.id,
+        kind: 'activity',
+        category: presentation.category,
+        direction: 'activity',
+        icon: presentation.icon,
+        typeLabel: record.title || presentation.label,
+        sourceLabel: presentation.label,
+        timeLabel: formatTime(record.createdAt),
+        createdAt: record.createdAt,
+        patternId: record.patternId || '',
+        patternName: record.patternName || '',
+        previewMatrix: pattern ? pattern.matrix : [],
+        description: record.description || '',
+        durationLabel: record.durationMs ? formatDuration(record.durationMs) : '',
+        amountLabel: record.durationMs ? formatDuration(record.durationMs) : '',
+        items: [],
+        visibleItems: [],
+        hiddenCount: 0,
+        undone: false
+      }
+    })
+    const records = inventoryRecords.concat(activityRecords).sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
+    const activeRecords = inventoryRecords.filter((item) => !item.undone)
+    const activitySummary = summarizeActivities(activities)
     this.setData({
       records,
       inboundTotal: activeRecords.reduce((sum, item) => sum + item.inbound, 0),
       outboundTotal: activeRecords.reduce((sum, item) => sum + item.outbound, 0),
+      totalTimeText: formatDuration(activitySummary.durationMs),
+      sessionCount: activitySummary.sessionCount,
       recordCount: records.length
     }, () => this.applyFilter())
   },
 
   applyFilter() {
     const active = this.data.activeFilter
-    const visibleRecords = this.data.records.filter((item) => active === 'all' || item.direction === active)
+    const visibleRecords = this.data.records.filter((item) => active === 'all' || item.category === active || item.direction === active)
     this.setData({ visibleRecords })
   },
 

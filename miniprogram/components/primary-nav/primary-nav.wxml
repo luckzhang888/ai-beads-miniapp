@@ -4,7 +4,7 @@
       <view class="brand-mark" aria-label="{{appName}} Logo">
         <view class="brand-cube"><view class="cube-top"></view><view class="cube-left"></view><view class="cube-right"></view></view>
       </view>
-      <view><view class="brand-name">{{appName}}</view><view class="brand-note">MARD 221 标准色</view></view>
+      <view><view class="brand-name">{{appName}}</view><view class="brand-note">MARD 295 标准色</view></view>
     </view>
   </view>
   <scroll-view scroll-x class="primary-scroll" enhanced show-scrollbar="false">

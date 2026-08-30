@@ -12,7 +12,7 @@ Component({
   },
 
   data: {
-    appName: 'AI豆仓',
+    appName: '豆仓助手',
     items: [
       { id: 'inventory', label: '豆仓' },
       { id: 'patterns', label: '图纸册' },

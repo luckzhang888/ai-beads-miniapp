@@ -18,3 +18,8 @@
 .empty-state view { color: #7254d8; font-size: 58rpx; }
 .empty-state text { margin: 12rpx 0 25rpx; }
 .empty-state button { color: white; border-radius: 18rpx; background: #694ad2; }
+
+@media (min-width: 768px) {
+  .inspiration-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+  .preview { height: 250px; }
+}

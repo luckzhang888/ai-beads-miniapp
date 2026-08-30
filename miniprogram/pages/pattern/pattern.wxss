@@ -5,6 +5,7 @@
 .tool-item text { font-size: 27rpx; font-weight: 700; }
 .tool-item view { margin-top: 4rpx; font-size: 17rpx; }
 .tool-item.active { color: white; background: linear-gradient(145deg, #218bb0, #2aabd0); }
+.tool-item.timer-active { width: 104rpx; background: linear-gradient(145deg,#6f50df,#9b67e8); }
 .progress-bar { height: 77rpx; padding: 10rpx 23rpx; box-sizing: border-box; background: white; }
 .progress-copy { display: flex; align-items: center; justify-content: space-between; }
 .progress-copy > text:first-child { max-width: 70%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; }

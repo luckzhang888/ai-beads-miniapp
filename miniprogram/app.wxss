@@ -67,3 +67,30 @@ page {
   color: #6847ce;
   font-size: 22rpx;
 }
+
+@media (min-width: 768px) {
+  .warehouse-page,
+  .library-page,
+  .inspiration-page,
+  .records-page,
+  .profile-page {
+    width: calc(100% - 220px);
+    min-height: 100vh;
+    margin-left: 220px;
+    padding-left: clamp(24px, 4vw, 52px);
+    padding-right: clamp(24px, 4vw, 52px);
+  }
+
+  .journey-page,
+  .classify-page,
+  .recognition-page,
+  .config-page,
+  .pdf-page,
+  .detail-page {
+    width: min(100%, 1080px);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(28px, 5vw, 72px);
+    padding-right: clamp(28px, 5vw, 72px);
+  }
+}

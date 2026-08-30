@@ -16,7 +16,8 @@ const {
   saveInventorySettings
 } = require('../../utils/inventory')
 
-const SERIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'M']
+const SERIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'M', 'P', 'Q', 'R', 'T', 'Y', 'Z']
+const SERIES_LABELS = { P: 'P（珠光）', Q: 'Q（温变）', R: 'R（果冻）', T: 'T（透明）', Y: 'Y（夜光）', Z: 'Z（光变）' }
 
 function naturalCodeNumber(code) {
   return Number(String(code).replace(/\D/g, '')) || 0
@@ -27,7 +28,7 @@ Page({
     paletteMap: createPaletteMap(mardPalette),
     query: '',
     activeSeries: 'ALL',
-    seriesOptions: ['ALL'].concat(SERIES),
+    seriesOptions: [{ code: 'ALL', label: '全部' }].concat(SERIES.map((code) => ({ code, label: SERIES_LABELS[code] || code }))),
     rows: [],
     groups: [],
     totalStock: 0,
@@ -63,7 +64,7 @@ Page({
       { count: 192, label: '192色' },
       { count: 216, label: '216色' },
       { count: 221, label: '221全实色' },
-      { count: 295, label: '295全色', unavailable: mardPalette.length < 295 }
+      { count: 295, label: '295全色', unavailable: false }
     ],
     selectedPackage: 221,
     packageAmount: 1000,
@@ -151,6 +152,7 @@ Page({
       const items = rows.filter((item) => item.series === series)
       return {
         series,
+        label: SERIES_LABELS[series] || (series + '系列'),
         items,
         colorCount: items.length,
         totalStock: items.reduce((sum, item) => sum + item.stock, 0),
@@ -349,14 +351,7 @@ Page({
   },
   selectPackage(event) {
     const count = Number(event.currentTarget.dataset.count) || 221
-    if (count > mardPalette.length) {
-      wx.showModal({
-        title: '295 色卡尚未配置',
-        content: '当前仓库只有 MARD 221 标准色数据，不能用重复或虚构色号冒充 295 色。补充额外 74 色色卡后，该套装会自动开放。',
-        showCancel: false
-      })
-      return
-    }
+    if (count > mardPalette.length) return
     this.setData({ selectedPackage: count })
   },
   inputPackageAmount(event) { this.setData({ packageAmount: Math.max(0, Math.floor(Number(event.detail.value) || 0)) }) },

@@ -38,3 +38,9 @@
 .primary-button { color: white; background: linear-gradient(135deg, #7b57e8, #6341d6); box-shadow: 0 10rpx 24rpx rgba(101,67,211,.24); }
 .more-button { padding: 0; color: #5f5668; background: white; border: 1rpx solid #ddd6e4; }
 .detail-actions button::after { border: 0; }
+
+@media (min-width: 768px) {
+  .main-preview { min-height: 650px; }
+  .color-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .detail-actions { left: 50%; right: auto; width: min(100%, 1080px); transform: translateX(-50%); box-sizing: border-box; }
+}

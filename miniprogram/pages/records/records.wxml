@@ -2,6 +2,7 @@
   <primary-nav active="records" />
   <view class="record-summary">
     <view><text class="summary-value">{{recordCount}}</text><text class="summary-label">条记录</text></view>
+    <view><text class="summary-value timer">{{totalTimeText}}</text><text class="summary-label">{{sessionCount}} 次拼豆计时</text></view>
     <view><text class="summary-value in">+{{inboundTotal}}</text><text class="summary-label">累计入库</text></view>
     <view><text class="summary-value out">-{{outboundTotal}}</text><text class="summary-label">累计出库</text></view>
   </view>
@@ -16,7 +17,7 @@
     <view class="record-card {{item.undone ? 'undone' : ''}}" wx:for="{{visibleRecords}}" wx:key="id">
       <view class="record-head">
         <view class="record-heading">
-          <view class="direction-icon {{item.direction}}">{{item.direction === 'in' ? '＋' : (item.direction === 'out' ? '－' : '↕')}}</view>
+          <view class="direction-icon {{item.direction}}">{{item.kind === 'activity' ? item.icon : (item.direction === 'in' ? '＋' : (item.direction === 'out' ? '－' : '↕'))}}</view>
           <view class="heading-copy">
             <view><text class="record-type {{item.direction}}">{{item.typeLabel}}</text><text wx:if="{{item.patternName}}"> · {{item.patternName}}</text></view>
             <text>{{item.sourceLabel}} · {{item.timeLabel}}</text>
@@ -30,7 +31,9 @@
         <view><view>关联图纸</view><text>查看“{{item.patternName}}”图纸详情 ›</text></view>
       </view>
 
-      <view class="change-list">
+      <view wx:if="{{item.kind === 'activity' && item.description}}" class="activity-description">{{item.description}}</view>
+
+      <view wx:if="{{item.kind === 'inventory'}}" class="change-list">
         <view class="change-chip" wx:for="{{item.visibleItems}}" wx:for-item="change" wx:key="key">
           <text class="change-dot" style="background: {{change.hex}};"></text>
           <text>{{change.code}}</text>
@@ -38,7 +41,7 @@
         </view>
       </view>
 
-      <view class="record-footer">
+      <view wx:if="{{item.kind === 'inventory'}}" class="record-footer">
         <view wx:if="{{item.hiddenCount}}" class="detail-toggle" data-id="{{item.id}}" bindtap="toggleDetails">{{item.expanded ? '收起明细' : '展开其余 ' + item.hiddenCount + ' 个色号'}}</view>
         <view wx:else class="item-count">共 {{item.items.length}} 个色号</view>
         <button wx:if="{{!item.undone}}" size="mini" data-id="{{item.id}}" bindtap="undoRecord">撤销</button>
@@ -46,5 +49,5 @@
       </view>
     </view>
   </view>
-  <view wx:else class="empty-records">当前筛选下还没有出入库记录</view>
+  <view wx:else class="empty-records">当前筛选下还没有记录</view>
 </view>
