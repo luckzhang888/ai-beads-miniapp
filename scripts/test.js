@@ -147,15 +147,15 @@ const beadGrid = Object.assign({
     if (callback) callback()
   }
 }, beadGridDefinition.methods)
-beadGrid.handleTouchStart({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 100, clientY: 0 }] })
-beadGrid.handleTouchMove({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 150, clientY: 0 }] })
+beadGrid.handleNativeTouchStart({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 100, clientY: 0 }] })
+beadGrid.handleNativeScale({ detail: { scale: 3 } })
 assert.strictEqual(zoomEvents.length, 0)
-beadGrid.handleTouchMove({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 1000, clientY: 0 }] })
-beadGrid.handleTouchEnd({ touches: [] })
+beadGrid.handleNativeScale({ detail: { scale: 8 } })
+beadGrid.handleNativeChange({ detail: { x: -120, y: -80, source: 'touch' } })
+beadGrid.handleNativeTouchEnd()
 assert.deepStrictEqual(zoomEvents[0], { name: 'zoomchange', detail: { zoom: 6 } })
+assert.deepStrictEqual(zoomEvents[1], { name: 'viewchange', detail: { scrollLeft: 120, scrollTop: 80 } })
 assert.strictEqual(beadGrid._pinching, false)
-assert.strictEqual(beadGrid.data.gestureScale, 1)
-assert.strictEqual(beadGrid.data.gestureActive, false)
 
 function loadPage(relativePath) {
   let definition

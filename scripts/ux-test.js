@@ -3,6 +3,7 @@ const assert = require('assert')
 async function main() {
   const storage = new Map()
   const modalLog = []
+  let actionSheetTapIndex = 0
   global.wx = {
     env: { USER_DATA_PATH: 'tmp' },
     getStorageSync(key) { return storage.get(key) },
@@ -22,7 +23,7 @@ async function main() {
       if (options.success) options.success({ confirm: true, content: options.content || '' })
     },
     showActionSheet(options) {
-      if (options.success) options.success({ tapIndex: 0 })
+      if (options.success) options.success({ tapIndex: actionSheetTapIndex })
     }
   }
 
@@ -49,11 +50,20 @@ async function main() {
   const library = loadPage('../miniprogram/pages/patterns/patterns')
   library.onShow()
   assert.strictEqual(library.data.patterns.length, 2)
-  const firstId = library.data.patterns[0].id
+  const firstId = library.data.patterns.find((item) => item.folderId === 'original').id
+  library.deleteFolder({ currentTarget: { dataset: { folder: 'original' } } })
+  assert.strictEqual(library.data.folderOptions.some((item) => item.id === 'original'), false)
+  assert.strictEqual(patternUtils.getPatternById(firstId).folderId, '')
+  actionSheetTapIndex = 1
   library.enterSelection({ currentTarget: { dataset: { id: firstId } } })
   assert.strictEqual(library.data.selectedCount, 1)
   library.moveSelected()
-  assert.strictEqual(patternUtils.getPatternById(firstId).folderId, 'original')
+  assert.strictEqual(patternUtils.getPatternById(firstId).folderId, 'favorites')
+  storage.set('aiDoucangFolders:v1', [{ id: 'favorites', title: '灵感图集' }, { id: 'empty', title: '空文件夹' }])
+  library.refresh()
+  assert.strictEqual(library.data.folders.find((item) => item.id === 'empty').cover, null)
+  library.deleteFolder({ currentTarget: { dataset: { folder: 'empty' } } })
+  assert.strictEqual(library.data.folderOptions.length, 1)
   library.enterSelection({ currentTarget: { dataset: { id: firstId } } })
   library.selectAllVisible()
   assert.strictEqual(library.data.selectedCount, 2)
@@ -92,29 +102,34 @@ async function main() {
   require(componentPath)
   delete global.Component
   const zoomEvents = []
-  let setDataCount = 0
+  let nativeSetDataCount = 0
   const grid = Object.assign({
     data: { compact: false, locked: false, zoom: 2, maxZoom: 6 },
     triggerEvent(name, detail) { zoomEvents.push({ name, detail }) },
     setData(next, callback) {
-      setDataCount += 1
+      nativeSetDataCount += 1
       this.data = Object.assign({}, this.data, next)
       if (callback) callback()
     }
   }, beadGridDefinition.methods)
-  grid.handleTouchStart({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 100, clientY: 0 }] })
+  grid.handleNativeTouchStart({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 100, clientY: 0 }] })
   for (let index = 0; index < 100; index += 1) {
-    grid.handleTouchMove({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 101 + index * 2, clientY: 0 }] })
+    grid.handleNativeScale({ detail: { scale: 2 + index / 20 } })
   }
   assert.strictEqual(zoomEvents.length, 0)
-  await new Promise((resolve) => setTimeout(resolve, 25))
-  assert.ok(setDataCount <= 2, 'pinch preview should coalesce UI updates')
-  grid.handleTouchEnd({ touches: [] })
+  grid.handleNativeTouchEnd()
   assert.strictEqual(zoomEvents.length, 1)
   assert.strictEqual(zoomEvents[0].detail.zoom, 6)
+  assert.strictEqual(nativeSetDataCount, 0)
+
+  storage.set('aiDoucangFolders:v1', [])
+  library.refresh()
+  assert.strictEqual(library.data.folders.length, 0)
+  library.refresh()
+  assert.strictEqual(library.data.folders.length, 0)
 
   delete global.wx
-  console.log('UX regression passed: bulk move/delete, all-221 stock adjustment + undo, multi-pattern consumption, and 100-event pinch coalescing.')
+  console.log('UX regression passed: folder lifecycle, bulk move/delete, all-221 stock adjustment + undo, multi-pattern consumption, and native 100-event pinch.')
 }
 
 main().catch((error) => {

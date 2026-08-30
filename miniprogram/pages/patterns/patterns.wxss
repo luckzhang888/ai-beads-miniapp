@@ -32,7 +32,9 @@
 .folder-card { position: relative; width: 292rpx; flex: none; padding: 12rpx; border: 1rpx solid #ddd5e7; border-radius: 22rpx; background: rgba(255,255,255,.92); box-sizing: border-box; overflow: hidden; }
 .folder-card.selected { border: 3rpx solid #704de0; }
 .folder-count { position: absolute; z-index: 3; top: 20rpx; left: 20rpx; padding: 7rpx 14rpx; border-radius: 999rpx; color: white; background: #744fdd; font-size: 19rpx; }
+.folder-delete { position: absolute; z-index: 5; top: 18rpx; right: 18rpx; width: 47rpx; height: 47rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #7c6e84; background: rgba(255,255,255,.94); box-shadow: 0 4rpx 14rpx rgba(47,35,59,.15); font-size: 30rpx; }
 .folder-preview { height: 214rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 16rpx; background: linear-gradient(145deg, #f4effc, #eef9f7); }
+.folder-preview.empty-folder { color: #9d8dc0; border: 2rpx dashed #d1c6e4; font-size: 55rpx; }
 .folder-name { padding: 17rpx 8rpx 7rpx; font-weight: 650; }
 .pattern-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17rpx; }
 .pattern-card { position: relative; min-width: 0; border: 1rpx solid #ded6e6; border-radius: 24rpx; background: rgba(255,255,255,.95); overflow: hidden; box-shadow: 0 10rpx 26rpx rgba(76,54,101,.06); }

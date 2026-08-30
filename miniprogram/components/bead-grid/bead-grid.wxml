@@ -1,23 +1,46 @@
-<scroll-view
-  class="grid-scroll {{compact ? 'compact' : ''}}"
-  scroll-x="{{!compact && !locked}}"
-  scroll-y="{{!compact && !locked}}"
-  enhanced
-  show-scrollbar="{{false}}"
-  scroll-left="{{scrollLeft}}"
-  scroll-top="{{scrollTop}}"
-  bindscroll="handleScroll"
-  style="height: {{viewportHeight}}px; width: {{viewportSize}}px;"
->
+<view wx:if="{{compact}}" class="grid-scroll compact" style="height: {{viewportHeight}}px; width: {{viewportSize}}px;">
   <canvas
     id="beadCanvas"
     type="2d"
     bindtap="handleTap"
-    bindtouchstart="handleTouchStart"
-    bindtouchmove="handleTouchMove"
-    bindtouchend="handleTouchEnd"
-    bindtouchcancel="handleTouchEnd"
-    class="bead-canvas {{gestureActive ? 'gesture-active' : ''}}"
-    style="width: {{canvasWidth}}px; height: {{canvasHeight}}px; transform: scale({{gestureScale}});"
+    class="bead-canvas"
+    style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
   />
-</scroll-view>
+</view>
+
+<movable-area
+  wx:else
+  class="grid-movable-area"
+  scale-area="{{true}}"
+  style="height: {{viewportHeight}}px; width: {{viewportSize}}px;"
+>
+  <movable-view
+    class="grid-movable-view"
+    direction="{{locked ? 'none' : 'all'}}"
+    x="{{0 - scrollLeft}}"
+    y="{{0 - scrollTop}}"
+    inertia="{{true}}"
+    out-of-bounds="{{false}}"
+    damping="40"
+    friction="2"
+    scale="{{!locked}}"
+    scale-min="1"
+    scale-max="{{maxZoom}}"
+    scale-value="{{zoom}}"
+    animation="{{false}}"
+    bindscale="handleNativeScale"
+    bindchange="handleNativeChange"
+    bindtouchstart="handleNativeTouchStart"
+    bindtouchend="handleNativeTouchEnd"
+    bindtouchcancel="handleNativeTouchEnd"
+    style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+  >
+    <canvas
+      id="beadCanvas"
+      type="2d"
+      bindtap="handleTap"
+      class="bead-canvas"
+      style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+    />
+  </movable-view>
+</movable-area>

@@ -19,7 +19,7 @@ const DEFAULT_FOLDERS = [
 
 function getFolders() {
   const saved = wx.getStorageSync(FOLDERS_KEY)
-  return Array.isArray(saved) && saved.length ? saved : DEFAULT_FOLDERS
+  return Array.isArray(saved) ? saved : DEFAULT_FOLDERS.map((item) => Object.assign({}, item))
 }
 
 function formatTime(timestamp) {
@@ -31,6 +31,7 @@ function formatTime(timestamp) {
 function seedPatterns() {
   if (getSavedPatterns().length || wx.getStorageSync(DEMO_SEEDED_KEY)) return
   const first = createDemoPattern(32)
+  first.id = 'demo-mint-heart'
   first.name = '薄荷爱心'
   first.tags = ['原创', '萌系']
   first.folderId = 'original'
@@ -38,6 +39,7 @@ function seedPatterns() {
   savePattern(first, mardPalette)
 
   const second = createDemoPattern(48)
+  second.id = 'demo-berry-wish'
   second.name = '莓果心愿'
   second.tags = ['爱心', '红色']
   second.folderId = 'favorites'
@@ -92,8 +94,8 @@ Page({
     const folderOptions = getFolders()
     const folders = folderOptions.map((folder) => {
       const children = patterns.filter((item) => item.folderId === folder.id)
-      return Object.assign({}, folder, { count: children.length, cover: children[0] || patterns[0] })
-    }).filter((folder) => folder.cover)
+      return Object.assign({}, folder, { count: children.length, cover: children[0] || null })
+    })
     const stats = {
       folders: folders.length,
       working: patterns.filter((item) => item.status === '正在拼').length,
@@ -204,6 +206,10 @@ Page({
         const title = String(result.content || '').trim().slice(0, 12)
         if (!result.confirm || !title) return
         const folders = getFolders()
+        if (folders.some((item) => item.title === title)) {
+          wx.showToast({ title: '已有同名文件夹', icon: 'none' })
+          return
+        }
         folders.push({ id: 'folder-' + Date.now(), title })
         wx.setStorageSync(FOLDERS_KEY, folders)
         this.refresh()
@@ -219,17 +225,43 @@ Page({
     }
     const folders = getFolders()
     wx.showActionSheet({
-      itemList: folders.map((item) => item.title),
+      itemList: ['移出文件夹'].concat(folders.map((item) => item.title)),
       success: (result) => {
-        const folder = folders[result.tapIndex]
-        if (!folder) return
+        const folder = result.tapIndex === 0 ? null : folders[result.tapIndex - 1]
+        if (result.tapIndex > 0 && !folder) return
         ids.forEach((id) => {
           const pattern = getPatternById(id)
-          if (pattern) savePattern(Object.assign({}, pattern, { folderId: folder.id }), mardPalette)
+          if (pattern) savePattern(Object.assign({}, pattern, { folderId: folder ? folder.id : '' }), mardPalette)
         })
         this.exitSelection()
         this.refresh()
-        wx.showToast({ title: '已移动到' + folder.title, icon: 'success' })
+        wx.showToast({ title: folder ? ('已移动到' + folder.title) : '已移出文件夹', icon: 'success' })
+      }
+    })
+  },
+
+  deleteFolder(event) {
+    const folderId = event.currentTarget.dataset.folder
+    const folder = getFolders().find((item) => item.id === folderId)
+    if (!folder) return
+    const count = this.data.patterns.filter((item) => item.folderId === folderId).length
+    wx.showModal({
+      title: '删除文件夹“' + folder.title + '”？',
+      content: count ? ('其中 ' + count + ' 张图纸会移到根目录，图纸本身不会删除。') : '这是一个空文件夹。',
+      confirmText: '删除文件夹',
+      confirmColor: '#e54b5f',
+      success: (result) => {
+        if (!result.confirm) return
+        const remainingFolders = getFolders().filter((item) => item.id !== folderId)
+        wx.setStorageSync(FOLDERS_KEY, remainingFolders)
+        this.data.patterns.filter((item) => item.folderId === folderId).forEach((item) => {
+          const pattern = getPatternById(item.id)
+          if (pattern) savePattern(Object.assign({}, pattern, { folderId: '' }), mardPalette)
+        })
+        const afterDelete = () => this.refresh()
+        if (this.data.selectedFolder === folderId) this.setData({ selectedFolder: '' }, afterDelete)
+        else afterDelete()
+        wx.showToast({ title: '文件夹已删除', icon: 'success' })
       }
     })
   },

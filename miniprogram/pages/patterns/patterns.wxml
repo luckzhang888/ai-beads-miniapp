@@ -52,10 +52,12 @@
   <scroll-view scroll-x class="folder-scroll" enhanced show-scrollbar="false">
     <view class="folder-inner">
       <view class="folder-card {{selectedFolder === item.id ? 'selected' : ''}}" wx:for="{{folders}}" wx:key="id" data-folder="{{item.id}}" bindtap="selectFolder">
+        <view class="folder-delete" data-folder="{{item.id}}" catchtap="deleteFolder">×</view>
         <view class="folder-count">{{item.count}} 图纸</view>
-        <view class="folder-preview">
+        <view wx:if="{{item.cover}}" class="folder-preview">
           <bead-grid matrix="{{item.cover.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{146}}" show-grid="{{false}}" />
         </view>
+        <view wx:else class="folder-preview empty-folder">＋</view>
         <view class="folder-name">{{item.title}}</view>
       </view>
     </view>
