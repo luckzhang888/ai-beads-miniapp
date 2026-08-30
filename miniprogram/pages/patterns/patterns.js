@@ -68,7 +68,8 @@ Page({
     selectedIds: [],
     selectedCount: 0,
     selectedFolder: '',
-    folderOptions: []
+    folderOptions: [],
+    showFolderManager: false
   },
 
   onShow() {
@@ -216,6 +217,9 @@ Page({
       }
     })
   },
+
+  openFolderManager() { this.setData({ showFolderManager: true }) },
+  closeFolderManager() { this.setData({ showFolderManager: false }) },
 
   moveSelected() {
     const ids = this.data.selectedIds || []

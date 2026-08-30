@@ -27,12 +27,13 @@
 .section-name { font-size: 31rpx; font-weight: 750; }
 .section-count { color: #988fa2; font-size: 22rpx; }
 .create-folder { padding: 9rpx 18rpx; border: 1rpx solid #bca8e9; border-radius: 999rpx; color: #6847ce; font-size: 22rpx; }
+.folder-head-actions { display: flex; align-items: center; gap: 11rpx; }
+.manage-folders { padding: 9rpx 15rpx; border-radius: 999rpx; color: #766a80; background: white; font-size: 21rpx; }
 .folder-scroll { white-space: nowrap; }
 .folder-inner { padding-right: 20rpx; }
 .folder-card { position: relative; width: 292rpx; flex: none; padding: 12rpx; border: 1rpx solid #ddd5e7; border-radius: 22rpx; background: rgba(255,255,255,.92); box-sizing: border-box; overflow: hidden; }
 .folder-card.selected { border: 3rpx solid #704de0; }
 .folder-count { position: absolute; z-index: 3; top: 20rpx; left: 20rpx; padding: 7rpx 14rpx; border-radius: 999rpx; color: white; background: #744fdd; font-size: 19rpx; }
-.folder-delete { position: absolute; z-index: 5; top: 18rpx; right: 18rpx; width: 47rpx; height: 47rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #7c6e84; background: rgba(255,255,255,.94); box-shadow: 0 4rpx 14rpx rgba(47,35,59,.15); font-size: 30rpx; }
 .folder-preview { height: 214rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 16rpx; background: linear-gradient(145deg, #f4effc, #eef9f7); }
 .folder-preview.empty-folder { color: #9d8dc0; border: 2rpx dashed #d1c6e4; font-size: 55rpx; }
 .folder-name { padding: 17rpx 8rpx 7rpx; font-weight: 650; }
@@ -75,3 +76,14 @@
 .sheet-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 15rpx; margin-top: 32rpx; }
 .sheet-actions button { width: 100%; margin: 0; border-radius: 20rpx; color: #6948d4; background: white; border: 2rpx solid #7150dd; }
 .sheet-actions .primary { color: white; background: #6b4cda; }
+.folder-manager-sheet { max-height: 78vh; }
+.folder-manage-note { margin: 18rpx 0; padding: 16rpx 18rpx; border-radius: 15rpx; color: #807686; background: #f5f2f8; font-size: 20rpx; line-height: 1.55; }
+.folder-manage-list { overflow-y: auto; max-height: 650rpx; }
+.folder-manage-row { min-height: 105rpx; display: grid; grid-template-columns: 60rpx minmax(0,1fr) 120rpx; align-items: center; gap: 14rpx; border-bottom: 1rpx solid #ece8f0; }
+.folder-manage-icon { width: 55rpx; height: 55rpx; display: flex; align-items: center; justify-content: center; border-radius: 16rpx; color: #6849d1; background: #eee8fa; }
+.folder-manage-copy { min-width: 0; }
+.folder-manage-copy view { overflow: hidden; font-size: 25rpx; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
+.folder-manage-copy text { display: block; margin-top: 5rpx; color: #9c93a2; font-size: 19rpx; }
+.folder-manage-row button { width: 112rpx; margin: 0; color: #dc5063; border: 1rpx solid #efb8c0; border-radius: 16rpx; background: #fff4f5; font-size: 21rpx; }
+.folder-manager-empty { padding: 70rpx 20rpx; color: #a39aa8; text-align: center; }
+.folder-manager-create { width: 100%; margin: 22rpx 0 0; color: white; border-radius: 18rpx; background: #694bd7; }

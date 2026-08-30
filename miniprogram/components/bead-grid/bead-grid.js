@@ -21,11 +21,13 @@ Component({
     canvasWidth: 320,
     canvasHeight: 320,
     viewportSize: 320,
-    viewportHeight: 320
+    viewportHeight: 320,
+    renderedImagePath: '',
+    rendering: false
   },
 
   observers: {
-    'matrix,palette,showCodes,showGrid,highlightCode,zoom,majorGrid,compact,previewSize,locked,completedIndices': function () {
+    'matrix,palette,showCodes,showGrid,highlightCode,majorGrid,compact,previewSize,locked,completedIndices': function () {
       this.scheduleDraw()
     }
   },
@@ -34,6 +36,7 @@ Component({
     ready() { this.scheduleDraw() },
     detached() {
       if (this._drawTimer) clearTimeout(this._drawTimer)
+      this.removeTempImage(this.data.renderedImagePath)
     }
   },
 
@@ -41,6 +44,12 @@ Component({
     scheduleDraw() {
       if (this._drawTimer) clearTimeout(this._drawTimer)
       this._drawTimer = setTimeout(() => this.draw(), 30)
+    },
+
+    removeTempImage(path) {
+      if (!path || !wx.getFileSystemManager) return
+      const manager = wx.getFileSystemManager()
+      if (manager && manager.unlink) manager.unlink({ filePath: path, fail() {} })
     },
 
     handleNativeTouchStart(event) {
@@ -104,7 +113,9 @@ Component({
           Math.max(320, Math.round((system.windowHeight || 700) * 0.62))
         )
 
-      this.setData({ canvasWidth, canvasHeight, viewportSize, viewportHeight }, () => {
+      this._paintVersion = Number(this._paintVersion || 0) + 1
+      const paintVersion = this._paintVersion
+      this.setData({ canvasWidth, canvasHeight, viewportSize, viewportHeight, rendering: !this.data.compact }, () => {
         this.createSelectorQuery()
           .select('#beadCanvas')
           .fields({ node: true, size: true })
@@ -112,23 +123,23 @@ Component({
             const res = result && result[0]
             if (!res || !res.node) return
             this._canvasNode = res.node
-            this.paint(res.node, res.width || canvasWidth, res.height || canvasHeight, matrix)
+            this.paint(res.node, res.width || canvasWidth, res.height || canvasHeight, matrix, paintVersion)
           })
       })
     },
 
-    paint(canvas, cssWidth, cssHeight, matrix) {
+    paint(canvas, cssWidth, cssHeight, matrix, paintVersion) {
       const rows = matrix.length
       const cols = matrix[0].length
       const system = wx.getSystemInfoSync()
       const cells = rows * cols
       const width = Math.max(1, Math.floor(cssWidth))
       const height = Math.max(1, Math.floor(cssHeight))
-      const zoom = this.data.compact ? 1 : Math.max(1, Number(this.data.zoom) || 1)
+      const renderZoom = this.data.compact ? 1 : Math.max(1, Number(this.data.maxZoom) || 6)
       const desiredDpr = this.data.compact
         ? Math.min(system.pixelRatio || 1, 2)
-        : Math.max(2, Math.min(6, zoom * 1.15))
-      const budgetDpr = Math.sqrt(6000000 / Math.max(1, width * height))
+        : Math.max(2, Math.min(5, renderZoom))
+      const budgetDpr = Math.sqrt(4000000 / Math.max(1, width * height))
       const dpr = Math.max(1, Math.min(desiredDpr, budgetDpr))
 
       canvas.width = Math.floor(width * dpr)
@@ -143,8 +154,8 @@ Component({
       const palette = this.data.palette || {}
       const highlight = this.data.highlightCode
       const completed = new Set(this.data.completedIndices || [])
-      const effectiveZoom = this.data.compact ? 1 : Math.max(1, Number(this.data.zoom) || 1)
-      const effectiveCell = Math.min(cellX, cellY) * effectiveZoom
+      const effectiveZoom = renderZoom
+      const effectiveCell = Math.min(cellX, cellY) * renderZoom
 
       for (let y = 0; y < rows; y += 1) {
         const row = matrix[y]
@@ -171,7 +182,7 @@ Component({
       if (this.data.showGrid && effectiveCell >= 2.2) {
         ctx.beginPath()
         ctx.strokeStyle = 'rgba(0,0,0,0.20)'
-        ctx.lineWidth = 0.5 / effectiveZoom
+        ctx.lineWidth = 0.55 / Math.sqrt(effectiveZoom)
         for (let x = 0; x <= cols; x += 1) {
           const pos = Math.min(width, x * cellX)
           ctx.moveTo(pos, 0)
@@ -187,7 +198,7 @@ Component({
         if (this.data.majorGrid && effectiveCell >= 3) {
           ctx.beginPath()
           ctx.strokeStyle = 'rgba(210, 35, 62, 0.82)'
-          ctx.lineWidth = (effectiveCell >= 9 ? 1.4 : 0.9) / effectiveZoom
+          ctx.lineWidth = (effectiveCell >= 9 ? 1.4 : 0.9) / Math.sqrt(effectiveZoom)
           for (let x = 0; x <= cols; x += 5) {
             const pos = Math.min(width, x * cellX)
             ctx.moveTo(pos, 0)
@@ -233,6 +244,29 @@ Component({
         }
         ctx.globalAlpha = 1
       }
+
+      if (!this.data.compact) this.createRenderedImage(canvas, paintVersion)
+    },
+
+    createRenderedImage(canvas, paintVersion) {
+      wx.canvasToTempFilePath({
+        canvas,
+        fileType: 'png',
+        quality: 1,
+        destWidth: canvas.width,
+        destHeight: canvas.height,
+        success: (result) => {
+          if (paintVersion !== this._paintVersion) {
+            this.removeTempImage(result.tempFilePath)
+            return
+          }
+          const previous = this.data.renderedImagePath
+          this.setData({ renderedImagePath: result.tempFilePath, rendering: false }, () => {
+            if (previous && previous !== result.tempFilePath) this.removeTempImage(previous)
+          })
+        },
+        fail: () => this.setData({ rendering: false })
+      }, this)
     },
 
     handleTap(event) {
@@ -245,7 +279,7 @@ Component({
       const clientY = touch ? touch.clientY : event.detail.y
 
       this.createSelectorQuery()
-        .select('#beadCanvas')
+        .select(this.data.compact ? '#beadCanvas' : '#gridImage')
         .boundingClientRect()
         .exec((result) => {
           const rect = result && result[0]
@@ -265,6 +299,10 @@ Component({
 
     exportImage() {
       return new Promise((resolve, reject) => {
+        if (this.data.renderedImagePath) {
+          resolve(this.data.renderedImagePath)
+          return
+        }
         const canvas = this._canvasNode
         if (!canvas) {
           reject(new Error('canvas not ready'))

@@ -48,11 +48,10 @@
     </view>
   </scroll-view>
 
-  <view class="section-head"><view class="section-name">文件夹</view><view class="create-folder" bindtap="createFolder">＋ 创建</view></view>
+  <view class="section-head"><view class="section-name">文件夹</view><view class="folder-head-actions"><view class="manage-folders" bindtap="openFolderManager">管理文件夹</view><view class="create-folder" bindtap="createFolder">＋ 创建</view></view></view>
   <scroll-view scroll-x class="folder-scroll" enhanced show-scrollbar="false">
     <view class="folder-inner">
-      <view class="folder-card {{selectedFolder === item.id ? 'selected' : ''}}" wx:for="{{folders}}" wx:key="id" data-folder="{{item.id}}" bindtap="selectFolder">
-        <view class="folder-delete" data-folder="{{item.id}}" catchtap="deleteFolder">×</view>
+      <view class="folder-card {{selectedFolder === item.id ? 'selected' : ''}}" wx:for="{{folders}}" wx:key="id" data-folder="{{item.id}}" bindtap="selectFolder" bindlongpress="openFolderManager">
         <view class="folder-count">{{item.count}} 图纸</view>
         <view wx:if="{{item.cover}}" class="folder-preview">
           <bead-grid matrix="{{item.cover.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{146}}" show-grid="{{false}}" />
@@ -122,6 +121,23 @@
         <view class="option-pill {{sizeFilter === 'large' ? 'active' : ''}}" data-value="large" bindtap="setSizeFilter">超大图</view>
       </view>
       <view class="sheet-actions"><button bindtap="resetFilter">重置</button><button class="primary" bindtap="applyFilterPanel">完成</button></view>
+    </view>
+  </view>
+
+  <view wx:if="{{showFolderManager}}" class="sheet-mask" bindtap="closeFolderManager">
+    <view class="filter-sheet folder-manager-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-title">文件夹管理</view>
+      <view class="folder-manage-note">删除文件夹不会删除图纸，里面的图纸会自动移到根目录。</view>
+      <view wx:if="{{folders.length}}" class="folder-manage-list">
+        <view class="folder-manage-row" wx:for="{{folders}}" wx:key="id">
+          <view class="folder-manage-icon">▦</view>
+          <view class="folder-manage-copy"><view>{{item.title}}</view><text>{{item.count}} 张图纸</text></view>
+          <button data-folder="{{item.id}}" bindtap="deleteFolder">删除</button>
+        </view>
+      </view>
+      <view wx:else class="folder-manager-empty">暂时没有文件夹</view>
+      <button class="folder-manager-create" bindtap="createFolder">＋ 创建新文件夹</button>
     </view>
   </view>
 </view>

@@ -20,3 +20,24 @@ canvas {
 .grid-movable-view {
   overflow: visible;
 }
+
+.render-canvas {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  pointer-events: none;
+}
+
+.grid-image {
+  display: block;
+}
+
+.grid-rendering {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  color: #8c8394;
+  background: linear-gradient(145deg, #f7f5fa, #eef6f4);
+  font-size: 22rpx;
+}

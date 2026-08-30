@@ -138,6 +138,7 @@ let beadGridDefinition
 global.Component = (definition) => { beadGridDefinition = definition }
 require('../miniprogram/components/bead-grid/bead-grid')
 delete global.Component
+assert.strictEqual(Object.keys(beadGridDefinition.observers).some((key) => key.split(',').indexOf('zoom') >= 0), false)
 const zoomEvents = []
 const beadGrid = Object.assign({
   data: { compact: false, locked: false, zoom: 2, maxZoom: 6 },

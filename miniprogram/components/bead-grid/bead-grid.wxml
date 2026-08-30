@@ -8,8 +8,16 @@
   />
 </view>
 
-<movable-area
+<canvas
   wx:else
+  id="beadCanvas"
+  type="2d"
+  class="render-canvas"
+  style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+/>
+
+<movable-area
+  wx:if="{{!compact}}"
   class="grid-movable-area"
   scale-area="{{true}}"
   style="height: {{viewportHeight}}px; width: {{viewportSize}}px;"
@@ -35,12 +43,15 @@
     bindtouchcancel="handleNativeTouchEnd"
     style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
   >
-    <canvas
-      id="beadCanvas"
-      type="2d"
+    <image
+      wx:if="{{renderedImagePath}}"
+      id="gridImage"
+      src="{{renderedImagePath}}"
+      mode="scaleToFill"
       bindtap="handleTap"
-      class="bead-canvas"
+      class="grid-image"
       style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
     />
+    <view wx:else class="grid-rendering" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;">{{rendering ? '正在准备高清图纸…' : '图纸加载失败，点击工具栏重试'}}</view>
   </movable-view>
 </movable-area>

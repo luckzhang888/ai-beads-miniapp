@@ -50,6 +50,10 @@ async function main() {
   const library = loadPage('../miniprogram/pages/patterns/patterns')
   library.onShow()
   assert.strictEqual(library.data.patterns.length, 2)
+  library.openFolderManager()
+  assert.strictEqual(library.data.showFolderManager, true)
+  library.closeFolderManager()
+  assert.strictEqual(library.data.showFolderManager, false)
   const firstId = library.data.patterns.find((item) => item.folderId === 'original').id
   library.deleteFolder({ currentTarget: { dataset: { folder: 'original' } } })
   assert.strictEqual(library.data.folderOptions.some((item) => item.id === 'original'), false)
