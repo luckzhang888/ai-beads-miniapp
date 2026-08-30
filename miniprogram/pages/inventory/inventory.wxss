@@ -335,6 +335,24 @@
 .direction-switch view.danger { color: white; background: #ef6172; }
 .entry-content { flex: 1; min-height: 0; box-sizing: border-box; padding: 20rpx 28rpx 0; }
 .entry-card { padding: 27rpx; border-radius: 24rpx; background: white; }
+.batch-summary { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 20rpx; border-radius: 22rpx; background: white; box-shadow: 0 10rpx 30rpx rgba(77,67,118,.06); }
+.batch-summary view { padding: 22rpx; display: flex; flex-direction: column; align-items: center; }
+.batch-summary view + view { border-left: 1rpx solid #e4e1e9; }
+.batch-summary text:first-child { color: #684ede; font-size: 34rpx; font-weight: 800; }
+.batch-summary text:last-child { margin-top: 5rpx; color: #aaa3b0; font-size: 19rpx; }
+.batch-card { padding-top: 22rpx; }
+.batch-card-head { display: flex; align-items: center; justify-content: space-between; }
+.batch-clear { padding: 9rpx 17rpx; border-radius: 999rpx; color: #e05565; background: #fff0f2; font-size: 20rpx; }
+.batch-series-scroll { margin: 18rpx 0 12rpx; white-space: nowrap; }
+.batch-series-row { display: inline-flex; gap: 10rpx; }
+.batch-series-pill { min-width: 48rpx; padding: 11rpx 18rpx; box-sizing: border-box; border: 1rpx solid #dfdbe7; border-radius: 999rpx; color: #6d6672; background: white; text-align: center; font-size: 21rpx; }
+.batch-series-pill.active { color: white; border-color: #6950df; background: #6950df; }
+.batch-list { border-top: 1rpx solid #ebe8ef; }
+.batch-row { min-height: 92rpx; display: grid; grid-template-columns: 86rpx 116rpx repeat(3,minmax(76rpx,1fr)); align-items: center; gap: 8rpx; border-bottom: 1rpx solid #ebe8ef; }
+.batch-code { display: flex; align-items: center; gap: 8rpx; font-size: 22rpx; font-weight: 750; }
+.batch-code text { width: 24rpx; height: 24rpx; flex: none; border: 1rpx solid #d2ced8; border-radius: 50%; }
+.batch-row input { min-width: 0; height: 60rpx; padding: 0 10rpx; box-sizing: border-box; border: 1rpx solid #e4e0ea; border-radius: 12rpx; background: #faf9fc; text-align: center; font-size: 21rpx; }
+.batch-preset { padding: 15rpx 4rpx; border-radius: 12rpx; color: #634bd2; background: #f1eefb; text-align: center; font-size: 18rpx; }
 .package-pill { padding: 12rpx 20rpx; border: 1rpx solid #dedbe5; border-radius: 999rpx; color: #605968; background: white; font-size: 22rpx; }
 .package-pill.active { color: white; border-color: #6b50df; background: #6b50df; }
 .manual-card { padding-top: 12rpx; }

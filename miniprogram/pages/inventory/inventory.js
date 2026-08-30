@@ -40,8 +40,12 @@ Page({
     shortageCount: 0,
     transactions: [],
     showStockEntry: false,
-    entryTab: 'manual',
+    entryTab: 'batch',
     entryDirection: 1,
+    batchSeries: 'ALL',
+    batchRows: [],
+    batchSelectedCount: 0,
+    batchTotalAmount: 0,
     entryRows: [{ code: '', amount: '' }, { code: '', amount: '' }, { code: '', amount: '' }],
     csvItems: [],
     csvFileName: '',
@@ -252,18 +256,63 @@ Page({
   openStockEntry(event) {
     const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {}
     const direction = Number(dataset.direction)
+    const entryTab = dataset.tab || 'batch'
+    if (entryTab === 'batch') this._batchAmounts = {}
     this.setData({
       showStockEntry: true,
-      entryTab: dataset.tab || 'manual',
+      entryTab,
       entryDirection: direction === -1 ? -1 : 1
+    }, () => {
+      if (entryTab === 'batch') this.refreshBatchRows()
     })
   },
 
   closeStockEntry() { this.setData({ showStockEntry: false }) },
   noop() {},
 
-  selectEntryTab(event) { this.setData({ entryTab: event.currentTarget.dataset.tab }) },
+  selectEntryTab(event) {
+    const entryTab = event.currentTarget.dataset.tab
+    this.setData({ entryTab }, () => {
+      if (entryTab === 'batch') {
+        if (!this._batchAmounts) this._batchAmounts = {}
+        this.refreshBatchRows()
+      }
+    })
+  },
   selectEntryDirection(event) { this.setData({ entryDirection: Number(event.currentTarget.dataset.direction) < 0 ? -1 : 1 }) },
+  refreshBatchRows() {
+    const amounts = this._batchAmounts || {}
+    const batchSeries = this.data.batchSeries || 'ALL'
+    const batchRows = mardPalette
+      .filter((item) => batchSeries === 'ALL' || item.series === batchSeries)
+      .map((item) => Object.assign({}, item, { amount: amounts[item.code] ? String(amounts[item.code]) : '' }))
+    const selectedCodes = Object.keys(amounts).filter((code) => Number(amounts[code]) > 0)
+    const batchTotalAmount = selectedCodes.reduce((sum, code) => sum + Number(amounts[code] || 0), 0)
+    this.setData({ batchRows, batchSelectedCount: selectedCodes.length, batchTotalAmount })
+  },
+  selectBatchSeries(event) {
+    this.setData({ batchSeries: event.currentTarget.dataset.series || 'ALL' }, () => this.refreshBatchRows())
+  },
+  inputBatchAmount(event) {
+    const code = event.currentTarget.dataset.code
+    const amount = Math.max(0, Math.floor(Number(event.detail.value) || 0))
+    if (!this._batchAmounts) this._batchAmounts = {}
+    if (amount) this._batchAmounts[code] = amount
+    else delete this._batchAmounts[code]
+    this.refreshBatchRows()
+  },
+  quickBatchAmount(event) {
+    const code = event.currentTarget.dataset.code
+    const increment = Math.max(0, Math.floor(Number(event.currentTarget.dataset.amount) || 0))
+    if (!code || !increment) return
+    if (!this._batchAmounts) this._batchAmounts = {}
+    this._batchAmounts[code] = Number(this._batchAmounts[code] || 0) + increment
+    this.refreshBatchRows()
+  },
+  clearBatchEntries() {
+    this._batchAmounts = {}
+    this.refreshBatchRows()
+  },
   selectPackage(event) { this.setData({ selectedPackage: Number(event.currentTarget.dataset.count) || 221 }) },
   inputPackageAmount(event) { this.setData({ packageAmount: Math.max(0, Math.floor(Number(event.detail.value) || 0)) }) },
 
@@ -340,7 +389,14 @@ Page({
   confirmStockEntry() {
     let items = []
     let source = this.data.entryTab
-    if (this.data.entryTab === 'manual') {
+    if (this.data.entryTab === 'batch') {
+      const amounts = this._batchAmounts || {}
+      items = Object.keys(amounts).map((code) => ({
+        code,
+        delta: this.data.entryDirection * Math.max(0, Number(amounts[code]) || 0),
+        brand: this.data.activeBrand
+      })).filter((item) => item.delta !== 0)
+    } else if (this.data.entryTab === 'manual') {
       const validCodes = new Set(mardPalette.map((item) => item.code))
       items = this.data.entryRows.map((row) => ({
         code: String(row.code || '').trim().toUpperCase(),
@@ -368,6 +424,7 @@ Page({
       success: (result) => {
         if (!result.confirm) return
         batchAdjustStock(items, { source: 'stock-entry-' + source })
+        if (source === 'batch') this._batchAmounts = {}
         this.setData({ showStockEntry: false })
         this.refresh()
         wx.showToast({ title: '已更新 ' + items.length + ' 个色号', icon: 'success' })

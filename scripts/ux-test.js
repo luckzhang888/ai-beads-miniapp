@@ -83,6 +83,19 @@ async function main() {
 
   const inventory = loadPage('../miniprogram/pages/inventory/inventory')
   inventory.onShow()
+  inventory.openStockEntry({ currentTarget: { dataset: { tab: 'batch', direction: 1 } } })
+  assert.strictEqual(inventory.data.batchRows.length, 221)
+  inventory.inputBatchAmount({ currentTarget: { dataset: { code: 'A1' } }, detail: { value: '500' } })
+  inventory.quickBatchAmount({ currentTarget: { dataset: { code: 'A2', amount: '1000' } } })
+  assert.strictEqual(inventory.data.batchSelectedCount, 2)
+  assert.strictEqual(inventory.data.batchTotalAmount, 1500)
+  inventory.confirmStockEntry()
+  assert.strictEqual(inventoryUtils.getInventory('MARD').A1, 500)
+  assert.strictEqual(inventoryUtils.getInventory('MARD').A2, 1000)
+  const batchTransaction = inventoryUtils.getTransactions()[0]
+  assert.strictEqual(batchTransaction.items.length, 2)
+  assert.strictEqual(inventoryUtils.undoTransaction(batchTransaction.id).ok, true)
+
   inventory.openStockEntry({ currentTarget: { dataset: { tab: 'package', direction: 1 } } })
   inventory.setData({ selectedPackage: 221, packageAmount: 500, entryDirection: 1 })
   inventory.confirmStockEntry()
@@ -135,7 +148,7 @@ async function main() {
   assert.strictEqual(library.data.folders.length, 0)
 
   delete global.wx
-  console.log('UX regression passed: folder lifecycle, bulk move/delete, 221-color package intake + undo, multi-pattern consumption, and native 100-event pinch.')
+  console.log('UX regression passed: folder lifecycle, bulk move/delete, per-color batch intake, 221-color package intake + undo, multi-pattern consumption, and native 100-event pinch.')
 }
 
 main().catch((error) => {

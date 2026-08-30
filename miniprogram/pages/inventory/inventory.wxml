@@ -26,7 +26,7 @@
   <view class="inventory-quick-actions four">
     <view class="quick-action" bindtap="showShortageList">缺豆清单 <text>{{shortageCount}}</text></view>
     <view class="quick-action" bindtap="openConsumptionCalculator">消耗计算</view>
-    <view class="quick-action" data-tab="manual" data-direction="1" bindtap="openStockEntry">补豆入库</view>
+    <view class="quick-action" data-tab="batch" data-direction="1" bindtap="openStockEntry">补豆入库</view>
     <view class="quick-action" bindtap="setLowStockThreshold">低库存阈值 <text>{{lowStock}}</text></view>
   </view>
 
@@ -127,6 +127,7 @@
       <view class="entry-header"><view class="back-link" bindtap="closeStockEntry">‹ 返回</view><view class="entry-title">补豆入库</view><view class="ai-label">✦ 智能录入</view></view>
       <scroll-view scroll-x class="entry-tabs" enhanced show-scrollbar="false">
         <view class="entry-tab-row">
+          <view class="entry-tab {{entryTab === 'batch' ? 'active' : ''}}" data-tab="batch" bindtap="selectEntryTab">批量记录</view>
           <view class="entry-tab {{entryTab === 'manual' ? 'active' : ''}}" data-tab="manual" bindtap="selectEntryTab">手动记录</view>
           <view class="entry-tab {{entryTab === 'csv' ? 'active' : ''}}" data-tab="csv" bindtap="selectEntryTab">导入文件</view>
           <view class="entry-tab {{entryTab === 'package' ? 'active' : ''}}" data-tab="package" bindtap="selectEntryTab">套装入库</view>
@@ -138,7 +139,29 @@
       </view>
 
       <scroll-view class="entry-content" scroll-y enhanced show-scrollbar="false">
-        <view wx:if="{{entryTab === 'manual'}}" class="entry-card manual-card">
+        <view wx:if="{{entryTab === 'batch'}}" class="batch-entry">
+          <view class="batch-summary">
+            <view><text>{{batchSelectedCount}}</text><text>已填写色号</text></view>
+            <view><text>{{batchTotalAmount}}</text><text>合计豆数</text></view>
+          </view>
+          <view class="entry-card batch-card">
+            <view class="batch-card-head"><view class="entry-card-title">逐色号批量录入</view><view class="batch-clear" bindtap="clearBatchEntries">清空</view></view>
+            <scroll-view scroll-x class="batch-series-scroll" enhanced show-scrollbar="false">
+              <view class="batch-series-row"><view wx:for="{{seriesOptions}}" wx:key="*this" class="batch-series-pill {{batchSeries === item ? 'active' : ''}}" data-series="{{item}}" bindtap="selectBatchSeries">{{item === 'ALL' ? '全部' : item}}</view></view>
+            </scroll-view>
+            <view class="batch-list">
+              <view class="batch-row" wx:for="{{batchRows}}" wx:key="code">
+                <view class="batch-code"><text style="background: {{item.hex}};"></text>{{item.code}}</view>
+                <input type="number" placeholder="数量" value="{{item.amount}}" data-code="{{item.code}}" bindinput="inputBatchAmount" />
+                <view class="batch-preset" data-code="{{item.code}}" data-amount="500" bindtap="quickBatchAmount">+500</view>
+                <view class="batch-preset" data-code="{{item.code}}" data-amount="1000" bindtap="quickBatchAmount">+1000</view>
+                <view class="batch-preset" data-code="{{item.code}}" data-amount="1200" bindtap="quickBatchAmount">+1200</view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:elif="{{entryTab === 'manual'}}" class="entry-card manual-card">
           <view class="entry-card-title">逐个录入色号</view>
           <view class="manual-row" wx:for="{{entryRows}}" wx:key="index">
             <view class="remove-row" data-index="{{index}}" bindtap="removeEntryRow">－</view>
