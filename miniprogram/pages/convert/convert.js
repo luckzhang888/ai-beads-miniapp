@@ -37,6 +37,8 @@ Page({
     outputWidth: 80,
     outputHeight: 80,
     generating: false,
+    batchImporting: false,
+    batchProgress: '',
     previewing: false,
     previewResult: null,
     paletteMap: createPaletteMap(mardPalette),
@@ -364,6 +366,108 @@ Page({
       success(res) {
         done(res.tempFilePaths && res.tempFilePaths[0])
       }
+    })
+  },
+
+  chooseBatchImages() {
+    const done = (paths) => {
+      if (paths && paths.length) this.processBatchImages(paths.slice(0, 9))
+    }
+    if (typeof wx.chooseMedia === 'function') {
+      wx.chooseMedia({
+        count: 9,
+        mediaType: ['image'],
+        sourceType: ['album'],
+        sizeType: ['compressed'],
+        success: (result) => done((result.tempFiles || []).map((item) => item.tempFilePath).filter(Boolean))
+      })
+      return
+    }
+    wx.chooseImage({ count: 9, sizeType: ['compressed'], sourceType: ['album'], success: (result) => done(result.tempFilePaths || []) })
+  },
+
+  getImageInfo(path) {
+    return new Promise((resolve, reject) => wx.getImageInfo({ src: path, success: resolve, fail: reject }))
+  },
+
+  setDataAsync(changes) {
+    return new Promise((resolve) => this.setData(changes, resolve))
+  },
+
+  async processBatchImages(paths) {
+    if (this.data.batchImporting) return
+    this.setData({ batchImporting: true, batchProgress: '准备处理 0/' + paths.length })
+    wx.showLoading({ title: '批量处理中 0/' + paths.length, mask: true })
+    const savedPatterns = []
+    const original = {
+      imagePath: this.data.imagePath,
+      imageInfo: this.data.imageInfo,
+      outputWidth: this.data.outputWidth,
+      outputHeight: this.data.outputHeight,
+      cropX: this.data.cropX,
+      cropY: this.data.cropY,
+      cropScale: this.data.cropScale,
+      cropRotation: this.data.cropRotation,
+      cropMirrored: this.data.cropMirrored,
+      cropStyle: this.data.cropStyle
+    }
+    try {
+      for (let index = 0; index < paths.length; index += 1) {
+        try {
+          const path = paths[index]
+          const info = await this.getImageInfo(path)
+          const dims = calculatePatternDimensions(info.width, info.height, this.data.selectedSize, this.data.cropMode)
+          await this.setDataAsync({
+            imagePath: path,
+            imageInfo: info,
+            outputWidth: dims.width,
+            outputHeight: dims.height,
+            cropX: 0,
+            cropY: 0,
+            cropScale: 1,
+            cropRotation: 0,
+            cropMirrored: false,
+            cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
+            previewResult: null,
+            batchProgress: '正在处理 ' + (index + 1) + '/' + paths.length
+          })
+          this.cachedSignature = ''
+          this.cachedResult = null
+          const result = await this.processCurrentImage()
+          const saved = savePattern(createPattern({
+            name: '批量图纸 ' + (index + 1) + ' · ' + result.width + '×' + result.height,
+            matrix: result.matrix,
+            stats: result.stats,
+            palette: result.palette,
+            brand: 'MARD',
+            width: result.width,
+            height: result.height,
+            qualityMode: this.data.qualityMode,
+            status: '待拼',
+            tags: ['批量导入'],
+            sourceOptions: this.processingOptions()
+          }), mardPalette)
+          savedPatterns.push(saved)
+          wx.showLoading({ title: '批量处理中 ' + (index + 1) + '/' + paths.length, mask: true })
+        } catch (error) {
+          console.error('batch image failed', index, error)
+        }
+      }
+    } finally {
+      wx.hideLoading()
+      await this.setDataAsync(Object.assign({}, original, { batchImporting: false, batchProgress: '' }))
+    }
+    if (!savedPatterns.length) {
+      wx.showModal({ title: '批量导入失败', content: '所选图片均未能识别，请检查图片格式后重试。', showCancel: false })
+      return
+    }
+    const last = savedPatterns[savedPatterns.length - 1]
+    setCurrentPattern(last)
+    wx.showModal({
+      title: '批量导入完成',
+      content: '成功生成 ' + savedPatterns.length + '/' + paths.length + ' 张图纸。',
+      showCancel: false,
+      success: () => wx.redirectTo({ url: '/pages/detail/detail?id=' + encodeURIComponent(last.id) })
     })
   },
 

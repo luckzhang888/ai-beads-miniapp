@@ -28,6 +28,8 @@
 .method-arrow { color: #b5adbd; font-size: 41rpx; }
 .config-page { background: radial-gradient(circle at 80% 0, rgba(218, 208, 251, .32), transparent 26%), #f7f6fa; }
 .config-head { padding: 3rpx 2rpx 23rpx; }
+.config-actions { display: flex; align-items: center; gap: 11rpx; }
+.batch-import { padding: 10rpx 14rpx; border: 1rpx solid #6d4dd7; border-radius: 999rpx; color: #6546c9; background: #f2edff; font-size: 19rpx; white-space: nowrap; }
 .back-methods { padding: 11rpx 18rpx; border: 1rpx solid #cbbbea; border-radius: 999rpx; color: #6847ce; font-size: 21rpx; }
 
 .step-title {
@@ -175,6 +177,7 @@
   background: linear-gradient(135deg, #7b57e8, #6341d6);
   box-shadow: 0 12rpx 28rpx rgba(101, 67, 211, .26);
 }
+.batch-progress { position: fixed; z-index: 45; left: 50%; bottom: calc(120rpx + env(safe-area-inset-bottom)); padding: 13rpx 24rpx; transform: translateX(-50%); border-radius: 999rpx; color: white; background: rgba(56,43,75,.88); font-size: 21rpx; white-space: nowrap; }
 
 .compact-hint { margin-top: 5rpx; }
 .background-row, .preview-head, .preview-summary { display: flex; align-items: center; justify-content: space-between; }

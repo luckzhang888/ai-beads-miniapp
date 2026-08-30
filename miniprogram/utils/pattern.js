@@ -151,6 +151,16 @@ function deletePattern(id) {
   return patterns
 }
 
+function deletePatterns(ids) {
+  const targets = new Set((ids || []).map((id) => String(id)))
+  if (!targets.size) return getSavedPatterns()
+  const patterns = getSavedPatterns().filter((item) => !targets.has(String(item.id)))
+  wx.setStorageSync(PATTERNS_KEY, patterns)
+  const current = getCurrentPattern()
+  if (current && targets.has(String(current.id))) wx.removeStorageSync(CURRENT_KEY)
+  return patterns
+}
+
 function renamePattern(id, name) {
   const cleanName = String(name || '').trim().slice(0, 30)
   if (!cleanName) return null
@@ -347,6 +357,7 @@ module.exports = {
   savePattern,
   getPatternById,
   deletePattern,
+  deletePatterns,
   renamePattern,
   duplicatePattern,
   mirrorHorizontal,

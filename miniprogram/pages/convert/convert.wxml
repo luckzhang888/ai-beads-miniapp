@@ -20,7 +20,7 @@
 </view>
 
 <view wx:elif="{{stage === 'config'}}" class="container config-page">
-  <view class="config-head"><view><view class="config-title">{{selectedMethodTitle || '图纸导入'}}</view><view class="config-note">使用 MARD 221 标准色与 CIEDE2000 匹配</view></view><view class="back-methods" bindtap="resetMethods">更换方式</view></view>
+  <view class="config-head"><view><view class="config-title">{{selectedMethodTitle || '图纸导入'}}</view><view class="config-note">使用 MARD 221 标准色与 CIEDE2000 匹配</view></view><view class="config-actions"><view class="batch-import" bindtap="chooseBatchImages">▧ 批量导入</view><view class="back-methods" bindtap="resetMethods">更换方式</view></view></view>
   <view class="card">
     <view class="step-title">1. 选择图片</view>
     <view
@@ -123,6 +123,7 @@
   <button class="primary-btn generate-btn" loading="{{generating}}" disabled="{{generating}}" bindtap="generatePattern">
     {{generating ? '正在生成…' : '生成拼豆图纸'}}
   </button>
+  <view wx:if="{{batchImporting}}" class="batch-progress">{{batchProgress}}</view>
 </view>
 
 <view wx:elif="{{stage === 'pdf'}}" class="pdf-page">

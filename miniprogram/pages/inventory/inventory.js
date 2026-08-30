@@ -1,10 +1,13 @@
 const mardPalette = require('../../data/colors/mard')
-const { getCurrentPattern } = require('../../utils/pattern')
+const { getCurrentPattern, getSavedPatterns } = require('../../utils/pattern')
 const {
   getInventory,
   setStock,
   adjustStock,
   batchAdjustStock,
+  buildSeriesAdjustments,
+  parseInventoryCsv,
+  buildRefillList,
   getShortageList,
   getTransactions,
   undoTransaction,
@@ -36,7 +39,28 @@ Page({
     activeBrand: 'MARD',
     brandOptions: ['MARD'],
     shortageCount: 0,
-    transactions: []
+    transactions: [],
+    showStockEntry: false,
+    entryTab: 'batch',
+    entryDirection: 1,
+    entryScope: 'ALL',
+    entryScopeCount: mardPalette.length,
+    entryAmount: 500,
+    entryPresets: [100, 500, 1000, 1200],
+    entryRows: [{ code: '', amount: '' }, { code: '', amount: '' }, { code: '', amount: '' }],
+    csvItems: [],
+    csvFileName: '',
+    packageOptions: [24, 48, 72, 96, 120, 144, 168, 192, 216, 221],
+    selectedPackage: 221,
+    packageAmount: 1000,
+    showShortageSheet: false,
+    shortageRows: [],
+    shortagePatternName: '',
+    refillTarget: 1000,
+    refillUnit: 500,
+    showConsumptionSheet: false,
+    consumptionPatterns: [],
+    selectedConsumptionIds: []
   },
 
   onShow() {
@@ -230,24 +254,226 @@ Page({
     })
   },
 
+  openStockEntry(event) {
+    const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {}
+    const direction = Number(dataset.direction)
+    const scope = this.data.activeSeries || 'ALL'
+    this.setData({
+      showStockEntry: true,
+      entryTab: dataset.tab || 'batch',
+      entryDirection: direction === -1 ? -1 : 1,
+      entryScope: scope,
+      entryScopeCount: scope === 'ALL' ? mardPalette.length : mardPalette.filter((item) => item.series === scope).length
+    })
+  },
+
+  closeStockEntry() { this.setData({ showStockEntry: false }) },
+  noop() {},
+
+  selectEntryTab(event) { this.setData({ entryTab: event.currentTarget.dataset.tab }) },
+  selectEntryDirection(event) { this.setData({ entryDirection: Number(event.currentTarget.dataset.direction) < 0 ? -1 : 1 }) },
+  selectEntryScope(event) {
+    const entryScope = event.currentTarget.dataset.series
+    this.setData({ entryScope, entryScopeCount: entryScope === 'ALL' ? mardPalette.length : mardPalette.filter((item) => item.series === entryScope).length })
+  },
+  selectEntryPreset(event) { this.setData({ entryAmount: Number(event.currentTarget.dataset.amount) || 0 }) },
+  inputEntryAmount(event) { this.setData({ entryAmount: Math.max(0, Math.floor(Number(event.detail.value) || 0)) }) },
+  selectPackage(event) { this.setData({ selectedPackage: Number(event.currentTarget.dataset.count) || 221 }) },
+  inputPackageAmount(event) { this.setData({ packageAmount: Math.max(0, Math.floor(Number(event.detail.value) || 0)) }) },
+
+  inputEntryRow(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const field = event.currentTarget.dataset.field
+    const rows = this.data.entryRows.slice()
+    if (!rows[index]) return
+    rows[index] = Object.assign({}, rows[index], { [field]: event.detail.value })
+    this.setData({ entryRows: rows })
+  },
+
+  quickEntryRow(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const rows = this.data.entryRows.slice()
+    if (!rows[index]) return
+    rows[index] = Object.assign({}, rows[index], { amount: String(event.currentTarget.dataset.amount) })
+    this.setData({ entryRows: rows })
+  },
+
+  addEntryRow() {
+    this.setData({ entryRows: this.data.entryRows.concat({ code: '', amount: '' }) })
+  },
+
+  removeEntryRow(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const rows = this.data.entryRows.filter((item, rowIndex) => rowIndex !== index)
+    this.setData({ entryRows: rows.length ? rows : [{ code: '', amount: '' }] })
+  },
+
+  chooseCsvFile() {
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: ['csv', 'txt'],
+      success: (result) => {
+        const file = result.tempFiles && result.tempFiles[0]
+        if (!file) return
+        wx.getFileSystemManager().readFile({
+          filePath: file.path,
+          encoding: 'utf8',
+          success: (content) => {
+            const validCodes = new Set(mardPalette.map((item) => item.code))
+            const csvItems = parseInventoryCsv(content.data, this.data.activeBrand).filter((item) => validCodes.has(item.code))
+            if (!csvItems.length) {
+              wx.showToast({ title: '文件中没有有效 MARD 色号', icon: 'none' })
+              return
+            }
+            this.setData({ csvItems, csvFileName: file.name || '库存文件.csv' })
+          },
+          fail: () => wx.showToast({ title: '文件读取失败', icon: 'none' })
+        })
+      }
+    })
+  },
+
+  downloadCsvTemplate() {
+    const filePath = wx.env.USER_DATA_PATH + '/豆仓入库模板.csv'
+    wx.getFileSystemManager().writeFile({
+      filePath,
+      data: '\uFEFF色号,入库数量\nA1,500\nB7,1000\nC19,1200',
+      encoding: 'utf8',
+      success: () => {
+        if (typeof wx.shareFileMessage === 'function') {
+          wx.shareFileMessage({ filePath, fileName: '豆仓入库模板.csv', fail: () => wx.setClipboardData({ data: '色号,入库数量\nA1,500\nB7,1000\nC19,1200' }) })
+        } else {
+          wx.setClipboardData({ data: '色号,入库数量\nA1,500\nB7,1000\nC19,1200' })
+        }
+      },
+      fail: () => wx.showToast({ title: '模板生成失败', icon: 'none' })
+    })
+  },
+
+  confirmStockEntry() {
+    let items = []
+    let source = this.data.entryTab
+    if (this.data.entryTab === 'batch') {
+      items = buildSeriesAdjustments(mardPalette, this.data.entryScope, this.data.entryDirection * Number(this.data.entryAmount || 0), this.data.activeBrand)
+    } else if (this.data.entryTab === 'manual') {
+      const validCodes = new Set(mardPalette.map((item) => item.code))
+      items = this.data.entryRows.map((row) => ({
+        code: String(row.code || '').trim().toUpperCase(),
+        delta: this.data.entryDirection * Math.max(0, Number(row.amount) || 0),
+        brand: this.data.activeBrand
+      })).filter((item) => validCodes.has(item.code) && item.delta !== 0)
+    } else if (this.data.entryTab === 'csv') {
+      items = this.data.csvItems.map((item) => Object.assign({}, item, { delta: this.data.entryDirection * Math.abs(Number(item.delta || 0)) }))
+    } else if (this.data.entryTab === 'package') {
+      items = mardPalette.slice(0, Number(this.data.selectedPackage) || 0).map((item) => ({
+        brand: this.data.activeBrand,
+        code: item.code,
+        delta: this.data.entryDirection * Number(this.data.packageAmount || 0)
+      }))
+    }
+    if (!items.length) {
+      wx.showToast({ title: '请填写有效的库存数量', icon: 'none' })
+      return
+    }
+    const directionText = this.data.entryDirection > 0 ? '增加' : '减少'
+    wx.showModal({
+      title: directionText + ' ' + items.length + ' 个色号？',
+      content: '减少库存时最低为 0；本次操作可在库存记录中撤销。',
+      confirmText: '确认执行',
+      success: (result) => {
+        if (!result.confirm) return
+        batchAdjustStock(items, { source: 'stock-entry-' + source, scope: this.data.entryScope })
+        this.setData({ showStockEntry: false })
+        this.refresh()
+        wx.showToast({ title: '已更新 ' + items.length + ' 个色号', icon: 'success' })
+      }
+    })
+  },
+
+  buildCombinedStats(patterns) {
+    const totals = {}
+    ;(patterns || []).forEach((pattern) => {
+      ;(pattern.stats || []).forEach((item) => {
+        if (!totals[item.code]) totals[item.code] = Object.assign({}, item, { required: 0 })
+        totals[item.code].required += Number(item.required || 0)
+      })
+    })
+    return Object.keys(totals).map((code) => totals[code])
+  },
+
+  openShortageSheet(name, stats) {
+    this._shortageStats = stats || []
+    const shortageRows = buildRefillList(stats, this.data.activeBrand, this.data.refillTarget, this.data.refillUnit)
+    this.setData({ showShortageSheet: true, shortagePatternName: name, shortageRows })
+  },
+
   showShortageList() {
     const pattern = getCurrentPattern()
     if (!pattern) {
       wx.showToast({ title: '请先打开一张图纸', icon: 'none' })
       return
     }
-    const shortage = getShortageList(pattern.stats || [], pattern.brand || 'MARD')
-    if (!shortage.length) {
-      wx.showToast({ title: '当前图纸库存充足', icon: 'success' })
+    this.openShortageSheet(pattern.name, pattern.stats || [])
+  },
+
+  closeShortageSheet() { this.setData({ showShortageSheet: false }) },
+  inputRefillTarget(event) {
+    this.setData({ refillTarget: Math.max(0, Math.floor(Number(event.detail.value) || 0)) }, () => this.rebuildShortageSheet())
+  },
+  setRefillUnit(event) {
+    this.setData({ refillUnit: Number(event.currentTarget.dataset.unit) || 500 }, () => this.rebuildShortageSheet())
+  },
+  rebuildShortageSheet() {
+    const selected = this._shortageStats || (getCurrentPattern() && getCurrentPattern().stats) || []
+    this.setData({ shortageRows: buildRefillList(selected, this.data.activeBrand, this.data.refillTarget, this.data.refillUnit) })
+  },
+  copyShortage(event) {
+    const mode = event.currentTarget.dataset.mode
+    const text = this.data.shortageRows.map((item) => {
+      if (mode === 'codes') return item.code
+      if (mode === 'stock') return item.code + ' 当前 ' + item.stock
+      return item.code + ' 补 ' + item.refill
+    }).join(mode === 'codes' ? ',' : '\n')
+    wx.setClipboardData({ data: text })
+  },
+
+  openConsumptionCalculator() {
+    const consumptionPatterns = getSavedPatterns().map((item) => Object.assign({}, item, {
+      colorCount: (item.stats || []).length,
+      beadCount: (item.stats || []).reduce((sum, color) => sum + Number(color.required || 0), 0),
+      selected: false
+    }))
+    this.setData({ showConsumptionSheet: true, consumptionPatterns, selectedConsumptionIds: [] })
+  },
+  closeConsumptionSheet() { this.setData({ showConsumptionSheet: false }) },
+  toggleConsumptionPattern(event) {
+    const id = event.currentTarget.dataset.id
+    const selected = new Set(this.data.selectedConsumptionIds)
+    if (selected.has(id)) selected.delete(id)
+    else selected.add(id)
+    const ids = Array.from(selected)
+    this.setData({
+      selectedConsumptionIds: ids,
+      consumptionPatterns: this.data.consumptionPatterns.map((item) => Object.assign({}, item, { selected: selected.has(item.id) }))
+    })
+  },
+  selectAllConsumption() {
+    const allSelected = this.data.selectedConsumptionIds.length === this.data.consumptionPatterns.length
+    const ids = allSelected ? [] : this.data.consumptionPatterns.map((item) => item.id)
+    const selected = new Set(ids)
+    this.setData({ selectedConsumptionIds: ids, consumptionPatterns: this.data.consumptionPatterns.map((item) => Object.assign({}, item, { selected: selected.has(item.id) })) })
+  },
+  calculateConsumption() {
+    const selected = new Set(this.data.selectedConsumptionIds)
+    const patterns = getSavedPatterns().filter((item) => selected.has(item.id))
+    if (!patterns.length) {
+      wx.showToast({ title: '请至少选择一张图纸', icon: 'none' })
       return
     }
-    const text = pattern.name + ' 缺豆清单\n' + shortage.map((item) => item.code + ' 缺 ' + item.missing + ' 粒').join('\n')
-    wx.showModal({
-      title: '缺豆清单（' + shortage.length + ' 色）',
-      content: text,
-      confirmText: '复制清单',
-      success(result) { if (result.confirm) wx.setClipboardData({ data: text }) }
-    })
+    const stats = this.buildCombinedStats(patterns)
+    this._shortageStats = stats
+    this.setData({ showConsumptionSheet: false }, () => this.openShortageSheet(patterns.length + ' 张图纸合计', stats))
   },
 
   undoStockTransaction(event) {

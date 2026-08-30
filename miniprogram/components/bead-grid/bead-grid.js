@@ -21,7 +21,9 @@ Component({
     canvasWidth: 320,
     canvasHeight: 320,
     viewportSize: 320,
-    viewportHeight: 320
+    viewportHeight: 320,
+    gestureScale: 1,
+    gestureActive: false
   },
 
   observers: {
@@ -34,6 +36,7 @@ Component({
     ready() { this.scheduleDraw() },
     detached() {
       if (this._drawTimer) clearTimeout(this._drawTimer)
+      if (this._gestureFrameTimer) clearTimeout(this._gestureFrameTimer)
     }
   },
 
@@ -61,6 +64,7 @@ Component({
       this._pinchStartZoom = Number(this.data.zoom) || 1
       this._lastPinchZoom = this._pinchStartZoom
       this._lastGestureAt = Date.now()
+      this.setData({ gestureActive: true, gestureScale: 1 })
     },
 
     handleTouchMove(event) {
@@ -72,19 +76,32 @@ Component({
       const nextZoom = Math.max(1, Math.min(maxZoom, Math.round(rawZoom * 20) / 20))
       if (Math.abs(nextZoom - this._lastPinchZoom) < 0.05) return
       const now = Date.now()
-      if (this._lastZoomEventAt && now - this._lastZoomEventAt < 45) return
-      this._lastZoomEventAt = now
       this._lastPinchZoom = nextZoom
       this._lastGestureAt = now
-      this.triggerEvent('zoomchange', { zoom: nextZoom })
+      if (this._gestureFrameTimer) return
+      this._gestureFrameTimer = setTimeout(() => {
+        this._gestureFrameTimer = null
+        if (!this._pinching) return
+        const gestureScale = Math.max(0.25, Math.min(4, this._lastPinchZoom / this._pinchStartZoom))
+        this.setData({ gestureScale: Math.round(gestureScale * 1000) / 1000 })
+      }, 16)
     },
 
     handleTouchEnd(event) {
       if (!event.touches || event.touches.length < 2) {
+        const finalZoom = Number(this._lastPinchZoom) || Number(this.data.zoom) || 1
+        const startZoom = Number(this._pinchStartZoom) || Number(this.data.zoom) || 1
+        const changed = Math.abs(finalZoom - startZoom) >= 0.05
         this._pinching = false
         this._pinchStartDistance = 0
         this._lastGestureAt = Date.now()
-        this.scheduleDraw()
+        if (this._gestureFrameTimer) {
+          clearTimeout(this._gestureFrameTimer)
+          this._gestureFrameTimer = null
+        }
+        this.setData({ gestureScale: 1, gestureActive: false }, () => {
+          if (changed) this.triggerEvent('zoomchange', { zoom: finalZoom })
+        })
       }
     },
 
@@ -92,6 +109,7 @@ Component({
       const detail = event.detail || {}
       this._scrollLeft = Number(detail.scrollLeft) || 0
       this._scrollTop = Number(detail.scrollTop) || 0
+      if (this._pinching) return
       const now = Date.now()
       if (!this._lastViewEventAt || now - this._lastViewEventAt >= 120) {
         this._lastViewEventAt = now

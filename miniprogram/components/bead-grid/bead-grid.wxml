@@ -17,6 +17,7 @@
     bindtouchmove="handleTouchMove"
     bindtouchend="handleTouchEnd"
     bindtouchcancel="handleTouchEnd"
-    style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+    class="bead-canvas {{gestureActive ? 'gesture-active' : ''}}"
+    style="width: {{canvasWidth}}px; height: {{canvasHeight}}px; transform: scale({{gestureScale}});"
   />
 </scroll-view>

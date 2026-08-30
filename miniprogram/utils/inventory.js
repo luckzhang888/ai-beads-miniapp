@@ -108,6 +108,38 @@ function batchAdjustStock(items, metadata) {
   return recordTransaction('batch', changes, metadata)
 }
 
+function buildSeriesAdjustments(palette, scope, delta, brand) {
+  const target = String(scope || 'ALL').toUpperCase()
+  const amount = Number(delta || 0)
+  if (!Number.isFinite(amount) || amount === 0) return []
+  return (palette || [])
+    .filter((item) => target === 'ALL' || String(item.series || '').toUpperCase() === target)
+    .map((item) => ({ brand: brand || DEFAULT_BRAND, code: item.code, delta: amount }))
+}
+
+function parseInventoryCsv(text, brand) {
+  const merged = {}
+  String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).forEach((line) => {
+    const columns = line.trim().split(/[,，;；\t]+/).map((item) => item.trim())
+    const code = String(columns[0] || '').toUpperCase()
+    const delta = Number(String(columns[1] || '').replace(/[^\d+-.]/g, ''))
+    if (!/^[A-Z]+\d+$/.test(code) || !Number.isFinite(delta) || delta === 0) return
+    merged[code] = Number(merged[code] || 0) + delta
+  })
+  return Object.keys(merged).map((code) => ({ brand: brand || DEFAULT_BRAND, code, delta: merged[code] }))
+}
+
+function buildRefillList(stats, brand, targetStock, unit) {
+  const desired = Math.max(0, Number(targetStock) || 0)
+  const refillUnit = Math.max(1, Number(unit) || 1)
+  return mergeStatsWithInventory(stats || [], brand).map((item) => {
+    const afterUse = Number(item.stock || 0) - Number(item.required || 0)
+    const gap = Math.max(0, desired - afterUse)
+    const refill = gap ? Math.ceil(gap / refillUnit) * refillUnit : 0
+    return Object.assign({}, item, { afterUse, refill })
+  }).filter((item) => item.refill > 0)
+}
+
 function mergeStatsWithInventory(stats, brand) {
   const inventory = getInventory(brand)
   return stats.map((item) => {
@@ -199,6 +231,9 @@ module.exports = {
   setStock,
   adjustStock,
   batchAdjustStock,
+  buildSeriesAdjustments,
+  parseInventoryCsv,
+  buildRefillList,
   mergeStatsWithInventory,
   canConsumeStats,
   getShortageList,

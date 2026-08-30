@@ -42,6 +42,14 @@ function displayIndices(indices, width, mirrored) {
   })
 }
 
+function axisMarkers(length) {
+  const size = Math.max(1, Number(length) || 1)
+  const values = [1]
+  for (let value = 10; value < size; value += 10) values.push(value)
+  if (values.indexOf(size) < 0) values.push(size)
+  return values.map((value) => ({ key: String(value), label: value, percent: Math.round(((value - 1) / Math.max(1, size - 1)) * 1000) / 10 }))
+}
+
 Page({
   data: {
     pattern: null,
@@ -66,7 +74,9 @@ Page({
     areaStart: null,
     scrollLeft: 0,
     scrollTop: 0,
-    performanceHint: ''
+    performanceHint: '',
+    axisX: [],
+    axisY: []
   },
 
   onLoad(options) {
@@ -115,7 +125,9 @@ Page({
       progress,
       completedIndices,
       displayCompletedIndices: displayIndices(completedIndices, pattern.width, this.data.mirrored),
-      performanceHint: pattern.width * pattern.height >= 12000 ? '大图已启用性能模式：拖动时降低清晰度，停止后自动恢复' : ''
+      performanceHint: pattern.width * pattern.height >= 12000 ? '大图已启用性能模式：手势中使用 GPU 预览，松手后恢复清晰色号' : '',
+      axisX: axisMarkers(pattern.width),
+      axisY: axisMarkers(pattern.height)
     }
     if (!this.hasInitialZoom) {
       const viewState = pattern.viewState || {}

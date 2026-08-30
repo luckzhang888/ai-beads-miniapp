@@ -8,6 +8,7 @@
       <view class="tool-item {{locked ? 'active' : ''}}" bindtap="toggleLock"><text>{{locked ? '●' : '○'}}</text><view>锁定</view></view>
       <view class="tool-item {{working ? 'active' : ''}}" bindtap="chooseProgressTool"><text>✓</text><view>{{progressToolName}}</view></view>
       <view class="tool-item" bindtap="previewExport"><text>⇩</text><view>导出</view></view>
+      <view class="tool-item" bindtap="goEditor"><text>◉</text><view>色号整理</view></view>
       <view class="tool-item" bindtap="openSettings"><text>⚙</text><view>设置</view></view>
     </view>
   </scroll-view>
@@ -18,6 +19,8 @@
   </view>
 
   <view class="canvas-shell">
+    <view wx:if="{{majorGrid}}" class="axis-x"><text wx:for="{{axisX}}" wx:key="key" style="left: {{item.percent}}%;">{{item.label}}</text></view>
+    <view wx:if="{{majorGrid}}" class="axis-y"><text wx:for="{{axisY}}" wx:key="key" style="top: {{item.percent}}%;">{{item.label}}</text></view>
     <bead-grid
       id="patternGrid"
       matrix="{{displayMatrix}}"

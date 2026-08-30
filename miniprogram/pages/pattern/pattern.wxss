@@ -11,7 +11,11 @@
 .progress-number { color: #7b5ad7; font-size: 19rpx; }
 .progress-track { height: 7rpx; margin-top: 9rpx; overflow: hidden; border-radius: 999rpx; background: #eee9f2; }
 .progress-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8d69ea, #55ceb1); transition: width .3s ease; }
-.canvas-shell { height: calc(100vh - 103rpx - 77rpx - 154rpx - env(safe-area-inset-bottom)); display: flex; align-items: flex-start; justify-content: center; padding-top: 8rpx; box-sizing: border-box; overflow: hidden; }
+.canvas-shell { position: relative; height: calc(100vh - 103rpx - 77rpx - 154rpx - env(safe-area-inset-bottom)); display: flex; align-items: flex-start; justify-content: center; padding-top: 32rpx; box-sizing: border-box; overflow: hidden; }
+.axis-x { position: absolute; z-index: 6; left: 27rpx; right: 27rpx; top: 2rpx; height: 27rpx; color: #706a73; font-size: 16rpx; pointer-events: none; }
+.axis-x text { position: absolute; top: 4rpx; transform: translateX(-50%); }
+.axis-y { position: absolute; z-index: 6; left: 1rpx; top: 43rpx; bottom: 13rpx; width: 28rpx; color: #706a73; font-size: 16rpx; pointer-events: none; }
+.axis-y text { position: absolute; left: 4rpx; transform: translateY(-50%); }
 .gesture-hint { position: fixed; z-index: 12; left: 50%; bottom: calc(256rpx + env(safe-area-inset-bottom)); padding: 8rpx 17rpx; transform: translateX(-50%); border-radius: 999rpx; color: #736a7a; background: rgba(255,255,255,.86); box-shadow: 0 5rpx 16rpx rgba(48,38,56,.1); font-size: 18rpx; white-space: nowrap; pointer-events: none; }
 .performance-hint { position: fixed; z-index: 12; left: 50%; top: 194rpx; max-width: 86%; padding: 8rpx 15rpx; transform: translateX(-50%); border-radius: 999rpx; color: #735b20; background: rgba(255,244,207,.94); font-size: 17rpx; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .zoom-control { position: fixed; z-index: 12; left: 18rpx; bottom: calc(176rpx + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 65rpx 65rpx 65rpx; height: 65rpx; overflow: hidden; border: 1rpx solid #d8d1df; border-radius: 20rpx; background: rgba(255,255,255,.94); box-shadow: 0 8rpx 24rpx rgba(48,38,56,.16); }

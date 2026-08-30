@@ -117,6 +117,22 @@ assert.strictEqual(inventoryUtils.getInventory().F5, 15)
 assert.strictEqual(inventoryUtils.undoTransaction(consumedOnce.transactionId).ok, true)
 assert.strictEqual(inventoryUtils.getInventory().F5, 20)
 assert.strictEqual(inventoryUtils.consumeStats([{ code: 'F5', required: 5 }], { patternId: 'dedupe-pattern' }).ok, true)
+const allSeriesAdjustments = inventoryUtils.buildSeriesAdjustments(palette, 'ALL', 500, 'MARD')
+assert.strictEqual(allSeriesAdjustments.length, 221)
+assert.deepStrictEqual(inventoryUtils.buildSeriesAdjustments(palette, 'M', -100, 'MARD').map((item) => item.code), ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12', 'M13', 'M14', 'M15'])
+assert.deepStrictEqual(inventoryUtils.parseInventoryCsv('\uFEFF色号,入库数量\nA1,500\nA1,200\nB7,-20\n无效,10'), [
+  { brand: 'MARD', code: 'A1', delta: 700 },
+  { brand: 'MARD', code: 'B7', delta: -20 }
+])
+inventoryUtils.setStock('A1', 300)
+const refill = inventoryUtils.buildRefillList([{ code: 'A1', required: 450, hex: '#fff' }], 'MARD', 1000, 500)
+assert.strictEqual(refill[0].afterUse, -150)
+assert.strictEqual(refill[0].refill, 1500)
+patternUtils.savePattern(patternUtils.createPattern({ id: 'delete-a', name: '删除A', matrix: [['A1']] }), palette)
+patternUtils.savePattern(patternUtils.createPattern({ id: 'delete-b', name: '删除B', matrix: [['A2']] }), palette)
+patternUtils.deletePatterns(['delete-a', 'delete-b'])
+assert.strictEqual(patternUtils.getPatternById('delete-a'), null)
+assert.strictEqual(patternUtils.getPatternById('delete-b'), null)
 
 let beadGridDefinition
 global.Component = (definition) => { beadGridDefinition = definition }
@@ -125,16 +141,21 @@ delete global.Component
 const zoomEvents = []
 const beadGrid = Object.assign({
   data: { compact: false, locked: false, zoom: 2, maxZoom: 6 },
-  triggerEvent(name, detail) { zoomEvents.push({ name, detail }) }
+  triggerEvent(name, detail) { zoomEvents.push({ name, detail }) },
+  setData(next, callback) {
+    this.data = Object.assign({}, this.data, next)
+    if (callback) callback()
+  }
 }, beadGridDefinition.methods)
 beadGrid.handleTouchStart({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 100, clientY: 0 }] })
 beadGrid.handleTouchMove({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 150, clientY: 0 }] })
-assert.deepStrictEqual(zoomEvents[0], { name: 'zoomchange', detail: { zoom: 3 } })
-beadGrid._lastZoomEventAt = 0
+assert.strictEqual(zoomEvents.length, 0)
 beadGrid.handleTouchMove({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 1000, clientY: 0 }] })
-assert.strictEqual(zoomEvents[1].detail.zoom, 6)
 beadGrid.handleTouchEnd({ touches: [] })
+assert.deepStrictEqual(zoomEvents[0], { name: 'zoomchange', detail: { zoom: 6 } })
 assert.strictEqual(beadGrid._pinching, false)
+assert.strictEqual(beadGrid.data.gestureScale, 1)
+assert.strictEqual(beadGrid.data.gestureActive, false)
 
 function loadPage(relativePath) {
   let definition

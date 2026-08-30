@@ -14,5 +14,9 @@
 
 canvas {
   display: block;
-  transform-origin: 0 0;
+  transform-origin: center center;
+}
+
+.bead-canvas.gesture-active {
+  will-change: transform;
 }

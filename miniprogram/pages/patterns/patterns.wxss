@@ -1,6 +1,8 @@
 .library-page { min-height: 100vh; padding: 24rpx 24rpx 0; box-sizing: border-box; color: #261f2e; background: radial-gradient(circle at 90% 12%, rgba(188, 232, 241, .30), transparent 28%), radial-gradient(circle at 8% 30%, rgba(226, 210, 251, .34), transparent 24%), #f8f7fb; }
 .brand-bar, .brand, .summary-card, .search-box { display: flex; align-items: center; }
 .brand-bar { justify-content: space-between; padding: 8rpx 4rpx 22rpx; }
+.brand-actions { display: flex; align-items: center; gap: 12rpx; }
+.manage-link { padding: 13rpx 18rpx; border-radius: 999rpx; color: #6847ce; background: #f0ebfb; font-size: 23rpx; }
 .brand-mark { width: 70rpx; height: 70rpx; margin-right: 17rpx; display: flex; align-items: center; justify-content: center; border-radius: 22rpx; color: #6143c6; background: linear-gradient(145deg, #d7f3e9, #ddd3fa); font-size: 29rpx; font-weight: 800; box-shadow: 0 10rpx 24rpx rgba(90, 67, 170, .13); }
 .brand-name { font-size: 34rpx; font-weight: 800; letter-spacing: 1rpx; }
 .brand-note { margin-top: 4rpx; color: #9b92a4; font-size: 20rpx; }
@@ -28,18 +30,46 @@
 .folder-scroll { white-space: nowrap; }
 .folder-inner { padding-right: 20rpx; }
 .folder-card { position: relative; width: 292rpx; flex: none; padding: 12rpx; border: 1rpx solid #ddd5e7; border-radius: 22rpx; background: rgba(255,255,255,.92); box-sizing: border-box; overflow: hidden; }
+.folder-card.selected { border: 3rpx solid #704de0; }
 .folder-count { position: absolute; z-index: 3; top: 20rpx; left: 20rpx; padding: 7rpx 14rpx; border-radius: 999rpx; color: white; background: #744fdd; font-size: 19rpx; }
 .folder-preview { height: 214rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 16rpx; background: linear-gradient(145deg, #f4effc, #eef9f7); }
 .folder-name { padding: 17rpx 8rpx 7rpx; font-weight: 650; }
 .pattern-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17rpx; }
 .pattern-card { position: relative; min-width: 0; border: 1rpx solid #ded6e6; border-radius: 24rpx; background: rgba(255,255,255,.95); overflow: hidden; box-shadow: 0 10rpx 26rpx rgba(76,54,101,.06); }
+.pattern-card.selected { border: 3rpx solid #704de0; box-shadow: 0 0 0 5rpx rgba(112,77,224,.12); }
+.select-circle { position: absolute; z-index: 6; top: 13rpx; left: 13rpx; width: 52rpx; height: 52rpx; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border: 3rpx solid white; border-radius: 50%; color: white; background: rgba(255,255,255,.94); box-shadow: 0 4rpx 16rpx rgba(40,28,58,.2); }
+.select-circle.checked { border-color: #704de0; background: #704de0; }
 .pattern-preview { height: 320rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; background: linear-gradient(145deg, #f4effc, #edf9f6); }
 .pattern-copy { padding: 17rpx; }
 .pattern-name { overflow: hidden; font-size: 26rpx; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
 .pattern-meta { margin-top: 9rpx; color: #9990a1; font-size: 19rpx; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status-badge { position: absolute; z-index: 4; top: 13rpx; right: 13rpx; padding: 8rpx 15rpx; border-radius: 999rpx; color: white; background: linear-gradient(135deg, #ffca4a, #f19d15); font-size: 19rpx; box-shadow: 0 6rpx 16rpx rgba(224,154,25,.28); }
 .status-badge.done { background: linear-gradient(135deg, #4edab1, #22bb8b); }
+.ready-label { display: inline-flex; margin-top: 10rpx; padding: 5rpx 11rpx; border-radius: 999rpx; color: #d2871b; background: #fff4dd; font-size: 18rpx; }
+.ready-label.ready { color: #218d69; background: #e3f8ef; }
+.pattern-grid.list-mode { display: flex; flex-direction: column; }
+.pattern-grid.list-mode .pattern-card { display: grid; grid-template-columns: 210rpx minmax(0,1fr); }
+.pattern-grid.list-mode .pattern-preview { height: 210rpx; }
+.pattern-grid.list-mode .pattern-copy { display: flex; flex-direction: column; justify-content: center; }
 .empty-state { padding: 80rpx 20rpx; text-align: center; color: #9e95a8; }
 .safe-bottom { height: calc(145rpx + env(safe-area-inset-bottom)); }
 .upload-button { position: fixed; z-index: 10; right: 29rpx; bottom: calc(29rpx + env(safe-area-inset-bottom)); width: 235rpx; height: 84rpx; margin: 0; padding: 0; border: 0; border-radius: 22rpx; color: white; background: linear-gradient(135deg, #7b57e8, #6341d6); box-shadow: 0 12rpx 28rpx rgba(101,67,211,.28); font-size: 27rpx; font-weight: 600; }
 .upload-button::after { border: 0; }
+.selection-bar { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; min-height: 118rpx; padding: 17rpx 24rpx calc(17rpx + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 135rpx 1fr 135rpx 170rpx; align-items: center; gap: 12rpx; box-sizing: border-box; border-top: 1rpx solid #e7e2ec; background: rgba(255,255,255,.97); backdrop-filter: blur(18rpx); }
+.selection-bar button { width: 100%; margin: 0; border-radius: 20rpx; font-size: 25rpx; }
+.selection-outline { color: #6847ce; background: white; border: 2rpx solid #7351df; }
+.selection-delete { color: white; background: #ee6b78; }
+.selection-move { color: white; background: #8e7be7; }
+.selection-count { text-align: center; color: #675e70; font-size: 24rpx; }
+.sheet-mask { position: fixed; z-index: 40; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: flex-end; background: rgba(28,24,34,.44); }
+.filter-sheet { width: 100%; max-height: 88vh; padding: 17rpx 30rpx calc(28rpx + env(safe-area-inset-bottom)); box-sizing: border-box; overflow-y: auto; border-radius: 34rpx 34rpx 0 0; background: white; }
+.sheet-handle { width: 72rpx; height: 8rpx; margin: 0 auto 16rpx; border-radius: 999rpx; background: #ded8e6; }
+.sheet-title { padding-bottom: 21rpx; border-bottom: 1rpx solid #eeeaf2; text-align: center; font-size: 33rpx; font-weight: 800; }
+.filter-label { margin: 26rpx 0 15rpx; font-size: 27rpx; font-weight: 700; }
+.option-row { display: flex; gap: 13rpx; }
+.option-row.wrap { flex-wrap: wrap; }
+.option-pill { padding: 12rpx 22rpx; border: 1rpx solid #ded9e5; border-radius: 999rpx; background: white; font-size: 23rpx; }
+.option-pill.active { color: white; border-color: #6b4cda; background: #6b4cda; }
+.sheet-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 15rpx; margin-top: 32rpx; }
+.sheet-actions button { width: 100%; margin: 0; border-radius: 20rpx; color: #6948d4; background: white; border: 2rpx solid #7150dd; }
+.sheet-actions .primary { color: white; background: #6b4cda; }

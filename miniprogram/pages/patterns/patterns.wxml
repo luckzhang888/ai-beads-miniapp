@@ -4,7 +4,10 @@
       <view class="brand-mark">豆</view>
       <view><view class="brand-name">AI 豆仓</view><view class="brand-note">MARD 221 标准色</view></view>
     </view>
-    <view class="inventory-link" bindtap="goInventory">◫ 豆仓</view>
+    <view class="brand-actions">
+      <view class="manage-link" bindtap="toggleManagement">{{selectionMode ? '取消' : '管理'}}</view>
+      <view class="inventory-link" bindtap="goInventory">◫ 豆仓</view>
+    </view>
   </view>
 
   <scroll-view scroll-x class="top-nav" enhanced show-scrollbar="false">
@@ -30,7 +33,7 @@
   <view class="search-box">
     <text class="search-icon">⌕</text>
     <input value="{{query}}" bindinput="onSearch" placeholder="搜索图纸或标签" />
-    <text class="search-tool">⌘</text>
+    <text class="search-tool" bindtap="openFilter">⇅</text>
   </view>
 
   <scroll-view scroll-x class="filter-scroll" enhanced show-scrollbar="false">
@@ -45,10 +48,10 @@
     </view>
   </scroll-view>
 
-  <view class="section-head"><view class="section-name">文件夹</view><view class="create-folder" data-name="文件夹" bindtap="showComingSoon">＋ 创建</view></view>
+  <view class="section-head"><view class="section-name">文件夹</view><view class="create-folder" bindtap="createFolder">＋ 创建</view></view>
   <scroll-view scroll-x class="folder-scroll" enhanced show-scrollbar="false">
     <view class="folder-inner">
-      <view class="folder-card" wx:for="{{folders}}" wx:key="id" data-id="{{item.cover.id}}" bindtap="openPattern">
+      <view class="folder-card {{selectedFolder === item.id ? 'selected' : ''}}" wx:for="{{folders}}" wx:key="id" data-folder="{{item.id}}" bindtap="selectFolder">
         <view class="folder-count">{{item.count}} 图纸</view>
         <view class="folder-preview">
           <bead-grid matrix="{{item.cover.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{146}}" show-grid="{{false}}" />
@@ -59,21 +62,64 @@
   </scroll-view>
 
   <view class="section-head"><view class="section-name">我的图纸</view><view class="section-count">{{visiblePatterns.length}} 张</view></view>
-  <view wx:if="{{visiblePatterns.length}}" class="pattern-grid">
-    <view class="pattern-card" wx:for="{{visiblePatterns}}" wx:key="id" data-id="{{item.id}}" bindtap="openPattern">
+  <view wx:if="{{visiblePatterns.length}}" class="pattern-grid {{viewMode === 'list' ? 'list-mode' : ''}}">
+    <view class="pattern-card {{item.selected ? 'selected' : ''}}" wx:for="{{visiblePatterns}}" wx:key="id" data-id="{{item.id}}" bindtap="openPattern" bindlongpress="enterSelection">
+      <view wx:if="{{selectionMode}}" class="select-circle {{item.selected ? 'checked' : ''}}">{{item.selected ? '✓' : ''}}</view>
       <view class="status-badge {{item.status === '已拼' ? 'done' : ''}}">{{item.status}}</view>
       <view class="pattern-preview">
-        <bead-grid matrix="{{item.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{164}}" show-grid="{{false}}" />
+        <bead-grid matrix="{{item.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{viewMode === 'list' ? 96 : 164}}" show-grid="{{false}}" />
       </view>
       <view class="pattern-copy">
         <view class="pattern-name">{{item.name}}</view>
         <view class="pattern-meta">◉ {{item.colorCount}}　◎ {{item.beadCount}}</view>
         <view class="pattern-meta">▦ {{item.width || item.size}}×{{item.height || item.size}} · {{item.displayTime}}</view>
+        <view class="ready-label {{item.canMake ? 'ready' : ''}}">{{item.canMake ? '库存可拼' : '需要补豆'}}</view>
       </view>
     </view>
   </view>
   <view wx:else class="empty-state">没有匹配的图纸，换个关键词试试。</view>
 
   <view class="safe-bottom"></view>
-  <button class="upload-button" bindtap="goCreate">＋ 上传图纸</button>
+  <button wx:if="{{!selectionMode}}" class="upload-button" bindtap="goCreate">＋ 上传图纸</button>
+
+  <view wx:if="{{selectionMode}}" class="selection-bar">
+    <button class="selection-outline" bindtap="selectAllVisible">全选</button>
+    <view class="selection-count">已选 {{selectedCount}} 张</view>
+    <button class="selection-move" bindtap="moveSelected">移动</button>
+    <button class="selection-delete" bindtap="bulkDelete">⌫ 删除</button>
+  </view>
+
+  <view wx:if="{{showFilter}}" class="sheet-mask" bindtap="closeFilter">
+    <view class="filter-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-title">筛选与排序</view>
+      <view class="filter-label">布局方式</view>
+      <view class="option-row">
+        <view class="option-pill {{viewMode === 'grid' ? 'active' : ''}}" data-value="grid" bindtap="setViewMode">大图模式</view>
+        <view class="option-pill {{viewMode === 'list' ? 'active' : ''}}" data-value="list" bindtap="setViewMode">列表模式</view>
+      </view>
+      <view class="filter-label">排序方式</view>
+      <view class="option-row wrap">
+        <view class="option-pill {{sortMode === 'recent' ? 'active' : ''}}" data-value="recent" bindtap="setSortMode">时间近</view>
+        <view class="option-pill {{sortMode === 'old' ? 'active' : ''}}" data-value="old" bindtap="setSortMode">时间远</view>
+        <view class="option-pill {{sortMode === 'beads-desc' ? 'active' : ''}}" data-value="beads-desc" bindtap="setSortMode">消耗多</view>
+        <view class="option-pill {{sortMode === 'beads-asc' ? 'active' : ''}}" data-value="beads-asc" bindtap="setSortMode">消耗少</view>
+        <view class="option-pill {{sortMode === 'name' ? 'active' : ''}}" data-value="name" bindtap="setSortMode">图纸名称</view>
+      </view>
+      <view class="filter-label">库存筛选</view>
+      <view class="option-row">
+        <view class="option-pill {{availability === 'all' ? 'active' : ''}}" data-value="all" bindtap="setAvailability">全部</view>
+        <view class="option-pill {{availability === 'ready' ? 'active' : ''}}" data-value="ready" bindtap="setAvailability">只看当前可拼</view>
+      </view>
+      <view class="filter-label">图纸尺寸</view>
+      <view class="option-row wrap">
+        <view class="option-pill {{sizeFilter === 'all' ? 'active' : ''}}" data-value="all" bindtap="setSizeFilter">全部</view>
+        <view class="option-pill {{sizeFilter === '52' ? 'active' : ''}}" data-value="52" bindtap="setSizeFilter">≤52</view>
+        <view class="option-pill {{sizeFilter === '78' ? 'active' : ''}}" data-value="78" bindtap="setSizeFilter">53-78</view>
+        <view class="option-pill {{sizeFilter === '104' ? 'active' : ''}}" data-value="104" bindtap="setSizeFilter">79-104</view>
+        <view class="option-pill {{sizeFilter === 'large' ? 'active' : ''}}" data-value="large" bindtap="setSizeFilter">超大图</view>
+      </view>
+      <view class="sheet-actions"><button bindtap="resetFilter">重置</button><button class="primary" bindtap="applyFilterPanel">完成</button></view>
+    </view>
+  </view>
 </view>
