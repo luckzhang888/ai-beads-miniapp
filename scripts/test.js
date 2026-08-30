@@ -117,9 +117,6 @@ assert.strictEqual(inventoryUtils.getInventory().F5, 15)
 assert.strictEqual(inventoryUtils.undoTransaction(consumedOnce.transactionId).ok, true)
 assert.strictEqual(inventoryUtils.getInventory().F5, 20)
 assert.strictEqual(inventoryUtils.consumeStats([{ code: 'F5', required: 5 }], { patternId: 'dedupe-pattern' }).ok, true)
-const allSeriesAdjustments = inventoryUtils.buildSeriesAdjustments(palette, 'ALL', 500, 'MARD')
-assert.strictEqual(allSeriesAdjustments.length, 221)
-assert.deepStrictEqual(inventoryUtils.buildSeriesAdjustments(palette, 'M', -100, 'MARD').map((item) => item.code), ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12', 'M13', 'M14', 'M15'])
 assert.deepStrictEqual(inventoryUtils.parseInventoryCsv('\uFEFF色号,入库数量\nA1,500\nA1,200\nB7,-20\n无效,10'), [
   { brand: 'MARD', code: 'A1', delta: 700 },
   { brand: 'MARD', code: 'B7', delta: -20 }

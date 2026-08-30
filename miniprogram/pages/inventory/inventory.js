@@ -5,7 +5,6 @@ const {
   setStock,
   adjustStock,
   batchAdjustStock,
-  buildSeriesAdjustments,
   parseInventoryCsv,
   buildRefillList,
   getShortageList,
@@ -41,12 +40,8 @@ Page({
     shortageCount: 0,
     transactions: [],
     showStockEntry: false,
-    entryTab: 'batch',
+    entryTab: 'manual',
     entryDirection: 1,
-    entryScope: 'ALL',
-    entryScopeCount: mardPalette.length,
-    entryAmount: 500,
-    entryPresets: [100, 500, 1000, 1200],
     entryRows: [{ code: '', amount: '' }, { code: '', amount: '' }, { code: '', amount: '' }],
     csvItems: [],
     csvFileName: '',
@@ -257,13 +252,10 @@ Page({
   openStockEntry(event) {
     const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {}
     const direction = Number(dataset.direction)
-    const scope = this.data.activeSeries || 'ALL'
     this.setData({
       showStockEntry: true,
-      entryTab: dataset.tab || 'batch',
-      entryDirection: direction === -1 ? -1 : 1,
-      entryScope: scope,
-      entryScopeCount: scope === 'ALL' ? mardPalette.length : mardPalette.filter((item) => item.series === scope).length
+      entryTab: dataset.tab || 'manual',
+      entryDirection: direction === -1 ? -1 : 1
     })
   },
 
@@ -272,12 +264,6 @@ Page({
 
   selectEntryTab(event) { this.setData({ entryTab: event.currentTarget.dataset.tab }) },
   selectEntryDirection(event) { this.setData({ entryDirection: Number(event.currentTarget.dataset.direction) < 0 ? -1 : 1 }) },
-  selectEntryScope(event) {
-    const entryScope = event.currentTarget.dataset.series
-    this.setData({ entryScope, entryScopeCount: entryScope === 'ALL' ? mardPalette.length : mardPalette.filter((item) => item.series === entryScope).length })
-  },
-  selectEntryPreset(event) { this.setData({ entryAmount: Number(event.currentTarget.dataset.amount) || 0 }) },
-  inputEntryAmount(event) { this.setData({ entryAmount: Math.max(0, Math.floor(Number(event.detail.value) || 0)) }) },
   selectPackage(event) { this.setData({ selectedPackage: Number(event.currentTarget.dataset.count) || 221 }) },
   inputPackageAmount(event) { this.setData({ packageAmount: Math.max(0, Math.floor(Number(event.detail.value) || 0)) }) },
 
@@ -354,9 +340,7 @@ Page({
   confirmStockEntry() {
     let items = []
     let source = this.data.entryTab
-    if (this.data.entryTab === 'batch') {
-      items = buildSeriesAdjustments(mardPalette, this.data.entryScope, this.data.entryDirection * Number(this.data.entryAmount || 0), this.data.activeBrand)
-    } else if (this.data.entryTab === 'manual') {
+    if (this.data.entryTab === 'manual') {
       const validCodes = new Set(mardPalette.map((item) => item.code))
       items = this.data.entryRows.map((row) => ({
         code: String(row.code || '').trim().toUpperCase(),
@@ -383,7 +367,7 @@ Page({
       confirmText: '确认执行',
       success: (result) => {
         if (!result.confirm) return
-        batchAdjustStock(items, { source: 'stock-entry-' + source, scope: this.data.entryScope })
+        batchAdjustStock(items, { source: 'stock-entry-' + source })
         this.setData({ showStockEntry: false })
         this.refresh()
         wx.showToast({ title: '已更新 ' + items.length + ' 个色号', icon: 'success' })

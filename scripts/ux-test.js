@@ -83,8 +83,8 @@ async function main() {
 
   const inventory = loadPage('../miniprogram/pages/inventory/inventory')
   inventory.onShow()
-  inventory.openStockEntry({ currentTarget: { dataset: { tab: 'batch', direction: 1 } } })
-  inventory.setData({ entryScope: 'ALL', entryAmount: 500, entryDirection: 1 })
+  inventory.openStockEntry({ currentTarget: { dataset: { tab: 'package', direction: 1 } } })
+  inventory.setData({ selectedPackage: 221, packageAmount: 500, entryDirection: 1 })
   inventory.confirmStockEntry()
   const stocked = inventoryUtils.getInventory('MARD')
   assert.strictEqual(Object.keys(stocked).length, 221)
@@ -135,7 +135,7 @@ async function main() {
   assert.strictEqual(library.data.folders.length, 0)
 
   delete global.wx
-  console.log('UX regression passed: folder lifecycle, bulk move/delete, all-221 stock adjustment + undo, multi-pattern consumption, and native 100-event pinch.')
+  console.log('UX regression passed: folder lifecycle, bulk move/delete, 221-color package intake + undo, multi-pattern consumption, and native 100-event pinch.')
 }
 
 main().catch((error) => {

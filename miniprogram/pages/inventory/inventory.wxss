@@ -25,30 +25,6 @@
   color: #8d93a1;
 }
 
-.header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 12rpx;
-}
-
-.outline-btn {
-  margin: 0;
-  padding: 0 20rpx;
-  height: 64rpx;
-  line-height: 60rpx;
-  border: 2rpx solid #6955e8;
-  border-radius: 32rpx;
-  background: #f7f5ff;
-  color: #5b48ce;
-  font-size: 23rpx;
-}
-
-.outline-btn::after {
-  border: 0;
-}
-.outline-btn.primary { color: white; background: #6650df; }
-
 .summary-row {
   display: flex;
   align-items: center;
@@ -358,19 +334,9 @@
 .direction-switch view.active { color: white; background: #6850df; }
 .direction-switch view.danger { color: white; background: #ef6172; }
 .entry-content { flex: 1; min-height: 0; box-sizing: border-box; padding: 20rpx 28rpx 0; }
-.entry-stat { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 20rpx; border-radius: 22rpx; background: white; box-shadow: 0 10rpx 30rpx rgba(77,67,118,.06); }
-.entry-stat view { padding: 24rpx; display: flex; flex-direction: column; align-items: center; }
-.entry-stat view + view { border-left: 1rpx solid #e4e1e9; }
-.entry-stat text:first-child { color: #684ede; font-size: 34rpx; font-weight: 800; }
-.entry-stat text:last-child { margin-top: 5rpx; color: #aaa3b0; font-size: 19rpx; }
 .entry-card { padding: 27rpx; border-radius: 24rpx; background: white; }
-.with-top { margin-top: 30rpx; }
-.scope-scroll { margin-top: 17rpx; white-space: nowrap; }
-.scope-row { display: inline-flex; gap: 11rpx; }
-.scope-pill, .preset-pill, .package-pill { padding: 12rpx 20rpx; border: 1rpx solid #dedbe5; border-radius: 999rpx; color: #605968; background: white; font-size: 22rpx; }
-.scope-pill.active, .preset-pill.active, .package-pill.active { color: white; border-color: #6b50df; background: #6b50df; }
-.large-amount { height: 76rpx; margin-top: 15rpx; padding: 0 21rpx; border: 1rpx solid #e2dfea; border-radius: 16rpx; background: #faf9fc; font-size: 30rpx; font-weight: 700; }
-.preset-row { margin-top: 14rpx; display: flex; flex-wrap: wrap; gap: 12rpx; }
+.package-pill { padding: 12rpx 20rpx; border: 1rpx solid #dedbe5; border-radius: 999rpx; color: #605968; background: white; font-size: 22rpx; }
+.package-pill.active { color: white; border-color: #6b50df; background: #6b50df; }
 .manual-card { padding-top: 12rpx; }
 .manual-card > .entry-card-title { padding: 15rpx 0 20rpx; }
 .manual-row { min-height: 104rpx; display: grid; grid-template-columns: 44rpx 1fr 1fr 86rpx 86rpx; align-items: center; gap: 9rpx; border-top: 1rpx solid #ebe8ef; }
@@ -436,7 +402,6 @@
 
 @media (max-width: 390px) {
   .warehouse-header { align-items: flex-start; }
-  .header-actions { max-width: 360rpx; }
   .inventory-quick-actions.four { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .manual-row { grid-template-columns: 40rpx 1fr 1fr; padding: 12rpx 0; }
   .manual-row .row-preset { display: none; }

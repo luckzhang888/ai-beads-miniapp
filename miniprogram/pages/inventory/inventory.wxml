@@ -4,10 +4,6 @@
       <view class="warehouse-title">我的豆仓</view>
       <view class="warehouse-subtitle">MARD 221 标准色库存</view>
     </view>
-    <view class="header-actions">
-      <button class="outline-btn" data-tab="batch" data-direction="-1" bindtap="openStockEntry">－ 全系减少</button>
-      <button class="outline-btn primary" data-tab="batch" data-direction="1" bindtap="openStockEntry">＋ 全系增加</button>
-    </view>
   </view>
 
   <scroll-view class="brand-scroll" scroll-x enhanced show-scrollbar="false">
@@ -131,7 +127,6 @@
       <view class="entry-header"><view class="back-link" bindtap="closeStockEntry">‹ 返回</view><view class="entry-title">补豆入库</view><view class="ai-label">✦ 智能录入</view></view>
       <scroll-view scroll-x class="entry-tabs" enhanced show-scrollbar="false">
         <view class="entry-tab-row">
-          <view class="entry-tab {{entryTab === 'batch' ? 'active' : ''}}" data-tab="batch" bindtap="selectEntryTab">批量记录</view>
           <view class="entry-tab {{entryTab === 'manual' ? 'active' : ''}}" data-tab="manual" bindtap="selectEntryTab">手动记录</view>
           <view class="entry-tab {{entryTab === 'csv' ? 'active' : ''}}" data-tab="csv" bindtap="selectEntryTab">导入文件</view>
           <view class="entry-tab {{entryTab === 'package' ? 'active' : ''}}" data-tab="package" bindtap="selectEntryTab">套装入库</view>
@@ -143,18 +138,7 @@
       </view>
 
       <scroll-view class="entry-content" scroll-y enhanced show-scrollbar="false">
-        <view wx:if="{{entryTab === 'batch'}}">
-          <view class="entry-stat"><view><text>{{entryScopeCount}}</text><text> 色号</text></view><view><text>{{entryDirection > 0 ? '+' : '-'}}{{entryAmount}}</text><text> 每色变化</text></view></view>
-          <view class="entry-card">
-            <view class="entry-card-title">选择色系</view>
-            <scroll-view scroll-x class="scope-scroll" enhanced show-scrollbar="false"><view class="scope-row"><view wx:for="{{seriesOptions}}" wx:key="*this" class="scope-pill {{entryScope === item ? 'active' : ''}}" data-series="{{item}}" bindtap="selectEntryScope">{{item === 'ALL' ? '全部色系' : item}}</view></view></scroll-view>
-            <view class="entry-card-title with-top">每个色号数量</view>
-            <input class="large-amount" type="number" value="{{entryAmount}}" bindinput="inputEntryAmount" />
-            <view class="preset-row"><view wx:for="{{entryPresets}}" wx:key="*this" class="preset-pill {{entryAmount === item ? 'active' : ''}}" data-amount="{{item}}" bindtap="selectEntryPreset">{{entryDirection > 0 ? '+' : '-'}}{{item}}</view></view>
-          </view>
-        </view>
-
-        <view wx:elif="{{entryTab === 'manual'}}" class="entry-card manual-card">
+        <view wx:if="{{entryTab === 'manual'}}" class="entry-card manual-card">
           <view class="entry-card-title">逐个录入色号</view>
           <view class="manual-row" wx:for="{{entryRows}}" wx:key="index">
             <view class="remove-row" data-index="{{index}}" bindtap="removeEntryRow">－</view>

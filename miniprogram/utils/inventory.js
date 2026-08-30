@@ -108,15 +108,6 @@ function batchAdjustStock(items, metadata) {
   return recordTransaction('batch', changes, metadata)
 }
 
-function buildSeriesAdjustments(palette, scope, delta, brand) {
-  const target = String(scope || 'ALL').toUpperCase()
-  const amount = Number(delta || 0)
-  if (!Number.isFinite(amount) || amount === 0) return []
-  return (palette || [])
-    .filter((item) => target === 'ALL' || String(item.series || '').toUpperCase() === target)
-    .map((item) => ({ brand: brand || DEFAULT_BRAND, code: item.code, delta: amount }))
-}
-
 function parseInventoryCsv(text, brand) {
   const merged = {}
   String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).forEach((line) => {
@@ -231,7 +222,6 @@ module.exports = {
   setStock,
   adjustStock,
   batchAdjustStock,
-  buildSeriesAdjustments,
   parseInventoryCsv,
   buildRefillList,
   mergeStatsWithInventory,
