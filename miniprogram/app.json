@@ -6,10 +6,13 @@
     "pages/pattern/pattern",
     "pages/editor/editor",
     "pages/inventory/inventory",
+    "pages/records/records",
+    "pages/inspiration/inspiration",
+    "pages/profile/profile",
     "pages/home/home"
   ],
   "window": {
-    "navigationBarTitleText": "AI 豆仓",
+    "navigationBarTitleText": "AI豆仓",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f5f6f8",

@@ -1,0 +1,15 @@
+<view class="inspiration-page">
+  <primary-nav active="inspiration" />
+  <view class="inspiration-hero"><view><view class="hero-title">灵感库</view><view class="hero-note">收藏喜欢的图纸，随时转入拼豆计划</view></view><button bindtap="goCreate">＋ 导入图纸</button></view>
+  <view class="search-box"><text>⌕</text><input value="{{query}}" bindinput="onSearch" placeholder="搜索图纸或标签" /></view>
+  <view class="section-title">我的灵感 <text>{{visiblePatterns.length}} 张</text></view>
+  <view wx:if="{{visiblePatterns.length}}" class="inspiration-grid">
+    <view class="inspiration-card" wx:for="{{visiblePatterns}}" wx:key="id">
+      <view class="collect-button {{item.collected ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleCollect">{{item.collected ? '★' : '☆'}}</view>
+      <view class="preview" data-id="{{item.id}}" bindtap="openPattern"><bead-grid matrix="{{item.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{150}}" show-grid="{{false}}" /></view>
+      <view class="card-name" data-id="{{item.id}}" bindtap="openPattern">{{item.name}}</view>
+      <view class="card-meta">{{item.colorCount}} 色 · {{item.beadCount}} 粒</view>
+    </view>
+  </view>
+  <view wx:else class="empty-state"><view>✦</view><text>还没有图纸灵感</text><button bindtap="goCreate">导入第一张图纸</button></view>
+</view>

@@ -1,0 +1,16 @@
+<view class="profile-page">
+  <primary-nav active="profile" />
+  <view class="profile-card">
+    <view class="profile-logo"><view class="profile-cube"><view class="profile-cube-top"></view><view class="profile-cube-left"></view><view class="profile-cube-right"></view></view></view>
+    <view><view class="profile-name">{{appName}}</view><view class="profile-version">微信小程序 · v{{version}}</view></view>
+  </view>
+  <view class="stats-card"><view><text>{{patternCount}}</text><text class="stat-label">图纸</text></view><view><text>{{totalStock}}</text><text class="stat-label">库存</text></view><view><text>{{recordCount}}</text><text class="stat-label">记录</text></view></view>
+  <view class="menu-card">
+    <view data-route="import" bindtap="openRoute"><text>▧</text><text class="menu-label">图纸导入</text><text class="menu-arrow">›</text></view>
+    <view data-route="inventory" bindtap="openRoute"><text>▦</text><text class="menu-label">库存管理</text><text class="menu-arrow">›</text></view>
+    <view data-route="records" bindtap="openRoute"><text>↕</text><text class="menu-label">出入库记录</text><text class="menu-arrow">›</text></view>
+    <view bindtap="setLowStock"><text>⚠</text><text class="menu-label">低库存阈值</text><text class="menu-value">{{lowStock}}</text><text class="menu-arrow">›</text></view>
+    <view bindtap="showAbout"><text>ⓘ</text><text class="menu-label">关于 {{appName}}</text><text class="menu-arrow">›</text></view>
+  </view>
+  <view class="privacy-note">数据默认保存在本机微信存储中；卸载小程序前请先确认是否需要导出图纸。</view>
+</view>

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "灵感库",
+  "usingComponents": {
+    "primary-nav": "/components/primary-nav/primary-nav",
+    "bead-grid": "/components/bead-grid/bead-grid"
+  }
+}

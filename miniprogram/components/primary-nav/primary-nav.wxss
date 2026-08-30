@@ -1,0 +1,15 @@
+.primary-shell { margin-bottom: 22rpx; }
+.brand-row { min-height: 80rpx; display: flex; align-items: center; justify-content: space-between; padding: 5rpx 4rpx 18rpx; }
+.brand-identity { display: flex; align-items: center; }
+.brand-mark { width: 70rpx; height: 70rpx; margin-right: 17rpx; display: flex; align-items: center; justify-content: center; border-radius: 22rpx; color: #6143c6; background: linear-gradient(145deg,#d7f3e9,#ddd3fa); box-shadow: 0 10rpx 24rpx rgba(90,67,170,.13); }
+.brand-cube { position: relative; width: 44rpx; height: 46rpx; }
+.brand-cube view { position: absolute; box-sizing: border-box; border: 4rpx solid #6547d5; }
+.cube-top { left: 10rpx; top: 0; width: 25rpx; height: 25rpx; transform: rotate(45deg) skew(-7deg,-7deg); border-radius: 4rpx; background: rgba(255,255,255,.28); }
+.cube-left { left: 2rpx; top: 18rpx; width: 22rpx; height: 25rpx; transform: skewY(28deg); border-top: 0 !important; border-radius: 0 0 2rpx 5rpx; }
+.cube-right { right: 1rpx; top: 18rpx; width: 22rpx; height: 25rpx; transform: skewY(-28deg); border-top: 0 !important; border-radius: 0 0 5rpx 2rpx; }
+.brand-name { font-size: 34rpx; font-weight: 800; letter-spacing: 1rpx; }
+.brand-note { margin-top: 4rpx; color: #9b92a4; font-size: 20rpx; }
+.primary-scroll { width: 100%; white-space: nowrap; }
+.primary-items { min-width: 100%; display: inline-grid; grid-template-columns: repeat(5,minmax(112rpx,1fr)); gap: 5rpx; padding: 0 2rpx 8rpx; box-sizing: border-box; }
+.primary-item { min-width: 112rpx; padding: 14rpx 10rpx; box-sizing: border-box; border-radius: 17rpx; color: #756d7d; text-align: center; font-size: 25rpx; }
+.primary-item.active { color: #6544ca; background: #eee8fb; font-weight: 750; box-shadow: 0 6rpx 18rpx rgba(101,68,202,.08); }

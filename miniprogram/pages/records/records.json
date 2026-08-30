@@ -1,6 +1,6 @@
 {
-  "navigationBarTitleText": "我的图纸",
-  "enablePullDownRefresh": true,
+  "navigationBarTitleText": "出入库记录",
+  "enablePullDownRefresh": false,
   "usingComponents": {
     "bead-grid": "/components/bead-grid/bead-grid",
     "primary-nav": "/components/primary-nav/primary-nav"

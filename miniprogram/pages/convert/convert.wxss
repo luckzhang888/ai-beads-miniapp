@@ -15,6 +15,9 @@
 }
 
 .journey-head { padding: 20rpx 8rpx 34rpx; }
+.import-mode-tabs { margin: -12rpx 0 24rpx; padding: 8rpx; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7rpx; border-radius: 22rpx; background: #eeebfb; }
+.import-mode-tabs view { padding: 18rpx 8rpx; border-radius: 17rpx; text-align: center; font-size: 23rpx; font-weight: 650; }
+.import-mode-tabs view:first-child { color: #6243c8; background: white; box-shadow: 0 5rpx 14rpx rgba(77,55,116,.08); }
 .journey-title, .config-title { font-size: 39rpx; font-weight: 800; }
 .journey-note, .config-note { margin-top: 9rpx; color: #948b9e; font-size: 23rpx; }
 .journey-orb { width: 75rpx; height: 75rpx; display: flex; align-items: center; justify-content: center; border-radius: 23rpx; color: #6949d1; background: linear-gradient(145deg, #e4dbfb, #cff1e9); font-size: 33rpx; }
@@ -205,3 +208,34 @@
 .dialog-actions button { flex: 1; height: 81rpx; margin: 0; }
 .dialog-actions .primary-btn { background: linear-gradient(135deg, #7b57e8, #6341d6); }
 .dialog-actions button::after { border: 0; }
+.link-boundary { margin: -12rpx 0 20rpx; padding: 14rpx 16rpx; border-radius: 14rpx; color: #8b7480; background: #fff5f6; font-size: 19rpx; line-height: 1.5; }
+
+.classify-page, .recognition-page { min-height: 100vh; box-sizing: border-box; padding: 28rpx; color: #251f2c; background: linear-gradient(180deg,#f4f1ff,#eef8fb); }
+.classify-card { margin-top: 45rpx; padding: 30rpx; border-radius: 30rpx; background: white; box-shadow: 0 16rpx 45rpx rgba(69,53,92,.10); }
+.classify-title { text-align: center; font-size: 34rpx; font-weight: 800; }
+.classify-note { margin-top: 8rpx; color: #9a929f; text-align: center; font-size: 21rpx; }
+.classify-preview { height: 660rpx; margin: 26rpx 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 22rpx; background-color: #f4f4f4; background-image: linear-gradient(45deg,#e7e7e7 25%,transparent 25%),linear-gradient(-45deg,#e7e7e7 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e7e7e7 75%),linear-gradient(-45deg,transparent 75%,#e7e7e7 75%); background-size: 30rpx 30rpx; background-position: 0 0,0 15rpx,15rpx -15rpx,-15rpx 0; }
+.classify-preview image { width: 100%; height: 100%; }
+.variant-row { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14rpx; }
+.variant-item { padding: 19rpx 8rpx; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8rpx; border: 2rpx solid #d8d4dc; border-radius: 19rpx; font-size: 23rpx; }
+.variant-item view { color: #a49ca9; font-size: 31rpx; }
+.variant-item.active { color: #6545cb; border-color: #6d4ed6; background: #f1edfc; }
+.variant-item.active view { color: #6d4ed6; }
+.classify-confirm { margin-top: 24rpx; }
+.recognition-title { padding: 10rpx 0 24rpx; text-align: center; font-size: 36rpx; font-weight: 800; }
+.recognition-preview { min-height: 660rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 14rpx solid white; border-radius: 30rpx; background: #f3f0f6; box-shadow: 0 12rpx 35rpx rgba(68,52,91,.09); }
+.recognition-preview image { width: 100%; height: 660rpx; }
+.recognition-summary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 17rpx; margin-top: 20rpx; }
+.recognition-summary view { padding: 22rpx; display: flex; align-items: center; justify-content: space-between; border-radius: 22rpx; background: white; }
+.recognition-summary text { color: #aaa2ae; font-size: 20rpx; }
+.recognition-summary b { font-size: 25rpx; }
+.recognition-progress-card { margin-top: 20rpx; padding: 25rpx; border-radius: 25rpx; background: white; }
+.recognition-steps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 11rpx; }
+.recognition-steps text { padding-top: 12rpx; border-top: 6rpx solid #ddd8e2; color: #817887; text-align: center; font-size: 19rpx; }
+.recognition-steps text.done { border-color: #37c96a; color: #28212e; }
+.recognition-step { margin: 24rpx 0 14rpx; display: flex; justify-content: space-between; }
+.recognition-step b { font-size: 25rpx; }
+.recognition-step text { color: #684ad2; font-size: 26rpx; font-weight: 800; }
+.recognition-actions { display: grid; grid-template-columns: 1fr 1.8fr; gap: 14rpx; margin-top: 22rpx; padding-bottom: calc(28rpx + env(safe-area-inset-bottom)); }
+.recognition-actions button { width: 100%; margin: 0; border-radius: 20rpx; color: #6548ca; background: white; }
+.recognition-actions button.primary { color: white; background: linear-gradient(135deg,#7b57e8,#6341d6); }

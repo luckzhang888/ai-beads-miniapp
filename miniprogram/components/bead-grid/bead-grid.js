@@ -1,3 +1,7 @@
+function clampZoom(value, maxZoom) {
+  return Math.max(1, Math.min(Number(value) || 1, Math.max(1, Number(maxZoom) || 6)))
+}
+
 Component({
   properties: {
     matrix: { type: Array, value: [] },
@@ -23,17 +27,52 @@ Component({
     viewportSize: 320,
     viewportHeight: 320,
     renderedImagePath: '',
-    rendering: false
+    rendering: false,
+    controlledScale: 1,
+    controlledX: 0,
+    controlledY: 0
   },
 
   observers: {
     'matrix,palette,showCodes,showGrid,highlightCode,majorGrid,compact,previewSize,locked,completedIndices': function () {
       this.scheduleDraw()
+    },
+    'zoom,maxZoom': function (zoom, maxZoom) {
+      const next = clampZoom(zoom, maxZoom)
+      if (Number.isFinite(this._committedNativeZoom) && Math.abs(next - this._committedNativeZoom) < 0.01) {
+        this._committedNativeZoom = null
+        return
+      }
+      if (Math.abs(next - Number(this.data.controlledScale || 1)) >= 0.01) {
+        this.setData({ controlledScale: next })
+      }
+    },
+    'scrollLeft,scrollTop': function (scrollLeft, scrollTop) {
+      const nextLeft = Math.max(0, Number(scrollLeft) || 0)
+      const nextTop = Math.max(0, Number(scrollTop) || 0)
+      const committed = this._committedNativeView
+      if (committed && Math.abs(nextLeft - committed.scrollLeft) < 0.5 && Math.abs(nextTop - committed.scrollTop) < 0.5) {
+        this._committedNativeView = null
+        return
+      }
+      const controlledX = 0 - nextLeft
+      const controlledY = 0 - nextTop
+      if (Math.abs(controlledX - Number(this.data.controlledX || 0)) >= 0.5 ||
+        Math.abs(controlledY - Number(this.data.controlledY || 0)) >= 0.5) {
+        this.setData({ controlledX, controlledY })
+      }
     }
   },
 
   lifetimes: {
-    ready() { this.scheduleDraw() },
+    ready() {
+      this.setData({
+        controlledScale: clampZoom(this.data.zoom, this.data.maxZoom),
+        controlledX: 0 - Math.max(0, Number(this.data.scrollLeft) || 0),
+        controlledY: 0 - Math.max(0, Number(this.data.scrollTop) || 0)
+      })
+      this.scheduleDraw()
+    },
     detached() {
       if (this._drawTimer) clearTimeout(this._drawTimer)
       this.removeTempImage(this.data.renderedImagePath)
@@ -57,6 +96,8 @@ Component({
       this._nativeStartZoom = Number(this.data.zoom) || 1
       this._nativeScale = this._nativeStartZoom
       this._nativeMoved = false
+      this._nativeX = 0 - Math.max(0, Number(this.data.scrollLeft) || 0)
+      this._nativeY = 0 - Math.max(0, Number(this.data.scrollTop) || 0)
       this._nativeWasPinching = Boolean(event.touches && event.touches.length >= 2)
       if (this._nativeWasPinching) this._pinching = true
     },
@@ -66,7 +107,7 @@ Component({
       if (!Number.isFinite(scale)) return
       this._pinching = true
       this._nativeWasPinching = true
-      this._nativeScale = Math.max(1, Math.min(Number(this.data.maxZoom) || 6, scale))
+      this._nativeScale = clampZoom(scale, this.data.maxZoom)
     },
 
     handleNativeChange(event) {
@@ -82,11 +123,19 @@ Component({
       const changed = Math.abs(finalZoom - startZoom) >= 0.01
       this._pinching = false
       if (this._nativeMoved || this._nativeWasPinching) this._lastGestureAt = Date.now()
-      if (changed) this.triggerEvent('zoomchange', { zoom: finalZoom })
+      if (changed) {
+        this._committedNativeZoom = finalZoom
+        this.triggerEvent('zoomchange', { zoom: finalZoom })
+      }
       if (this._nativeMoved) {
-        this.triggerEvent('viewchange', {
+        const view = {
           scrollLeft: Math.max(0, -(Number(this._nativeX) || 0)),
           scrollTop: Math.max(0, -(Number(this._nativeY) || 0))
+        }
+        this._committedNativeView = view
+        this.triggerEvent('viewchange', {
+          scrollLeft: view.scrollLeft,
+          scrollTop: view.scrollTop
         })
       }
     },

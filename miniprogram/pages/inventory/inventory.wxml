@@ -1,8 +1,13 @@
 <view class="warehouse-page">
+  <primary-nav active="inventory" />
   <view class="warehouse-header">
     <view>
       <view class="warehouse-title">我的豆仓</view>
       <view class="warehouse-subtitle">MARD 221 标准色库存</view>
+    </view>
+    <view class="warehouse-header-actions">
+      <view class="header-stock-action out" data-tab="batch" data-direction="-1" bindtap="openStockEntry">⊖ 手动出库</view>
+      <view class="header-stock-action in" data-tab="batch" data-direction="1" bindtap="openStockEntry">⊕ 补豆入库</view>
     </view>
   </view>
 
@@ -26,7 +31,7 @@
   <view class="inventory-quick-actions four">
     <view class="quick-action" bindtap="showShortageList">缺豆清单 <text>{{shortageCount}}</text></view>
     <view class="quick-action" bindtap="openConsumptionCalculator">消耗计算</view>
-    <view class="quick-action" data-tab="batch" data-direction="1" bindtap="openStockEntry">补豆入库</view>
+    <view class="quick-action" bindtap="goRecords">出入库记录</view>
     <view class="quick-action" bindtap="setLowStockThreshold">低库存阈值 <text>{{lowStock}}</text></view>
   </view>
 
@@ -112,9 +117,10 @@
   </view>
 
   <view wx:if="{{transactions.length}}" class="transaction-section">
-    <view class="transaction-title">最近库存记录</view>
+    <view class="transaction-head"><view class="transaction-title">最近出入库记录</view><view class="all-records" bindtap="goRecords">全部记录 ›</view></view>
     <view class="transaction-row" wx:for="{{transactions}}" wx:key="id">
-      <view><view class="transaction-name">{{item.typeLabel}}{{item.patternName ? ' · ' + item.patternName : ''}}</view><view class="transaction-meta">{{item.itemCount}} 个色号 · {{item.timeLabel}}</view></view>
+      <view wx:if="{{item.previewMatrix.length}}" class="transaction-thumb"><bead-grid matrix="{{item.previewMatrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{36}}" show-grid="{{false}}" /></view>
+      <view class="transaction-copy"><view class="transaction-name"><text class="direction-tag {{item.direction}}">{{item.typeLabel}}</text>{{item.patternName ? ' · ' + item.patternName : ''}}</view><view class="transaction-meta">{{item.amountLabel}} 粒 · {{item.itemCount}} 个色号 · {{item.timeLabel}}</view></view>
       <button wx:if="{{!item.undone}}" size="mini" data-id="{{item.id}}" bindtap="undoStockTransaction">撤销</button>
       <text wx:else class="undone-label">已撤销</text>
     </view>
@@ -124,7 +130,7 @@
 
   <view wx:if="{{showStockEntry}}" class="full-mask">
     <view class="stock-entry-page">
-      <view class="entry-header"><view class="back-link" bindtap="closeStockEntry">‹ 返回</view><view class="entry-title">补豆入库</view><view class="ai-label">✦ 智能录入</view></view>
+      <view class="entry-header"><view class="back-link" bindtap="closeStockEntry">‹ 返回</view><view class="entry-title">{{entryDirection > 0 ? '补豆入库' : '手动出库'}}</view><view class="ai-label" bindtap="openAiEntry">✦ 智能录入</view></view>
       <scroll-view scroll-x class="entry-tabs" enhanced show-scrollbar="false">
         <view class="entry-tab-row">
           <view class="entry-tab {{entryTab === 'batch' ? 'active' : ''}}" data-tab="batch" bindtap="selectEntryTab">批量记录</view>
@@ -181,8 +187,9 @@
 
         <view wx:else class="entry-card">
           <view class="entry-card-title">选择套装</view>
-          <view class="package-grid"><view wx:for="{{packageOptions}}" wx:key="*this" class="package-pill {{selectedPackage === item ? 'active' : ''}}" data-count="{{item}}" bindtap="selectPackage">{{item}}{{item === 221 ? ' 全实色' : ' 色'}}</view></view>
+          <view class="package-grid"><view wx:for="{{packageOptions}}" wx:key="count" class="package-pill {{selectedPackage === item.count ? 'active' : ''}} {{item.unavailable ? 'unavailable' : ''}}" data-count="{{item.count}}" bindtap="selectPackage">{{item.label}}<text wx:if="{{item.unavailable}}">待色卡</text></view></view>
           <view class="package-amount"><text>每色数量</text><input type="number" value="{{packageAmount}}" bindinput="inputPackageAmount" /></view>
+          <view wx:if="{{entryDirection > 0}}" class="package-replace"><view><view>删除其他色号</view><text>开启后，套装外色号归零；套装内改为“每色数量”</text></view><switch checked="{{packageReplaceExisting}}" bindchange="togglePackageReplace" color="#6b4cda" /></view>
         </view>
         <view class="entry-bottom-space"></view>
       </scroll-view>
@@ -209,7 +216,7 @@
       <view class="entry-header"><view class="back-link" bindtap="closeConsumptionSheet">‹ 返回</view><view class="entry-title">消耗计算</view><view></view></view>
       <view class="consumption-count">已选 {{selectedConsumptionIds.length}} 张 · 可同时计算多张图纸</view>
       <scroll-view class="consumption-list" scroll-y enhanced show-scrollbar="false">
-        <view class="consumption-row {{item.selected ? 'selected' : ''}}" wx:for="{{consumptionPatterns}}" wx:key="id" data-id="{{item.id}}" bindtap="toggleConsumptionPattern"><view class="select-box">{{item.selected ? '✓' : ''}}</view><view class="pattern-thumb">▦</view><view class="consumption-copy"><view>{{item.name}}</view><text>{{item.colorCount}} 色 · {{item.beadCount}} 粒 · {{item.width}}×{{item.height}}</text></view></view>
+        <view class="consumption-row {{item.selected ? 'selected' : ''}}" wx:for="{{consumptionPatterns}}" wx:key="id" data-id="{{item.id}}" bindtap="toggleConsumptionPattern"><view class="select-box">{{item.selected ? '✓' : ''}}</view><view class="pattern-thumb"><bead-grid matrix="{{item.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{44}}" show-grid="{{false}}" /></view><view class="consumption-copy"><view>{{item.name}}</view><text>{{item.colorCount}} 色 · {{item.beadCount}} 粒 · {{item.width}}×{{item.height}}</text></view></view>
         <view wx:if="{{!consumptionPatterns.length}}" class="empty-shortage">还没有图纸，请先导入图纸。</view>
       </scroll-view>
       <view class="consumption-footer"><button bindtap="selectAllConsumption">一键全选</button><button class="primary" bindtap="calculateConsumption">立即计算</button></view>

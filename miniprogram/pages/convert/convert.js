@@ -15,9 +15,10 @@ const {
 const METHODS = [
   { id: 'diagram', icon: '▧', title: '图纸导入', description: '从相册或相机导入图纸，自动识别并匹配色号', badge: '推荐' },
   { id: 'pdf', icon: '▤', title: 'PDF 导入', description: '选择聊天文件中的 PDF 图纸，当前为 Beta 入口', badge: 'Beta' },
-  { id: 'share', icon: '⌘', title: '分享口令导入', description: '通过 AI 豆仓分享口令打开同设备上的图纸' },
+  { id: 'share', icon: '⌘', title: '分享口令导入', description: '通过 AI豆仓分享口令打开同设备上的图纸' },
+  { id: 'link', icon: '↗', title: '图片链接提取', description: '粘贴可公开访问的 JPG/PNG 图片直链后识别' },
   { id: 'pixel', icon: '▦', title: '像素画转图纸', description: '将像素画重新匹配为 MARD 221 色图纸' },
-  { id: 'recognize', icon: '◎', title: '无图例识别', description: '没有图例也能按画面颜色自动统计数量' }
+  { id: 'recognize', icon: '◎', title: 'AI 智能统计', description: '上传图片后自动识别网格、匹配色号并统计数量' }
 ]
 
 Page({
@@ -28,7 +29,10 @@ Page({
     selectedMethodTitle: '',
     pdfFile: null,
     showShareDialog: false,
+    showLinkDialog: false,
     shareCode: '',
+    linkInput: '',
+    linkExtracting: false,
     sizes: [32, 48, 64, 80, 96, 128],
     selectedSize: 80,
     recommendedSize: 80,
@@ -41,6 +45,16 @@ Page({
     batchProgress: '',
     previewing: false,
     previewResult: null,
+    sourceVariant: 'main',
+    sourceVariants: [
+      { value: 'main', label: '主图' },
+      { value: 'mirror', label: '镜像图' },
+      { value: 'effect', label: '效果图' }
+    ],
+    recognitionProgress: 0,
+    recognitionStep: '等待图片',
+    recognitionResult: null,
+    recognitionSaving: false,
     paletteMap: createPaletteMap(mardPalette),
     paletteName: 'MARD 221 标准色',
     cropMode: 'ratio',
@@ -69,12 +83,25 @@ Page({
     ]
   },
 
+  onLoad(options) {
+    if (!options || options.mode !== 'recognize') return
+    const method = METHODS.find((item) => item.id === 'recognize')
+    this.setData({ selectedMethod: method.id, selectedMethodTitle: method.title }, () => {
+      if (typeof wx.setNavigationBarTitle === 'function') wx.setNavigationBarTitle({ title: 'AI 智能录入' })
+      this.chooseImage()
+    })
+  },
+
   selectMethod(event) {
     const id = event.currentTarget.dataset.id
     const method = METHODS.find((item) => item.id === id)
     if (!method) return
     if (id === 'share') {
       this.setData({ showShareDialog: true, shareCode: '' })
+      return
+    }
+    if (id === 'link') {
+      this.openLinkDialog()
       return
     }
     if (id === 'pdf') {
@@ -97,6 +124,10 @@ Page({
       imageInfo: null,
       pdfFile: null,
       previewResult: null,
+      recognitionResult: null,
+      recognitionProgress: 0,
+      recognitionStep: '等待图片',
+      sourceVariant: 'main',
       cropX: 0,
       cropY: 0,
       cropScale: 1,
@@ -139,6 +170,56 @@ Page({
 
   closeShareDialog() {
     this.setData({ showShareDialog: false })
+  },
+
+  openLinkDialog() {
+    this.setData({ showLinkDialog: true, linkInput: '' })
+    if (typeof wx.getClipboardData === 'function') {
+      wx.getClipboardData({
+        success: (result) => {
+          const value = String(result.data || '').trim()
+          if (/^https?:\/\//i.test(value)) this.setData({ linkInput: value })
+        }
+      })
+    }
+  },
+
+  closeLinkDialog() { this.setData({ showLinkDialog: false, linkExtracting: false }) },
+  onLinkInput(event) { this.setData({ linkInput: event.detail.value }) },
+
+  extractImageLink() {
+    const url = String(this.data.linkInput || '').trim()
+    if (!/^https?:\/\//i.test(url)) {
+      wx.showToast({ title: '请输入完整的图片链接', icon: 'none' })
+      return
+    }
+    if (this.data.linkExtracting) return
+    this.setData({ linkExtracting: true })
+    wx.showLoading({ title: '下载图片中', mask: true })
+    wx.downloadFile({
+      url,
+      success: (result) => {
+        if (Number(result.statusCode) < 200 || Number(result.statusCode) >= 300 || !result.tempFilePath) {
+          wx.showToast({ title: '图片链接无法下载', icon: 'none' })
+          return
+        }
+        this.setData({
+          showLinkDialog: false,
+          selectedMethod: 'recognize',
+          selectedMethodTitle: '图片链接提取'
+        })
+        this.acceptImagePath(result.tempFilePath)
+      },
+      fail: () => wx.showModal({
+        title: '链接提取失败',
+        content: '目前支持 JPG/PNG 图片直链。小红书等分享页面需要经过已备案的服务端解析，不能在小程序客户端绕过平台限制。',
+        showCancel: false
+      }),
+      complete: () => {
+        wx.hideLoading()
+        this.setData({ linkExtracting: false })
+      }
+    })
   },
 
   noop() {},
@@ -243,6 +324,88 @@ Page({
     this.cropGesture = null
   },
 
+  selectSourceVariant(event) {
+    this.setData({ sourceVariant: event.currentTarget.dataset.value || 'main' })
+  },
+
+  confirmSourceVariant() {
+    if (!this.data.imagePath) return
+    if (this.data.selectedMethod === 'recognize' || this.data.selectedMethod === 'link') {
+      this.runAiRecognition()
+      return
+    }
+    this.setData({ stage: 'config' })
+  },
+
+  async runAiRecognition() {
+    if (!this.data.imagePath || (this.data.recognitionProgress > 0 && this.data.recognitionProgress < 100)) return
+    this.cachedSignature = ''
+    this.cachedResult = null
+    this.setData({
+      stage: 'recognizing',
+      recognitionProgress: 18,
+      recognitionStep: '第 1 步 · 对齐图片网格',
+      recognitionResult: null
+    })
+    try {
+      await this.setDataAsync({ recognitionProgress: 48, recognitionStep: '第 2 步 · 统计图例与颜色' })
+      const result = await this.processCurrentImage()
+      await this.setDataAsync({ recognitionProgress: 82, recognitionStep: '第 3 步 · 匹配 MARD 色号' })
+      this.setData({
+        recognitionProgress: 100,
+        recognitionStep: '识别完成',
+        recognitionResult: result,
+        previewResult: result
+      })
+    } catch (error) {
+      console.error('AI recognition failed', error)
+      this.setData({ stage: 'config', recognitionProgress: 0, recognitionStep: '识别失败' })
+      wx.showModal({
+        title: '智能识别失败',
+        content: error && error.message ? error.message : '无法读取这张图片，请更换清晰图纸后重试。',
+        showCancel: false
+      })
+    }
+  },
+
+  saveProcessedPattern(result, settings) {
+    const options = settings || {}
+    const variant = this.data.sourceVariants.find((item) => item.value === this.data.sourceVariant)
+    return savePattern(createPattern({
+      name: options.name || ('图片图纸 ' + result.width + '×' + result.height),
+      matrix: result.matrix,
+      stats: result.stats,
+      palette: result.palette,
+      brand: 'MARD',
+      width: result.width,
+      height: result.height,
+      qualityMode: this.data.qualityMode,
+      status: '待拼',
+      tags: [options.tag || this.data.selectedMethodTitle || '图片导入', variant ? variant.label : '主图'],
+      sourceOptions: Object.assign({}, this.processingOptions(), { sourceVariant: this.data.sourceVariant })
+    }), mardPalette)
+  },
+
+  saveRecognitionResult(event) {
+    const result = this.data.recognitionResult
+    if (!result || this.data.recognitionSaving) return
+    this.setData({ recognitionSaving: true })
+    try {
+      const pattern = this.saveProcessedPattern(result, {
+        name: 'AI识别图纸 ' + result.width + '×' + result.height,
+        tag: 'AI智能统计'
+      })
+      const target = event.currentTarget.dataset.target
+      wx.redirectTo({
+        url: target === 'editor'
+          ? ('/pages/editor/editor?id=' + encodeURIComponent(pattern.id))
+          : ('/pages/detail/detail?id=' + encodeURIComponent(pattern.id))
+      })
+    } finally {
+      this.setData({ recognitionSaving: false })
+    }
+  },
+
   updateCropTransform(changes) {
     const next = Object.assign({}, this.data, changes || {})
     const cropStyle = 'transform: translate(' + next.cropX + 'px, ' + next.cropY + 'px) scale(' +
@@ -319,7 +482,7 @@ Page({
     }
   },
 
-  updateRecommendedSize(path) {
+  updateRecommendedSize(path, ready) {
     wx.getImageInfo({
       src: path,
       success: (info) => {
@@ -332,18 +495,37 @@ Page({
           outputWidth: dims.width,
           outputHeight: dims.height,
           previewResult: null
-        })
-      }
+        }, () => { if (typeof ready === 'function') ready(info) })
+      },
+      fail: () => wx.showModal({ title: '图片读取失败', content: '请确认图片仍在本机并允许小程序访问相册，然后重新选择。', showCancel: false })
     })
   },
 
+  handleImagePickerFailure(error) {
+    const message = String(error && error.errMsg ? error.errMsg : '')
+    if (message.toLowerCase().indexOf('cancel') >= 0) return
+    wx.showModal({
+      title: '无法选择图片',
+      content: '请检查相册/相机权限；如果当前使用游客 AppID，请改用正式小程序 AppID 后在真机重试。',
+      showCancel: false
+    })
+  },
+
+  acceptImagePath(path) {
+    if (!path) return
+    this.setData({
+      imagePath: path,
+      stage: 'classify',
+      sourceVariant: 'main',
+      recognitionProgress: 0,
+      recognitionResult: null,
+      previewResult: null
+    })
+    this.updateRecommendedSize(path)
+  },
+
   chooseImage() {
-    const done = (path) => {
-      if (path) {
-        this.setData({ imagePath: path, stage: 'config' })
-        this.updateRecommendedSize(path)
-      }
-    }
+    const done = (path) => this.acceptImagePath(path)
 
     if (typeof wx.chooseMedia === 'function') {
       wx.chooseMedia({
@@ -354,7 +536,8 @@ Page({
         success(res) {
           const file = res.tempFiles && res.tempFiles[0]
           done(file ? file.tempFilePath : '')
-        }
+        },
+        fail: (error) => this.handleImagePickerFailure(error)
       })
       return
     }
@@ -365,7 +548,8 @@ Page({
       sourceType: ['album', 'camera'],
       success(res) {
         done(res.tempFilePaths && res.tempFilePaths[0])
-      }
+      },
+      fail: (error) => this.handleImagePickerFailure(error)
     })
   },
 
@@ -379,11 +563,18 @@ Page({
         mediaType: ['image'],
         sourceType: ['album'],
         sizeType: ['compressed'],
-        success: (result) => done((result.tempFiles || []).map((item) => item.tempFilePath).filter(Boolean))
+        success: (result) => done((result.tempFiles || []).map((item) => item.tempFilePath).filter(Boolean)),
+        fail: (error) => this.handleImagePickerFailure(error)
       })
       return
     }
-    wx.chooseImage({ count: 9, sizeType: ['compressed'], sourceType: ['album'], success: (result) => done(result.tempFilePaths || []) })
+    wx.chooseImage({
+      count: 9,
+      sizeType: ['compressed'],
+      sourceType: ['album'],
+      success: (result) => done(result.tempFilePaths || []),
+      fail: (error) => this.handleImagePickerFailure(error)
+    })
   },
 
   getImageInfo(path) {
@@ -483,19 +674,7 @@ Page({
     try {
       const result = await this.processCurrentImage()
 
-      const pattern = savePattern(createPattern({
-        name: '图片图纸 ' + result.width + '×' + result.height,
-        matrix: result.matrix,
-        stats: result.stats,
-        palette: result.palette,
-        brand: 'MARD',
-        width: result.width,
-        height: result.height,
-        qualityMode: this.data.qualityMode,
-        status: '待拼',
-        tags: [this.data.selectedMethodTitle || '图片导入'],
-        sourceOptions: this.processingOptions()
-      }), mardPalette)
+      const pattern = this.saveProcessedPattern(result)
 
       wx.navigateTo({
         url: '/pages/detail/detail?id=' + encodeURIComponent(pattern.id)

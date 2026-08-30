@@ -40,6 +40,25 @@ function getTransactions() {
   return Array.isArray(transactions) ? transactions : []
 }
 
+function summarizeTransaction(transaction) {
+  const items = Array.isArray(transaction && transaction.items) ? transaction.items : []
+  const inbound = items.reduce((sum, item) => sum + Math.max(0, Number(item.delta) || 0), 0)
+  const outbound = items.reduce((sum, item) => sum + Math.max(0, 0 - (Number(item.delta) || 0)), 0)
+  let direction = 'adjust'
+  let typeLabel = '库存调整'
+  if (inbound > 0 && outbound === 0) {
+    direction = 'in'
+    typeLabel = '入库'
+  } else if (outbound > 0 && inbound === 0) {
+    direction = 'out'
+    typeLabel = transaction && transaction.type === 'consume' ? '作品出库' : '出库'
+  }
+  const amountLabel = inbound && outbound
+    ? ('+' + inbound + ' / -' + outbound)
+    : (inbound ? ('+' + inbound) : ('-' + outbound))
+  return { direction, typeLabel, inbound, outbound, amountLabel }
+}
+
 function hasConsumedPattern(patternId) {
   return Boolean(patternId && getTransactions().some((item) =>
     item.type === 'consume' && !item.undone && item.metadata && item.metadata.patternId === patternId
@@ -229,6 +248,7 @@ module.exports = {
   getShortageList,
   consumeStats,
   getTransactions,
+  summarizeTransaction,
   hasConsumedPattern,
   undoTransaction,
   getInventorySettings,

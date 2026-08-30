@@ -1,3 +1,7 @@
 {
-  "navigationBarTitleText": "我的拼豆库存"
+  "navigationBarTitleText": "我的拼豆库存",
+  "usingComponents": {
+    "bead-grid": "/components/bead-grid/bead-grid",
+    "primary-nav": "/components/primary-nav/primary-nav"
+  }
 }

@@ -1,0 +1,23 @@
+.profile-page { min-height: 100vh; box-sizing: border-box; padding: 24rpx 24rpx 80rpx; background: linear-gradient(180deg,#f3effd,#f7fafc 420rpx,#f8f9fb); }
+.profile-card { display: flex; align-items: center; gap: 20rpx; padding: 27rpx; border-radius: 27rpx; background: white; box-shadow: 0 12rpx 32rpx rgba(70,56,91,.07); }
+.profile-logo { width: 82rpx; height: 82rpx; display: flex; align-items: center; justify-content: center; border-radius: 25rpx; color: #6848d1; background: linear-gradient(145deg,#d8f2e9,#ddd3fa); }
+.profile-cube { position: relative; width: 48rpx; height: 50rpx; }
+.profile-cube view { position: absolute; box-sizing: border-box; border: 4rpx solid #6547d5; }
+.profile-cube-top { left: 11rpx; top: 0; width: 27rpx; height: 27rpx; transform: rotate(45deg) skew(-7deg,-7deg); border-radius: 4rpx; }
+.profile-cube-left { left: 2rpx; top: 20rpx; width: 24rpx; height: 27rpx; transform: skewY(28deg); border-top: 0 !important; }
+.profile-cube-right { right: 1rpx; top: 20rpx; width: 24rpx; height: 27rpx; transform: skewY(-28deg); border-top: 0 !important; }
+.profile-name { font-size: 34rpx; font-weight: 800; }
+.profile-version { margin-top: 7rpx; color: #9a929f; font-size: 20rpx; }
+.stats-card { margin: 20rpx 0; padding: 25rpx 10rpx; display: grid; grid-template-columns: repeat(3,1fr); border-radius: 25rpx; background: white; }
+.stats-card view { display: flex; flex-direction: column; align-items: center; }
+.stats-card view + view { border-left: 1rpx solid #ece8f0; }
+.stats-card text { color: #6547cf; font-size: 31rpx; font-weight: 800; }
+.stats-card .stat-label { margin-top: 6rpx; color: #9a929f; font-size: 19rpx; font-weight: 400; }
+.menu-card { overflow: hidden; border-radius: 25rpx; background: white; }
+.menu-card > view { min-height: 92rpx; padding: 0 23rpx; display: flex; align-items: center; gap: 16rpx; }
+.menu-card > view + view { border-top: 1rpx solid #f0edf2; }
+.menu-card text { width: 43rpx; color: #694bd2; font-size: 28rpx; text-align: center; }
+.menu-card .menu-label { width: auto; flex: 1; color: #2b2530; font-size: 25rpx; text-align: left; }
+.menu-card .menu-value { width: auto; color: #8e8596; font-size: 21rpx; }
+.menu-card .menu-arrow { width: auto; color: #b1aab7; font-size: 32rpx; font-weight: 400; }
+.privacy-note { padding: 31rpx 18rpx; color: #9a929f; font-size: 20rpx; line-height: 1.6; text-align: center; }

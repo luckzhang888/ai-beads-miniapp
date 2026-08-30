@@ -106,6 +106,15 @@ const merged = inventoryUtils.mergeStatsWithInventory([{ code: 'B7', required: 9
 assert.strictEqual(merged[0].stock, 7)
 assert.strictEqual(merged[0].missing, 2)
 assert.strictEqual(inventoryUtils.canConsumeStats([{ code: 'B7', required: 8 }]).ok, false)
+assert.deepStrictEqual(inventoryUtils.summarizeTransaction({ type: 'batch', items: [{ code: 'A1', delta: 50 }] }), {
+  direction: 'in', typeLabel: '入库', inbound: 50, outbound: 0, amountLabel: '+50'
+})
+assert.deepStrictEqual(inventoryUtils.summarizeTransaction({ type: 'consume', items: [{ code: 'A1', delta: -20 }] }), {
+  direction: 'out', typeLabel: '作品出库', inbound: 0, outbound: 20, amountLabel: '-20'
+})
+assert.deepStrictEqual(inventoryUtils.summarizeTransaction({ type: 'batch', items: [{ code: 'A1', delta: 50 }, { code: 'B7', delta: -20 }] }), {
+  direction: 'adjust', typeLabel: '库存调整', inbound: 50, outbound: 20, amountLabel: '+50 / -20'
+})
 inventoryUtils.setStock('B7', 12)
 assert.strictEqual(inventoryUtils.consumeStats([{ code: 'B7', required: 8 }]).ok, true)
 assert.strictEqual(inventoryUtils.getInventory().B7, 4)
@@ -135,10 +144,14 @@ let beadGridDefinition
 global.Component = (definition) => { beadGridDefinition = definition }
 require('../miniprogram/components/bead-grid/bead-grid')
 delete global.Component
-assert.strictEqual(Object.keys(beadGridDefinition.observers).some((key) => key.split(',').indexOf('zoom') >= 0), false)
+const zoomObserverKey = Object.keys(beadGridDefinition.observers).find((key) => key.split(',').indexOf('zoom') >= 0)
+const viewportObserverKey = Object.keys(beadGridDefinition.observers).find((key) => key.split(',').indexOf('scrollLeft') >= 0)
+assert.ok(zoomObserverKey)
+assert.ok(viewportObserverKey)
+assert.strictEqual(Object.keys(beadGridDefinition.observers).find((key) => key.indexOf('matrix') >= 0).indexOf('zoom'), -1)
 const zoomEvents = []
 const beadGrid = Object.assign({
-  data: { compact: false, locked: false, zoom: 2, maxZoom: 6 },
+  data: { compact: false, locked: false, zoom: 2, maxZoom: 6, scrollLeft: 0, scrollTop: 0, controlledScale: 2, controlledX: 0, controlledY: 0 },
   triggerEvent(name, detail) { zoomEvents.push({ name, detail }) },
   setData(next, callback) {
     this.data = Object.assign({}, this.data, next)
@@ -154,6 +167,18 @@ beadGrid.handleNativeTouchEnd()
 assert.deepStrictEqual(zoomEvents[0], { name: 'zoomchange', detail: { zoom: 6 } })
 assert.deepStrictEqual(zoomEvents[1], { name: 'viewchange', detail: { scrollLeft: 120, scrollTop: 80 } })
 assert.strictEqual(beadGrid._pinching, false)
+beadGrid.data.zoom = 6
+beadGridDefinition.observers[zoomObserverKey].call(beadGrid, 6, 6)
+assert.strictEqual(beadGrid.data.controlledScale, 2, 'native pinch result must not be written back into movable-view')
+beadGridDefinition.observers[zoomObserverKey].call(beadGrid, 4, 6)
+assert.strictEqual(beadGrid.data.controlledScale, 4, 'toolbar zoom must still control movable-view')
+beadGrid.data.scrollLeft = 120
+beadGrid.data.scrollTop = 80
+beadGridDefinition.observers[viewportObserverKey].call(beadGrid, 120, 80)
+assert.strictEqual(beadGrid.data.controlledX, 0, 'native pan result must not be written back into movable-view')
+beadGridDefinition.observers[viewportObserverKey].call(beadGrid, 40, 20)
+assert.strictEqual(beadGrid.data.controlledX, -40)
+assert.strictEqual(beadGrid.data.controlledY, -20)
 
 function loadPage(relativePath) {
   let definition

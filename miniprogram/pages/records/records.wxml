@@ -1,0 +1,50 @@
+<view class="records-page">
+  <primary-nav active="records" />
+  <view class="record-summary">
+    <view><text class="summary-value">{{recordCount}}</text><text class="summary-label">条记录</text></view>
+    <view><text class="summary-value in">+{{inboundTotal}}</text><text class="summary-label">累计入库</text></view>
+    <view><text class="summary-value out">-{{outboundTotal}}</text><text class="summary-label">累计出库</text></view>
+  </view>
+
+  <scroll-view scroll-x class="filter-scroll" enhanced show-scrollbar="false">
+    <view class="filter-row">
+      <view wx:for="{{filters}}" wx:key="value" class="filter-pill {{activeFilter === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectFilter">{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{visibleRecords.length}}" class="record-list">
+    <view class="record-card {{item.undone ? 'undone' : ''}}" wx:for="{{visibleRecords}}" wx:key="id">
+      <view class="record-head">
+        <view class="record-heading">
+          <view class="direction-icon {{item.direction}}">{{item.direction === 'in' ? '＋' : (item.direction === 'out' ? '－' : '↕')}}</view>
+          <view class="heading-copy">
+            <view><text class="record-type {{item.direction}}">{{item.typeLabel}}</text><text wx:if="{{item.patternName}}"> · {{item.patternName}}</text></view>
+            <text>{{item.sourceLabel}} · {{item.timeLabel}}</text>
+          </view>
+        </view>
+        <view class="record-amount {{item.direction}}">{{item.amountLabel}}</view>
+      </view>
+
+      <view wx:if="{{item.previewMatrix.length}}" class="pattern-record" data-id="{{item.patternId}}" bindtap="openPattern">
+        <view class="pattern-record-thumb"><bead-grid matrix="{{item.previewMatrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{36}}" show-grid="{{false}}" /></view>
+        <view><view>关联图纸</view><text>查看“{{item.patternName}}”图纸详情 ›</text></view>
+      </view>
+
+      <view class="change-list">
+        <view class="change-chip" wx:for="{{item.visibleItems}}" wx:for-item="change" wx:key="key">
+          <text class="change-dot" style="background: {{change.hex}};"></text>
+          <text>{{change.code}}</text>
+          <text class="change-value {{change.delta > 0 ? 'in' : 'out'}}">{{change.deltaLabel}}</text>
+        </view>
+      </view>
+
+      <view class="record-footer">
+        <view wx:if="{{item.hiddenCount}}" class="detail-toggle" data-id="{{item.id}}" bindtap="toggleDetails">{{item.expanded ? '收起明细' : '展开其余 ' + item.hiddenCount + ' 个色号'}}</view>
+        <view wx:else class="item-count">共 {{item.items.length}} 个色号</view>
+        <button wx:if="{{!item.undone}}" size="mini" data-id="{{item.id}}" bindtap="undoRecord">撤销</button>
+        <text wx:else class="undone-label">已撤销</text>
+      </view>
+    </view>
+  </view>
+  <view wx:else class="empty-records">当前筛选下还没有出入库记录</view>
+</view>

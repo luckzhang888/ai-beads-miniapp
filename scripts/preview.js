@@ -34,7 +34,7 @@ async function main() {
   try {
     await ci.preview({
       project,
-      desc: 'AI 豆仓 develop 预览',
+      desc: 'AI豆仓 develop 预览',
       setting: {
         useProjectConfig: true
       },

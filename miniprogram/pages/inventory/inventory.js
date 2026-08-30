@@ -1,4 +1,5 @@
 const mardPalette = require('../../data/colors/mard')
+const { createPaletteMap } = require('../../utils/color-match')
 const { getCurrentPattern, getSavedPatterns } = require('../../utils/pattern')
 const {
   getInventory,
@@ -9,6 +10,7 @@ const {
   buildRefillList,
   getShortageList,
   getTransactions,
+  summarizeTransaction,
   undoTransaction,
   getInventorySettings,
   saveInventorySettings
@@ -22,6 +24,7 @@ function naturalCodeNumber(code) {
 
 Page({
   data: {
+    paletteMap: createPaletteMap(mardPalette),
     query: '',
     activeSeries: 'ALL',
     seriesOptions: ['ALL'].concat(SERIES),
@@ -49,9 +52,22 @@ Page({
     entryRows: [{ code: '', amount: '' }, { code: '', amount: '' }, { code: '', amount: '' }],
     csvItems: [],
     csvFileName: '',
-    packageOptions: [24, 48, 72, 96, 120, 144, 168, 192, 216, 221],
+    packageOptions: [
+      { count: 24, label: '24色' },
+      { count: 48, label: '48色' },
+      { count: 72, label: '72色' },
+      { count: 96, label: '96色' },
+      { count: 120, label: '120色' },
+      { count: 144, label: '144色' },
+      { count: 168, label: '168色' },
+      { count: 192, label: '192色' },
+      { count: 216, label: '216色' },
+      { count: 221, label: '221全实色' },
+      { count: 295, label: '295全色', unavailable: mardPalette.length < 295 }
+    ],
     selectedPackage: 221,
     packageAmount: 1000,
+    packageReplaceExisting: false,
     showShortageSheet: false,
     shortageRows: [],
     shortagePatternName: '',
@@ -80,14 +96,24 @@ Page({
     const shortageCount = currentPattern
       ? getShortageList(currentPattern.stats || [], currentPattern.brand || 'MARD').length
       : 0
-    const transactions = getTransactions().slice(0, 8).map((item) => ({
-      id: item.id,
-      typeLabel: { set: '修正库存', adjust: '库存调整', batch: '批量调整', consume: '作品扣减' }[item.type] || item.type,
-      itemCount: item.items.length,
-      timeLabel: new Date(item.createdAt).toLocaleString(),
-      undone: item.undone,
-      patternName: item.metadata && item.metadata.patternName ? item.metadata.patternName : ''
-    }))
+    const patterns = getSavedPatterns()
+    const patternMap = patterns.reduce((result, item) => {
+      result[item.id] = item
+      return result
+    }, {})
+    const transactions = getTransactions().slice(0, 8).map((item) => {
+      const summary = summarizeTransaction(item)
+      const patternId = item.metadata && item.metadata.patternId ? item.metadata.patternId : ''
+      const pattern = patternMap[patternId]
+      return Object.assign({}, summary, {
+        id: item.id,
+        itemCount: item.items.length,
+        timeLabel: new Date(item.createdAt).toLocaleString(),
+        undone: item.undone,
+        patternName: item.metadata && item.metadata.patternName ? item.metadata.patternName : '',
+        previewMatrix: pattern ? pattern.matrix : []
+      })
+    })
     this.data.lowStock = Number(settings.lowStock) || 0
     this.data.activeBrand = settings.activeBrand || 'MARD'
     this.allRows = this.buildRows()
@@ -267,6 +293,14 @@ Page({
     })
   },
 
+  openAiEntry() {
+    wx.navigateTo({ url: '/pages/convert/convert?mode=recognize' })
+  },
+
+  goRecords() {
+    wx.navigateTo({ url: '/pages/records/records' })
+  },
+
   closeStockEntry() { this.setData({ showStockEntry: false }) },
   noop() {},
 
@@ -313,8 +347,20 @@ Page({
     this._batchAmounts = {}
     this.refreshBatchRows()
   },
-  selectPackage(event) { this.setData({ selectedPackage: Number(event.currentTarget.dataset.count) || 221 }) },
+  selectPackage(event) {
+    const count = Number(event.currentTarget.dataset.count) || 221
+    if (count > mardPalette.length) {
+      wx.showModal({
+        title: '295 色卡尚未配置',
+        content: '当前仓库只有 MARD 221 标准色数据，不能用重复或虚构色号冒充 295 色。补充额外 74 色色卡后，该套装会自动开放。',
+        showCancel: false
+      })
+      return
+    }
+    this.setData({ selectedPackage: count })
+  },
   inputPackageAmount(event) { this.setData({ packageAmount: Math.max(0, Math.floor(Number(event.detail.value) || 0)) }) },
+  togglePackageReplace(event) { this.setData({ packageReplaceExisting: Boolean(event.detail.value) }) },
 
   inputEntryRow(event) {
     const index = Number(event.currentTarget.dataset.index)
@@ -406,11 +452,26 @@ Page({
     } else if (this.data.entryTab === 'csv') {
       items = this.data.csvItems.map((item) => Object.assign({}, item, { delta: this.data.entryDirection * Math.abs(Number(item.delta || 0)) }))
     } else if (this.data.entryTab === 'package') {
-      items = mardPalette.slice(0, Number(this.data.selectedPackage) || 0).map((item) => ({
-        brand: this.data.activeBrand,
-        code: item.code,
-        delta: this.data.entryDirection * Number(this.data.packageAmount || 0)
-      }))
+      const packageCount = Number(this.data.selectedPackage) || 0
+      if (packageCount > mardPalette.length) {
+        wx.showToast({ title: '当前色卡不支持该套装', icon: 'none' })
+        return
+      }
+      const amount = Number(this.data.packageAmount || 0)
+      if (this.data.entryDirection > 0 && this.data.packageReplaceExisting) {
+        const inventory = getInventory(this.data.activeBrand)
+        items = mardPalette.map((item, index) => ({
+          brand: this.data.activeBrand,
+          code: item.code,
+          delta: (index < packageCount ? amount : 0) - Number(inventory[item.code] || 0)
+        })).filter((item) => item.delta !== 0)
+      } else {
+        items = mardPalette.slice(0, packageCount).map((item) => ({
+          brand: this.data.activeBrand,
+          code: item.code,
+          delta: this.data.entryDirection * amount
+        }))
+      }
     }
     if (!items.length) {
       wx.showToast({ title: '请填写有效的库存数量', icon: 'none' })

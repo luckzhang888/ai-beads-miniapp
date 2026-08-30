@@ -1,6 +1,6 @@
 {
   "name": "ai-beads-miniapp",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "description": "AI豆仓类微信原生小程序 MVP",
   "scripts": {

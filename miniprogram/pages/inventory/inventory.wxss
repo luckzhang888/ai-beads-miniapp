@@ -25,6 +25,10 @@
   color: #8d93a1;
 }
 
+.warehouse-header-actions { display: flex; align-items: center; gap: 9rpx; }
+.header-stock-action { padding: 12rpx 15rpx; border: 2rpx solid #6b54df; border-radius: 999rpx; color: #624bd0; background: #f8f6ff; font-size: 19rpx; white-space: nowrap; }
+.header-stock-action.out { color: #cf5362; border-color: #eb9fab; background: #fff7f8; }
+
 .summary-row {
   display: flex;
   align-items: center;
@@ -309,11 +313,18 @@
 }
 
 .transaction-section { margin-top: 32rpx; padding: 22rpx; border: 1rpx solid #e3e4eb; border-radius: 22rpx; background: white; }
-.transaction-title { margin-bottom: 12rpx; font-size: 28rpx; font-weight: 750; }
+.transaction-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12rpx; }
+.transaction-title { font-size: 28rpx; font-weight: 750; }
+.all-records { color: #684bd0; font-size: 21rpx; }
 .transaction-row { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 15rpx 0; border-top: 1rpx solid #f0eef3; }
 .transaction-row button { margin: 0; color: #6547c8; background: #f0ebfb; }
+.transaction-thumb { width: 72rpx; height: 72rpx; flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 12rpx; background: #f2eefb; }
+.transaction-copy { min-width: 0; flex: 1; }
 .transaction-name { font-size: 23rpx; font-weight: 650; }
 .transaction-meta { margin-top: 5rpx; color: #9991a1; font-size: 18rpx; }
+.direction-tag { margin-right: 5rpx; color: #766f7c; }
+.direction-tag.in { color: #188e6b; }
+.direction-tag.out { color: #dc5867; }
 .undone-label { color: #aaa3b0; font-size: 19rpx; }
 
 .full-mask { position: fixed; z-index: 50; left: 0; right: 0; top: 0; bottom: 0; background: #f4f6ff; }
@@ -355,6 +366,8 @@
 .batch-preset { padding: 15rpx 4rpx; border-radius: 12rpx; color: #634bd2; background: #f1eefb; text-align: center; font-size: 18rpx; }
 .package-pill { padding: 12rpx 20rpx; border: 1rpx solid #dedbe5; border-radius: 999rpx; color: #605968; background: white; font-size: 22rpx; }
 .package-pill.active { color: white; border-color: #6b50df; background: #6b50df; }
+.package-pill.unavailable { color: #aaa2ae; border-style: dashed; background: #f6f4f7; }
+.package-pill.unavailable text { display: block; margin-top: 3rpx; font-size: 16rpx; }
 .manual-card { padding-top: 12rpx; }
 .manual-card > .entry-card-title { padding: 15rpx 0 20rpx; }
 .manual-row { min-height: 104rpx; display: grid; grid-template-columns: 44rpx 1fr 1fr 86rpx 86rpx; align-items: center; gap: 9rpx; border-top: 1rpx solid #ebe8ef; }
@@ -372,6 +385,9 @@
 .package-pill { border-radius: 16rpx; text-align: center; }
 .package-amount { margin-top: 30rpx; padding: 18rpx; display: flex; align-items: center; justify-content: space-between; border-radius: 18rpx; background: #f8f7fb; }
 .package-amount input { width: 180rpx; height: 62rpx; border: 1rpx solid #e1deea; border-radius: 13rpx; background: white; text-align: center; font-size: 27rpx; }
+.package-replace { margin-top: 18rpx; padding: 20rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; border-radius: 18rpx; background: #f6f3f8; }
+.package-replace > view > view { font-size: 24rpx; font-weight: 650; }
+.package-replace text { display: block; margin-top: 5rpx; color: #9d95a3; font-size: 18rpx; }
 .entry-bottom-space { height: 40rpx; }
 .entry-footer { flex: none; padding: 17rpx 28rpx calc(17rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid #e6e3eb; background: white; }
 .entry-footer button { width: 100%; margin: 0; color: white; border-radius: 20rpx; background: #654be0; }
@@ -410,7 +426,7 @@
 .consumption-row.selected { background: #f2efff; }
 .select-box { width: 43rpx; height: 43rpx; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border: 3rpx solid #cbc9d1; border-radius: 50%; color: white; }
 .consumption-row.selected .select-box { border-color: #694fdf; background: #694fdf; }
-.pattern-thumb { width: 88rpx; height: 88rpx; display: flex; align-items: center; justify-content: center; border-radius: 17rpx; color: #6d52d8; background: linear-gradient(145deg,#e2daf9,#dff5ee); font-size: 37rpx; }
+.pattern-thumb { width: 88rpx; height: 88rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 17rpx; color: #6d52d8; background: linear-gradient(145deg,#e2daf9,#dff5ee); font-size: 37rpx; }
 .consumption-copy { min-width: 0; }
 .consumption-copy view { overflow: hidden; font-size: 27rpx; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
 .consumption-copy text { display: block; margin-top: 8rpx; color: #9a94a0; font-size: 20rpx; }
@@ -419,7 +435,8 @@
 .consumption-footer button.primary { color: white; background: #674cdf; }
 
 @media (max-width: 390px) {
-  .warehouse-header { align-items: flex-start; }
+  .warehouse-header { align-items: flex-start; flex-wrap: wrap; }
+  .warehouse-header-actions { width: 100%; justify-content: flex-end; }
   .inventory-quick-actions.four { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .manual-row { grid-template-columns: 40rpx 1fr 1fr; padding: 12rpx 0; }
   .manual-row .row-preset { display: none; }

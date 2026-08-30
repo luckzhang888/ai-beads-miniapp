@@ -3,6 +3,11 @@
     <view><view class="journey-title">开始创作之旅</view><view class="journey-note">选择一种导入方式，我们会自动整理色号</view></view>
     <view class="journey-orb">✦</view>
   </view>
+  <view class="import-mode-tabs">
+    <view data-id="recognize" bindtap="selectMethod">AI智能统计</view>
+    <view data-id="diagram" bindtap="selectMethod">手动记录</view>
+    <view data-id="pdf" bindtap="selectMethod">导入文件</view>
+  </view>
   <view
     class="method-card"
     wx:for="{{methods}}"
@@ -16,6 +21,40 @@
       <view class="method-description">{{item.description}}</view>
     </view>
     <view class="method-arrow">›</view>
+  </view>
+</view>
+
+<view wx:elif="{{stage === 'classify'}}" class="classify-page">
+  <view class="classify-card">
+    <view class="classify-title">{{selectedMethodTitle || '图纸导入'}}</view>
+    <view class="classify-note">确认图片类型后再开始识别</view>
+    <view class="classify-preview"><image src="{{imagePath}}" mode="aspectFit" /></view>
+    <view class="variant-row">
+      <view wx:for="{{sourceVariants}}" wx:key="value" class="variant-item {{sourceVariant === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectSourceVariant"><view>{{sourceVariant === item.value ? '●' : '○'}}</view><text>{{item.label}}</text></view>
+    </view>
+    <button class="primary-btn classify-confirm" bindtap="confirmSourceVariant">{{selectedMethod === 'recognize' || selectedMethod === 'link' ? '确认并智能识别' : '确认并继续设置'}}</button>
+    <button class="secondary-btn" bindtap="chooseImage">重新选择图片</button>
+  </view>
+</view>
+
+<view wx:elif="{{stage === 'recognizing'}}" class="recognition-page">
+  <view class="recognition-title">AI 自动化处理</view>
+  <view class="recognition-preview">
+    <bead-grid wx:if="{{recognitionResult}}" matrix="{{recognitionResult.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{330}}" show-grid="{{true}}" />
+    <image wx:else src="{{imagePath}}" mode="aspectFit" />
+  </view>
+  <view wx:if="{{recognitionResult}}" class="recognition-summary">
+    <view><text>网格</text><b>{{recognitionResult.width}} × {{recognitionResult.height}}</b></view>
+    <view><text>图例</text><b>{{recognitionResult.usedColorCount}} 色 · {{recognitionResult.stats.length}} 项</b></view>
+  </view>
+  <view class="recognition-progress-card">
+    <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 对齐网格</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 统计图例</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 识别色号</text></view>
+    <view class="recognition-step"><b>{{recognitionStep}}</b><text>{{recognitionProgress}}%</text></view>
+    <progress percent="{{recognitionProgress}}" activeColor="#39c96b" stroke-width="8" />
+  </view>
+  <view wx:if="{{recognitionProgress === 100}}" class="recognition-actions">
+    <button data-target="detail" bindtap="saveRecognitionResult">保存到图纸册</button>
+    <button class="primary" data-target="editor" bindtap="saveRecognitionResult">进入色号整理</button>
   </view>
 </view>
 
@@ -145,6 +184,19 @@
     <view class="dialog-actions">
       <button class="secondary-btn" bindtap="closeShareDialog">取消</button>
       <button class="primary-btn" bindtap="importShareCode">立即导入</button>
+    </view>
+  </view>
+</view>
+
+<view wx:if="{{showLinkDialog}}" class="dialog-mask" bindtap="closeLinkDialog">
+  <view class="share-dialog" catchtap="noop">
+    <view class="share-title">图片链接提取</view>
+    <view class="share-note">支持可公开访问的 JPG/PNG 图片直链；剪贴板链接会自动填入</view>
+    <input class="share-input" value="{{linkInput}}" bindinput="onLinkInput" placeholder="https://example.com/pattern.png" />
+    <view class="link-boundary">小红书等分享页面不是图片直链，需要后端解析服务和合法域名配置。</view>
+    <view class="dialog-actions">
+      <button class="secondary-btn" bindtap="closeLinkDialog">取消</button>
+      <button class="primary-btn" loading="{{linkExtracting}}" bindtap="extractImageLink">下载并识别</button>
     </view>
   </view>
 </view>

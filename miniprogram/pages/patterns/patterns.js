@@ -9,7 +9,14 @@ const {
   deletePatterns,
   movePatternsFromFolder
 } = require('../../utils/pattern')
-const { getInventory } = require('../../utils/inventory')
+const {
+  getInventory,
+  batchAdjustStock,
+  canConsumeStats,
+  consumeStats,
+  hasConsumedPattern,
+  undoTransaction
+} = require('../../utils/inventory')
 
 const DEMO_SEEDED_KEY = 'aiDoucangDemoSeeded:v1'
 const FOLDERS_KEY = 'aiDoucangFolders:v1'
@@ -27,6 +34,17 @@ function formatTime(timestamp) {
   const date = new Date(Number(timestamp) || Date.now())
   const pad = (value) => value < 10 ? ('0' + value) : String(value)
   return date.getFullYear() + '/' + pad(date.getMonth() + 1) + '/' + pad(date.getDate())
+}
+
+function combinePatternStats(patterns) {
+  const totals = {}
+  ;(patterns || []).forEach((pattern) => {
+    ;(pattern.stats || []).forEach((item) => {
+      if (!totals[item.code]) totals[item.code] = { code: item.code, required: 0 }
+      totals[item.code].required += Math.max(0, Number(item.required) || 0)
+    })
+  })
+  return Object.keys(totals).map((code) => totals[code])
 }
 
 function seedPatterns() {
@@ -104,7 +122,7 @@ Page({
       pending: patterns.filter((item) => item.status === '待拼').length,
       total: patterns.length
     }
-    this.setData({ patterns, folders, folderOptions }, () => this.applyFilter())
+    this.setData({ patterns, folders, folderOptions, stats }, () => this.applyFilter())
   },
 
   onSearch(event) {
@@ -195,6 +213,7 @@ Page({
   },
 
   selectFolder(event) {
+    if (this._folderLongPressedAt && Date.now() - this._folderLongPressedAt < 450) return
     const folder = event.currentTarget.dataset.folder
     this.setData({ selectedFolder: this.data.selectedFolder === folder ? '' : folder }, () => this.applyFilter())
   },
@@ -222,6 +241,65 @@ Page({
   openFolderManager() { this.setData({ showFolderManager: true }) },
   closeFolderManager() { this.setData({ showFolderManager: false }) },
   noop() {},
+
+  saveFolderOrder(folders, message) {
+    wx.setStorageSync(FOLDERS_KEY, folders.map((item) => ({ id: item.id, title: item.title })))
+    this.refresh()
+    if (message) wx.showToast({ title: message, icon: 'success' })
+  },
+
+  moveFolderTo(folderId, targetIndex) {
+    const folders = getFolders()
+    const sourceIndex = folders.findIndex((item) => item.id === folderId)
+    if (sourceIndex < 0 || folders.length < 2) return false
+    const boundedTarget = Math.max(0, Math.min(folders.length - 1, Number(targetIndex)))
+    if (boundedTarget === sourceIndex) return false
+    const moved = folders.splice(sourceIndex, 1)[0]
+    folders.splice(boundedTarget, 0, moved)
+    this.saveFolderOrder(folders, '文件夹顺序已更新')
+    return true
+  },
+
+  moveFolderStep(event) {
+    const dataset = event.currentTarget.dataset || {}
+    const folderId = String(dataset.folderId || '')
+    const folders = getFolders()
+    const index = folders.findIndex((item) => item.id === folderId)
+    if (index < 0) return
+    this.moveFolderTo(folderId, index + Number(dataset.delta || 0))
+  },
+
+  manageFolderPosition(event) {
+    const folderId = String(event.currentTarget.dataset.folder || '')
+    const folders = getFolders()
+    const index = folders.findIndex((item) => item.id === folderId)
+    if (index < 0) return
+    this._folderLongPressedAt = Date.now()
+
+    const actions = []
+    if (index > 0) {
+      if (index > 1) actions.push({ label: '移到最前', target: 0 })
+      actions.push({ label: '向左移动', target: index - 1 })
+    }
+    if (index < folders.length - 1) {
+      actions.push({ label: '向右移动', target: index + 1 })
+      if (index < folders.length - 2) actions.push({ label: '移到最后', target: folders.length - 1 })
+    }
+    actions.push({ label: '删除文件夹', remove: true })
+
+    wx.showActionSheet({
+      itemList: actions.map((item) => item.label),
+      success: (result) => {
+        const action = actions[result.tapIndex]
+        if (!action) return
+        if (action.remove) {
+          this.deleteFolder({ currentTarget: { dataset: { folderId } } })
+          return
+        }
+        this.moveFolderTo(folderId, action.target)
+      }
+    })
+  },
 
   moveSelected() {
     const ids = this.data.selectedIds || []
@@ -317,11 +395,147 @@ Page({
     wx.navigateTo({ url: '/pages/inventory/inventory' })
   },
 
-  noop() {},
-
-  showComingSoon(event) {
-    wx.showToast({ title: event.currentTarget.dataset.name + '即将开放', icon: 'none' })
+  getSelectedPatterns() {
+    const selected = new Set(this.data.selectedIds || [])
+    return this.data.patterns.filter((item) => selected.has(item.id))
   },
+
+  setSelectedStatus() {
+    const patterns = this.getSelectedPatterns()
+    if (!patterns.length) {
+      wx.showToast({ title: '请先选择图纸', icon: 'none' })
+      return
+    }
+    const statuses = ['待拼', '正在拼', '已拼', '待发布', '已发布']
+    wx.showActionSheet({
+      itemList: statuses,
+      success: (result) => {
+        const status = statuses[result.tapIndex]
+        if (!status) return
+        patterns.forEach((pattern) => savePattern(Object.assign({}, pattern, { status }), mardPalette))
+        this.exitSelection()
+        this.refresh()
+        wx.showToast({ title: '已更新为' + status, icon: 'success' })
+      }
+    })
+  },
+
+  manageSelectedStock() {
+    const patterns = this.getSelectedPatterns()
+    if (!patterns.length) {
+      wx.showToast({ title: '请先选择图纸', icon: 'none' })
+      return
+    }
+    const actions = ['按图纸用量入库', '按图纸用量领料出库', '撤销已出库并退料']
+    wx.showActionSheet({
+      itemList: actions,
+      success: (result) => {
+        if (result.tapIndex === 0) this.inboundSelectedPatterns(patterns)
+        if (result.tapIndex === 1) this.outboundSelectedPatterns(patterns)
+        if (result.tapIndex === 2) this.undoSelectedOutbound(patterns)
+      }
+    })
+  },
+
+  inboundSelectedPatterns(patterns) {
+    const stats = combinePatternStats(patterns)
+    const total = stats.reduce((sum, item) => sum + item.required, 0)
+    wx.showModal({
+      title: '图纸用量入库',
+      content: '将 ' + patterns.length + ' 张图纸的 ' + stats.length + ' 个色号、共 ' + total + ' 粒加入库存，并生成关联记录。',
+      confirmText: '确认入库',
+      success: (result) => {
+        if (!result.confirm) return
+        const single = patterns.length === 1 ? patterns[0] : null
+        batchAdjustStock(stats.map((item) => ({ brand: 'MARD', code: item.code, delta: item.required })), {
+          source: 'pattern-management-inbound',
+          patternId: single ? single.id : '',
+          patternName: single ? single.name : (patterns.length + ' 张图纸')
+        })
+        this.exitSelection()
+        this.refresh()
+        wx.showToast({ title: '图纸用量已入库', icon: 'success' })
+      }
+    })
+  },
+
+  outboundSelectedPatterns(patterns) {
+    const pending = patterns.filter((pattern) => !hasConsumedPattern(pattern.id))
+    if (!pending.length) {
+      wx.showToast({ title: '所选图纸均已出库', icon: 'none' })
+      return
+    }
+    const stats = combinePatternStats(pending)
+    const check = canConsumeStats(stats, 'MARD')
+    if (!check.ok) {
+      const missing = check.missing.slice(0, 5).map((item) => item.code + ' 缺 ' + item.missing).join('、')
+      wx.showModal({ title: '库存不足', content: missing + (check.missing.length > 5 ? ' 等' : ''), showCancel: false })
+      return
+    }
+    wx.showModal({
+      title: '按图纸用量出库',
+      content: '将为 ' + pending.length + ' 张图纸领料出库；每张图纸都会生成可撤销的关联记录。',
+      confirmText: '确认出库',
+      success: (result) => {
+        if (!result.confirm) return
+        let completed = 0
+        pending.forEach((pattern) => {
+          const consumed = consumeStats(pattern.stats || [], {
+            brand: pattern.brand || 'MARD',
+            patternId: pattern.id,
+            patternName: pattern.name,
+            source: 'pattern-management-outbound'
+          })
+          if (!consumed.ok) return
+          savePattern(Object.assign({}, pattern, {
+            status: pattern.status === '待拼' ? '正在拼' : pattern.status,
+            inventoryConsumed: true,
+            lastConsumeTransactionId: consumed.transactionId
+          }), mardPalette)
+          completed += 1
+        })
+        this.exitSelection()
+        this.refresh()
+        wx.showToast({ title: '已出库 ' + completed + ' 张', icon: 'success' })
+      }
+    })
+  },
+
+  undoSelectedOutbound(patterns) {
+    const consumed = patterns.filter((pattern) => pattern.lastConsumeTransactionId && pattern.inventoryConsumed)
+    if (!consumed.length) {
+      wx.showToast({ title: '所选图纸没有可撤销出库', icon: 'none' })
+      return
+    }
+    wx.showModal({
+      title: '撤销图纸出库',
+      content: '将退回 ' + consumed.length + ' 张图纸对应的拼豆库存，原出库记录会标记为已撤销。',
+      confirmText: '确认退料',
+      success: (result) => {
+        if (!result.confirm) return
+        let undoneCount = 0
+        consumed.forEach((pattern) => {
+          const undone = undoTransaction(pattern.lastConsumeTransactionId)
+          if (!undone.ok) return
+          savePattern(Object.assign({}, pattern, {
+            status: pattern.status === '正在拼' ? '待拼' : pattern.status,
+            inventoryConsumed: false,
+            lastConsumeTransactionId: ''
+          }), mardPalette)
+          undoneCount += 1
+        })
+        this.exitSelection()
+        this.refresh()
+        wx.showToast({ title: '已退料 ' + undoneCount + ' 张', icon: 'success' })
+      }
+    })
+  },
+
+  goRecords() {
+    wx.navigateTo({ url: '/pages/records/records' })
+  },
+
+  noop() {},
 
   openPattern(event) {
     const id = event.currentTarget.dataset.id
