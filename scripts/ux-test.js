@@ -19,6 +19,7 @@ async function main() {
     redirectTo() {},
     setClipboardData() {},
     showModal(options) {
+      assert.ok(!options.confirmText || Array.from(options.confirmText).length <= 4, 'showModal confirmText must not exceed 4 characters')
       modalLog.push(options.title)
       if (options.success) options.success({ confirm: true, content: options.content || '' })
     },
@@ -55,9 +56,10 @@ async function main() {
   library.closeFolderManager()
   assert.strictEqual(library.data.showFolderManager, false)
   const firstId = library.data.patterns.find((item) => item.folderId === 'original').id
-  library.deleteFolder({ currentTarget: { dataset: { folder: 'original' } } })
+  library.deleteFolder({ currentTarget: { dataset: { folderId: 'original' } } })
   assert.strictEqual(library.data.folderOptions.some((item) => item.id === 'original'), false)
   assert.strictEqual(patternUtils.getPatternById(firstId).folderId, '')
+  assert.strictEqual(storage.get('aiDoucangFolders:v1').some((item) => item.id === 'original'), false)
   actionSheetTapIndex = 1
   library.enterSelection({ currentTarget: { dataset: { id: firstId } } })
   assert.strictEqual(library.data.selectedCount, 1)
@@ -66,7 +68,7 @@ async function main() {
   storage.set('aiDoucangFolders:v1', [{ id: 'favorites', title: '灵感图集' }, { id: 'empty', title: '空文件夹' }])
   library.refresh()
   assert.strictEqual(library.data.folders.find((item) => item.id === 'empty').cover, null)
-  library.deleteFolder({ currentTarget: { dataset: { folder: 'empty' } } })
+  library.deleteFolder({ currentTarget: { dataset: { folderId: 'empty' } } })
   assert.strictEqual(library.data.folderOptions.length, 1)
   library.enterSelection({ currentTarget: { dataset: { id: firstId } } })
   library.selectAllVisible()

@@ -6,7 +6,8 @@ const {
   getPatternById,
   savePattern,
   setCurrentPattern,
-  deletePatterns
+  deletePatterns,
+  movePatternsFromFolder
 } = require('../../utils/pattern')
 const { getInventory } = require('../../utils/inventory')
 
@@ -220,6 +221,7 @@ Page({
 
   openFolderManager() { this.setData({ showFolderManager: true }) },
   closeFolderManager() { this.setData({ showFolderManager: false }) },
+  noop() {},
 
   moveSelected() {
     const ids = this.data.selectedIds || []
@@ -245,27 +247,43 @@ Page({
   },
 
   deleteFolder(event) {
-    const folderId = event.currentTarget.dataset.folder
+    const dataset = event && event.currentTarget ? event.currentTarget.dataset || {} : {}
+    const folderId = String(dataset.folderId || dataset.folder || '')
     const folder = getFolders().find((item) => item.id === folderId)
-    if (!folder) return
+    if (!folder) {
+      wx.showToast({ title: '文件夹不存在，请刷新', icon: 'none' })
+      this.refresh()
+      return
+    }
     const count = this.data.patterns.filter((item) => item.folderId === folderId).length
     wx.showModal({
       title: '删除文件夹“' + folder.title + '”？',
       content: count ? ('其中 ' + count + ' 张图纸会移到根目录，图纸本身不会删除。') : '这是一个空文件夹。',
-      confirmText: '删除文件夹',
+      confirmText: '删除',
       confirmColor: '#e54b5f',
       success: (result) => {
         if (!result.confirm) return
-        const remainingFolders = getFolders().filter((item) => item.id !== folderId)
-        wx.setStorageSync(FOLDERS_KEY, remainingFolders)
-        this.data.patterns.filter((item) => item.folderId === folderId).forEach((item) => {
-          const pattern = getPatternById(item.id)
-          if (pattern) savePattern(Object.assign({}, pattern, { folderId: '' }), mardPalette)
-        })
-        const afterDelete = () => this.refresh()
-        if (this.data.selectedFolder === folderId) this.setData({ selectedFolder: '' }, afterDelete)
-        else afterDelete()
-        wx.showToast({ title: '文件夹已删除', icon: 'success' })
+        try {
+          const moved = movePatternsFromFolder(folderId, '')
+          const remainingFolders = getFolders().filter((item) => item.id !== folderId)
+          wx.setStorageSync(FOLDERS_KEY, remainingFolders)
+          if (getFolders().some((item) => item.id === folderId)) throw new Error('folder persistence check failed')
+
+          const afterDelete = () => {
+            this.refresh()
+            wx.showToast({ title: moved.updated ? '已删除，图纸已移出' : '文件夹已删除', icon: 'success' })
+          }
+          if (this.data.selectedFolder === folderId) this.setData({ selectedFolder: '' }, afterDelete)
+          else afterDelete()
+        } catch (error) {
+          console.error('delete folder failed', error)
+          this.refresh()
+          wx.showToast({ title: '删除失败，请重试', icon: 'none' })
+        }
+      },
+      fail: (error) => {
+        console.error('open delete folder modal failed', error)
+        wx.showToast({ title: '无法确认删除，请重试', icon: 'none' })
       }
     })
   },

@@ -133,7 +133,7 @@
         <view class="folder-manage-row" wx:for="{{folders}}" wx:key="id">
           <view class="folder-manage-icon">▦</view>
           <view class="folder-manage-copy"><view>{{item.title}}</view><text>{{item.count}} 张图纸</text></view>
-          <button data-folder="{{item.id}}" bindtap="deleteFolder">删除</button>
+          <button data-folder-id="{{item.id}}" catchtap="deleteFolder">删除</button>
         </view>
       </view>
       <view wx:else class="folder-manager-empty">暂时没有文件夹</view>

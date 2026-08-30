@@ -161,6 +161,30 @@ function deletePatterns(ids) {
   return patterns
 }
 
+function movePatternsFromFolder(folderId, nextFolderId) {
+  const sourceId = String(folderId || '')
+  const targetId = String(nextFolderId || '')
+  const patterns = getSavedPatterns()
+  if (!sourceId) return { updated: 0, patterns }
+
+  const updatedAt = Date.now()
+  let updated = 0
+  const nextPatterns = patterns.map((item) => {
+    if (String(item.folderId || '') !== sourceId) return item
+    updated += 1
+    return Object.assign({}, item, { folderId: targetId, updatedAt })
+  })
+
+  if (!updated) return { updated: 0, patterns }
+  wx.setStorageSync(PATTERNS_KEY, nextPatterns)
+
+  const current = getCurrentPattern()
+  if (current && String(current.folderId || '') === sourceId) {
+    setCurrentPattern(Object.assign({}, current, { folderId: targetId, updatedAt }))
+  }
+  return { updated, patterns: nextPatterns }
+}
+
 function renamePattern(id, name) {
   const cleanName = String(name || '').trim().slice(0, 30)
   if (!cleanName) return null
@@ -358,6 +382,7 @@ module.exports = {
   getPatternById,
   deletePattern,
   deletePatterns,
+  movePatternsFromFolder,
   renamePattern,
   duplicatePattern,
   mirrorHorizontal,
