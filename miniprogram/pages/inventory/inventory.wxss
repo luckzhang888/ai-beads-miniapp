@@ -499,6 +499,86 @@
   .package-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
   .full-mask { left: 184px; }
   .stock-entry-page, .consumption-page { max-width: 1080px; margin: 0 auto; }
+  .entry-header { height: 76px; padding: 0 22px; border-bottom-width: 1px; }
+  .back-link { font-size: 18px; }
+  .entry-title { font-size: 23px; }
+  .ai-label { padding: 7px 11px; border-width: 1px; font-size: 13px; }
+  .entry-tabs { margin: 14px 20px 0; border-radius: 15px; }
+  .entry-tab { min-width: 126px; padding: 14px 16px; border-radius: 14px; font-size: 15px; }
+  .direction-card { margin: 14px 20px 0; padding: 15px 17px; gap: 13px; border-radius: 15px; }
+  .entry-card-title { font-size: 18px; }
+  .entry-card-note { margin-top: 4px; font-size: 13px; }
+  .direction-switch { padding: 4px; }
+  .direction-switch view { padding: 8px 17px; font-size: 14px; }
+  .entry-content { padding: 14px 20px 0; }
+  .entry-card { padding: 19px; border-radius: 17px; }
+  .batch-summary { margin-bottom: 14px; border-radius: 15px; }
+  .batch-summary view { padding: 15px; }
+  .batch-summary view + view { border-left-width: 1px; }
+  .batch-summary text:first-child { font-size: 23px; }
+  .batch-summary text:last-child { margin-top: 4px; font-size: 13px; }
+  .batch-card { padding-top: 15px; }
+  .batch-clear { padding: 6px 12px; font-size: 13px; }
+  .batch-series-scroll { margin: 12px 0 8px; }
+  .batch-series-row { gap: 7px; }
+  .batch-series-pill { min-width: 34px; padding: 8px 13px; border-width: 1px; font-size: 14px; }
+  .batch-list { border-top-width: 1px; }
+  .batch-row { min-height: 64px; grid-template-columns: 60px 82px repeat(3,minmax(54px,1fr)); gap: 6px; border-bottom-width: 1px; }
+  .batch-code { gap: 6px; font-size: 15px; }
+  .batch-code text { width: 17px; height: 17px; border-width: 1px; }
+  .batch-row input { height: 42px; padding: 0 7px; border-width: 1px; border-radius: 8px; font-size: 14px; }
+  .batch-preset { padding: 10px 3px; border-radius: 8px; font-size: 12px; }
+  .package-pill { padding: 9px 14px; border-width: 1px; font-size: 15px; }
+  .package-pill.unavailable text { margin-top: 2px; font-size: 11px; }
+  .manual-card { padding-top: 8px; }
+  .manual-card > .entry-card-title { padding: 10px 0 14px; }
+  .manual-row { min-height: 72px; grid-template-columns: 32px 1fr 1fr 60px 60px; gap: 6px; border-top-width: 1px; }
+  .manual-row input { height: 43px; padding: 0 9px; border-width: 1px; border-radius: 9px; font-size: 15px; }
+  .remove-row { width: 27px; height: 27px; }
+  .row-preset { padding: 10px 4px; border-radius: 8px; font-size: 13px; }
+  .add-row { padding: 15px 0 6px; font-size: 18px; }
+  .upload-card { padding: 48px 18px; border-width: 1px; }
+  .upload-icon { width: 66px; height: 66px; margin-bottom: 14px; font-size: 33px; }
+  .file-preview { margin-top: 17px; padding: 12px; gap: 10px; border-radius: 10px; font-size: 13px; }
+  .upload-actions { margin-top: 19px; gap: 10px; }
+  .upload-actions button { border-width: 1px; font-size: 15px; }
+  .package-grid { margin-top: 15px; gap: 10px; }
+  .package-pill { border-radius: 11px; }
+  .package-amount { margin-top: 20px; padding: 12px; border-radius: 12px; }
+  .package-amount input { width: 126px; height: 43px; border-width: 1px; border-radius: 9px; font-size: 18px; }
+  .package-replace { margin-top: 12px; padding: 14px; gap: 14px; border-radius: 12px; }
+  .package-replace > view > view { font-size: 16px; }
+  .package-replace text { margin-top: 4px; font-size: 12px; }
+  .entry-bottom-space { height: 28px; }
+  .entry-footer { padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top-width: 1px; }
+  .entry-footer button { border-radius: 14px; font-size: 17px; }
+  .bottom-sheet { width: min(100%,920px); padding: 12px 20px calc(16px + env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; }
+  .sheet-handle { width: 52px; height: 6px; margin-bottom: 10px; }
+  .sheet-title { font-size: 23px; }
+  .sheet-subtitle { margin-top: 5px; font-size: 14px; }
+  .refill-summary { margin-top: 16px; padding: 14px; border-radius: 14px; }
+  .refill-summary > view text:first-child { font-size: 23px; }
+  .refill-summary > view text:last-child, .refill-summary label { font-size: 13px; }
+  .refill-summary input { width: 76px; margin: 0 6px; font-size: 19px; }
+  .unit-row { padding: 14px 0; }
+  .unit-options { padding: 3px; }
+  .unit-options view { padding: 7px 15px; font-size: 14px; }
+  .shortage-list { height: 450px; border-top-width: 1px; }
+  .shortage-head, .shortage-row { min-height: 50px; border-bottom-width: 1px; }
+  .shortage-head { font-size: 13px; }
+  .shortage-row { font-size: 16px; }
+  .color-dot { width: 19px; height: 19px; margin-right: 9px; border-width: 1px; }
+  .empty-shortage { padding: 55px 14px; }
+  .copy-actions { gap: 8px; margin-top: 13px; }
+  .copy-actions button { border-width: 1px; font-size: 14px; }
+  .consumption-count { padding: 13px 20px; font-size: 15px; }
+  .consumption-row { min-height: 94px; padding: 12px 20px; grid-template-columns: 36px 64px minmax(0,1fr); gap: 12px; border-bottom-width: 1px; }
+  .select-box { width: 30px; height: 30px; border-width: 2px; }
+  .pattern-thumb { width: 61px; height: 61px; border-radius: 12px; font-size: 25px; }
+  .consumption-copy view { font-size: 18px; }
+  .consumption-copy text { margin-top: 6px; font-size: 13px; }
+  .consumption-footer { padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); gap: 11px; border-top-width: 1px; }
+  .consumption-footer button { border-width: 1px; font-size: 15px; }
 }
 
 @media (min-width: 900px) {

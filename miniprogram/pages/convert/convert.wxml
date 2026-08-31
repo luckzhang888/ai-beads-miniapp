@@ -49,13 +49,22 @@
     <view><text>方式</text><b>{{recognitionResult.recognitionModeText}} · {{recognitionResult.confidencePercent}}%</b></view>
   </view>
   <view wx:if="{{recognitionResult.warning}}" class="recognition-warning">{{recognitionResult.warning}}</view>
+  <view wx:if="{{recognitionResult.needsCalibration}}" class="recognition-calibration">
+    <view class="calibration-copy">
+      <b>请校准图纸短边网格</b>
+      <text>普通照片没有可靠网格线，不能仅凭分辨率猜豆豆数量。点选后会重新计算。</text>
+    </view>
+    <view class="calibration-sizes">
+      <view wx:for="{{sizes}}" wx:key="*this" class="{{selectedSize == item ? 'active' : ''}}" data-size="{{item}}" bindtap="reprocessRecognitionSize">{{item}}</view>
+    </view>
+  </view>
   <view class="recognition-progress-card">
-    <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 对齐网格</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 统计图例</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 识别色号</text></view>
+    <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 检测网格</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 统计颜色</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 匹配色号</text></view>
     <view class="recognition-step"><b>{{recognitionStep}}</b><text>{{recognitionProgress}}%</text></view>
     <progress percent="{{recognitionProgress}}" activeColor="#39c96b" stroke-width="8" />
   </view>
   <view wx:if="{{recognitionProgress === 100}}" class="recognition-actions">
-    <button data-target="detail" bindtap="saveRecognitionResult">保存到图纸册</button>
+    <button data-target="detail" bindtap="saveRecognitionResult">{{recognitionResult.needsCalibration ? '确认当前尺寸并保存' : '保存到图纸册'}}</button>
     <button class="primary" data-target="editor" bindtap="saveRecognitionResult">进入色号整理</button>
   </view>
 </view>
@@ -193,9 +202,10 @@
 <view wx:if="{{showLinkDialog}}" class="dialog-mask" bindtap="closeLinkDialog">
   <view class="share-dialog" catchtap="noop">
     <view class="share-title">图片链接提取</view>
-    <view class="share-note">支持可公开访问的 JPG/PNG 图片直链；剪贴板链接会自动填入</view>
-    <input class="share-input" value="{{linkInput}}" bindinput="onLinkInput" placeholder="https://example.com/pattern.png" />
-    <view class="link-boundary">小红书等分享页面不是图片直链，需要后端解析服务和合法域名配置。</view>
+    <view class="share-note">可粘贴图片直链，也可粘贴包含链接的整段分享文字</view>
+    <textarea class="share-input link-input" value="{{linkInput}}" bindinput="onLinkInput" placeholder="粘贴分享文字或 https://example.com/pattern.png" />
+    <view wx:if="{{linkHint}}" class="link-hint">{{linkHint}}</view>
+    <view class="link-boundary">会自动提取 URL、解包图片代理参数，并尝试读取公开网页的 og:image / twitter:image 原图。第三方封闭分享页仍需合规服务端，请在微信公众平台配置 request 和 downloadFile 域名。</view>
     <view class="dialog-actions">
       <button class="secondary-btn" bindtap="closeLinkDialog">取消</button>
       <button class="primary-btn" loading="{{linkExtracting}}" bindtap="extractImageLink">下载并识别</button>

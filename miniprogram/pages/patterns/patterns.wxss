@@ -151,3 +151,26 @@
 .folder-manage-row button.folder-delete { width: 112rpx; color: #dc5063; border-color: #efb8c0; background: #fff4f5; }
 .folder-manager-empty { padding: 70rpx 20rpx; color: #a39aa8; text-align: center; }
 .folder-manager-create { width: 100%; margin: 22rpx 0 0; color: white; border-radius: 18rpx; background: #694bd7; }
+
+@media (min-width: 768px) {
+  .sheet-mask { padding-left: 184px; box-sizing: border-box; }
+  .filter-sheet { padding: 12px 22px calc(20px + env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; }
+  .sheet-handle { width: 50px; height: 6px; margin-bottom: 11px; }
+  .sheet-title { padding-bottom: 15px; border-bottom-width: 1px; font-size: 22px; }
+  .filter-label { margin: 18px 0 10px; font-size: 18px; }
+  .option-row { gap: 9px; }
+  .option-pill { padding: 8px 15px; border-width: 1px; font-size: 15px; }
+  .sheet-actions { gap: 10px; margin-top: 22px; }
+  .sheet-actions button { border-width: 1px; border-radius: 14px; font-size: 16px; }
+  .folder-manage-note { margin: 12px 0; padding: 11px 13px; border-radius: 10px; font-size: 13px; }
+  .folder-manage-list { max-height: 450px; }
+  .folder-manage-row { min-height: 72px; grid-template-columns: 42px minmax(0,1fr) 170px; gap: 10px; border-bottom-width: 1px; }
+  .folder-manage-icon { width: 38px; height: 38px; border-radius: 11px; }
+  .folder-manage-copy view { font-size: 17px; }
+  .folder-manage-copy text { margin-top: 4px; font-size: 13px; }
+  .folder-manage-actions { grid-template-columns: 36px 36px 78px; gap: 5px; }
+  .folder-manage-row button { width: 36px; border-width: 1px; border-radius: 9px; font-size: 14px; }
+  .folder-manage-row button.folder-delete { width: 78px; }
+  .folder-manager-empty { padding: 48px 14px; }
+  .folder-manager-create { margin-top: 15px; border-radius: 12px; font-size: 16px; }
+}

@@ -6,7 +6,14 @@ const { rgbToLab, deltaE2000 } = require('../miniprogram/utils/lab')
 const { preparePalette, findNearestColor, cleanupMatrix, shouldTreatAsBlank, matchImageData, mergeSimilarColors } = require('../miniprogram/utils/color-match')
 const { calculatePatternDimensions, recommendPatternSize, normalizeTransform } = require('../miniprogram/utils/image')
 const { buildPageRanges } = require('../miniprogram/utils/export')
-const { recognizeGuideGrid, prepareRecognitionPalette } = require('../miniprogram/utils/grid-recognition')
+const {
+  recognizeGuideGrid,
+  recognizeGenericGrid,
+  recognizePixelGrid,
+  nativePixelLikelihood,
+  prepareRecognitionPalette
+} = require('../miniprogram/utils/grid-recognition')
+const { extractUrls, unwrapImageUrl, selectBestUrl, extractHtmlImageUrls, validateDownload } = require('../miniprogram/utils/link')
 
 const storage = new Map()
 global.wx = {
@@ -56,7 +63,7 @@ assert.strictEqual(findNearestColor([24, 135, 162], prepared).code, 'C19')
 assert.strictEqual(findNearestColor([231, 0, 47], prepared).code, 'F5')
 assert.deepStrictEqual(calculatePatternDimensions(800, 400, 48, 'ratio'), { width: 96, height: 48 })
 assert.deepStrictEqual(calculatePatternDimensions(800, 400, 48, 'cover'), { width: 48, height: 48 })
-assert.strictEqual(recommendPatternSize(1400, 900), 80)
+assert.strictEqual(recommendPatternSize(1400, 900), 48)
 assert.strictEqual(shouldTreatAsBlank(250, 249, 251, 255, { removeBackground: true, whiteThreshold: 245 }), true)
 assert.strictEqual(shouldTreatAsBlank(250, 180, 180, 255, { removeBackground: true, whiteThreshold: 245 }), false)
 assert.strictEqual(shouldTreatAsBlank(20, 20, 20, 0, {}), true)
@@ -118,6 +125,74 @@ assert.strictEqual(guideResult.width, 22)
 assert.strictEqual(guideResult.height, 22)
 assert.strictEqual(guideResult.beadCount, 60)
 assert.strictEqual(guideResult.usedColorCount, 3)
+
+function syntheticGridChart(options) {
+  const settings = Object.assign({ columns: 12, rows: 10, cell: 12, x0: 14, y0: 16, gridLines: true }, options || {})
+  const width = settings.x0 * 2 + settings.columns * settings.cell + (settings.gridLines ? 1 : 0)
+  const height = settings.y0 * 2 + settings.rows * settings.cell + (settings.gridLines ? 1 : 0)
+  const data = new Uint8ClampedArray(width * height * 4)
+  const setPixel = (x, y, rgb) => {
+    const offset = (y * width + x) * 4
+    data[offset] = rgb[0]
+    data[offset + 1] = rgb[1]
+    data[offset + 2] = rgb[2]
+    data[offset + 3] = 255
+  }
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) setPixel(x, y, [250, 250, 250])
+  }
+  const colors = [[213, 79, 91], [57, 146, 193], [238, 182, 67], [88, 171, 119]]
+  for (let row = 0; row < settings.rows; row += 1) {
+    for (let column = 0; column < settings.columns; column += 1) {
+      const rgb = colors[(row + column) % colors.length]
+      const inset = settings.gridLines ? 1 : 0
+      for (let y = settings.y0 + row * settings.cell + inset; y < settings.y0 + (row + 1) * settings.cell; y += 1) {
+        for (let x = settings.x0 + column * settings.cell + inset; x < settings.x0 + (column + 1) * settings.cell; x += 1) setPixel(x, y, rgb)
+      }
+    }
+  }
+  if (settings.gridLines) {
+    for (let column = 0; column <= settings.columns; column += 1) {
+      const x = settings.x0 + column * settings.cell
+      for (let y = settings.y0; y <= settings.y0 + settings.rows * settings.cell; y += 1) setPixel(x, y, [92, 92, 92])
+    }
+    for (let row = 0; row <= settings.rows; row += 1) {
+      const y = settings.y0 + row * settings.cell
+      for (let x = settings.x0; x <= settings.x0 + settings.columns * settings.cell; x += 1) setPixel(x, y, [92, 92, 92])
+    }
+  }
+  return { imageData: { data }, width, height, settings }
+}
+
+const regularFixture = syntheticGridChart()
+const regularResult = recognizeGenericGrid(regularFixture.imageData, regularFixture.width, regularFixture.height, palette)
+assert.strictEqual(regularResult.ok, true, JSON.stringify(regularResult))
+assert.strictEqual(regularResult.width, regularFixture.settings.columns)
+assert.strictEqual(regularResult.height, regularFixture.settings.rows)
+assert.strictEqual(regularResult.beadCount, regularFixture.settings.columns * regularFixture.settings.rows)
+assert.strictEqual(regularResult.recognitionMode, 'regular-grid')
+
+const pixelFixture = syntheticGridChart({ columns: 14, rows: 11, cell: 7, x0: 0, y0: 0, gridLines: false })
+const pixelResult = recognizePixelGrid(pixelFixture.imageData, pixelFixture.width, pixelFixture.height, palette)
+assert.strictEqual(pixelResult.ok, true, JSON.stringify(pixelResult))
+assert.strictEqual(pixelResult.width, pixelFixture.settings.columns)
+assert.strictEqual(pixelResult.height, pixelFixture.settings.rows)
+assert.strictEqual(pixelResult.recognitionMode, 'pixel-grid')
+assert.strictEqual(nativePixelLikelihood(pixelFixture.imageData, pixelFixture.width, pixelFixture.height).ok, true)
+
+const shareText = '复制这段内容打开图纸：https://cdn.example.com/charts/demo.png，提取色号。'
+assert.deepStrictEqual(extractUrls(shareText), ['https://cdn.example.com/charts/demo.png'])
+assert.strictEqual(
+  unwrapImageUrl('https://example.com/proxy?url=https%3A%2F%2Fcdn.example.com%2Foriginal.jpg'),
+  'https://cdn.example.com/original.jpg'
+)
+assert.strictEqual(selectBestUrl('page https://example.com/post/1 image https://cdn.example.com/a.webp'), 'https://cdn.example.com/a.webp')
+assert.deepStrictEqual(
+  extractHtmlImageUrls('<meta property="og:image" content="/images/chart.png"><img data-src="thumb.jpg">', 'https://example.com/posts/1'),
+  ['https://example.com/images/chart.png', 'https://example.com/posts/thumb.jpg']
+)
+assert.strictEqual(validateDownload({ statusCode: 200, tempFilePath: 'tmp', header: { 'Content-Type': 'image/png' } }).ok, true)
+assert.strictEqual(validateDownload({ statusCode: 200, tempFilePath: 'tmp', header: { 'Content-Type': 'text/html' } }).reason, 'not-image-response')
 const blankResult = matchImageData({ data: new Uint8ClampedArray([
   255, 255, 255, 255,
   61, 175, 128, 255
@@ -298,4 +373,4 @@ assert.deepStrictEqual(convertPage.processingOptions().transform, {
 })
 
 delete global.wx
-console.log('All unit tests passed: blank detection, crop, palette merge, export paging, progress, inventory transactions and pinch zoom.')
+console.log('All unit tests passed: grid/pixel recognition, link extraction, blank detection, crop, palette merge, export paging, progress, inventory transactions and pinch zoom.')

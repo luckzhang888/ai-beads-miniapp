@@ -13,6 +13,13 @@ const {
   getPatternByShareCode
 } = require('../../utils/pattern')
 const { recordActivity } = require('../../utils/activity')
+const {
+  extractUrls,
+  extractHtmlImageUrls,
+  isKnownSharePage,
+  selectBestUrl,
+  validateDownload
+} = require('../../utils/link')
 
 const METHODS = [
   { id: 'diagram', icon: '▧', title: '图纸导入', description: '从相册或相机导入图纸，自动识别并匹配色号', badge: '推荐' },
@@ -34,6 +41,7 @@ Page({
     showLinkDialog: false,
     shareCode: '',
     linkInput: '',
+    linkHint: '',
     linkExtracting: false,
     sizes: [32, 48, 64, 80, 96, 128],
     selectedSize: 80,
@@ -115,7 +123,7 @@ Page({
       selectedMethodTitle: method.title
     }
     if (id === 'pixel') Object.assign(changes, { optimizePreset: 'natural', qualityMode: 'full' })
-    if (id === 'recognize') Object.assign(changes, { optimizePreset: 'photo', qualityMode: 'balanced' })
+    if (id === 'recognize') Object.assign(changes, { optimizePreset: 'photo', qualityMode: 'easy' })
     this.setData(changes, () => this.chooseImage())
   },
 
@@ -175,53 +183,123 @@ Page({
   },
 
   openLinkDialog() {
-    this.setData({ showLinkDialog: true, linkInput: '' })
+    this.setData({ showLinkDialog: true, linkInput: '', linkHint: '' })
     if (typeof wx.getClipboardData === 'function') {
       wx.getClipboardData({
         success: (result) => {
           const value = String(result.data || '').trim()
-          if (/^https?:\/\//i.test(value)) this.setData({ linkInput: value })
+          const urls = extractUrls(value)
+          if (urls.length) this.setData({
+            linkInput: value,
+            linkHint: urls.length > 1 ? ('已从分享文字中找到 ' + urls.length + ' 个链接，将优先使用图片链接') : '已从剪贴板识别到链接'
+          })
         }
       })
     }
   },
 
   closeLinkDialog() { this.setData({ showLinkDialog: false, linkExtracting: false }) },
-  onLinkInput(event) { this.setData({ linkInput: event.detail.value }) },
+  onLinkInput(event) {
+    const linkInput = event.detail.value
+    const urls = extractUrls(linkInput)
+    this.setData({
+      linkInput,
+      linkHint: urls.length ? ('已识别 ' + urls.length + ' 个链接') : ''
+    })
+  },
 
-  extractImageLink() {
-    const url = String(this.data.linkInput || '').trim()
-    if (!/^https?:\/\//i.test(url)) {
-      wx.showToast({ title: '请输入完整的图片链接', icon: 'none' })
+  downloadImageFile(url) {
+    return new Promise((resolve, reject) => {
+      wx.downloadFile({
+        url,
+        success: (result) => {
+          const validation = validateDownload(result)
+          if (!validation.ok) {
+            reject({ type: 'not-image', validation, url })
+            return
+          }
+          wx.getImageInfo({
+            src: result.tempFilePath,
+            success: () => resolve(result.tempFilePath),
+            fail: (error) => reject({ type: 'decode', error, url })
+          })
+        },
+        fail: (error) => reject({ type: 'download', error, url })
+      })
+    })
+  },
+
+  resolvePublicPageImage(url) {
+    return new Promise((resolve, reject) => {
+      if (typeof wx.request !== 'function') {
+        reject({ type: 'request-unavailable', url })
+        return
+      }
+      wx.request({
+        url,
+        method: 'GET',
+        success: (result) => {
+          const statusCode = Number(result.statusCode)
+          if (statusCode < 200 || statusCode >= 300) {
+            reject({ type: 'page-http', statusCode, url })
+            return
+          }
+          const candidates = extractHtmlImageUrls(typeof result.data === 'string' ? result.data : '', url)
+          if (!candidates.length) {
+            reject({ type: 'page-no-image', url })
+            return
+          }
+          resolve(selectBestUrl(candidates.join('\n')))
+        },
+        fail: (error) => reject({ type: 'page-request', error, url })
+      })
+    })
+  },
+
+  async extractImageLink() {
+    const raw = String(this.data.linkInput || '').trim()
+    const url = selectBestUrl(raw)
+    if (!url) {
+      wx.showToast({ title: '没有找到 http/https 链接', icon: 'none' })
       return
     }
     if (this.data.linkExtracting) return
     this.setData({ linkExtracting: true })
     wx.showLoading({ title: '下载图片中', mask: true })
-    wx.downloadFile({
-      url,
-      success: (result) => {
-        if (Number(result.statusCode) < 200 || Number(result.statusCode) >= 300 || !result.tempFilePath) {
-          wx.showToast({ title: '图片链接无法下载', icon: 'none' })
-          return
-        }
-        this.setData({
-          showLinkDialog: false,
-          selectedMethod: 'recognize',
-          selectedMethodTitle: '图片链接提取'
-        })
-        this.acceptImagePath(result.tempFilePath)
-      },
-      fail: () => wx.showModal({
-        title: '链接提取失败',
-        content: '目前支持 JPG/PNG 图片直链。小红书等分享页面需要经过已备案的服务端解析，不能在小程序客户端绕过平台限制。',
-        showCancel: false
-      }),
-      complete: () => {
-        wx.hideLoading()
-        this.setData({ linkExtracting: false })
+    let firstError = null
+    try {
+      let imagePath
+      try {
+        imagePath = await this.downloadImageFile(url)
+      } catch (error) {
+        firstError = error
+        const resolvedUrl = await this.resolvePublicPageImage(url)
+        if (!resolvedUrl || resolvedUrl === url) throw error
+        imagePath = await this.downloadImageFile(resolvedUrl)
       }
-    })
+      this.setData({
+        showLinkDialog: false,
+        selectedMethod: 'recognize',
+        selectedMethodTitle: '图片链接提取'
+      })
+      this.acceptImagePath(imagePath)
+    } catch (error) {
+      const issue = error || firstError || {}
+      let content
+      if (isKnownSharePage(url)) {
+        content = '这是第三方平台分享页，当前页面没有公开可下载的原图。请复制原图直链，或配置符合平台规则的服务端解析接口。'
+      } else if (issue.type === 'decode') {
+        content = '文件已下载，但微信无法解码为 JPG、PNG、WebP 等图片。'
+      } else if (issue.type === 'page-no-image') {
+        content = '网页中没有找到可公开访问的 og:image、twitter:image 或原图标签。'
+      } else {
+        content = '请确认链接公开可访问，并已在微信公众平台同时配置 request 和 downloadFile 合法域名。'
+      }
+      wx.showModal({ title: '链接提取失败', content, showCancel: false })
+    } finally {
+      wx.hideLoading()
+      this.setData({ linkExtracting: false })
+    }
   },
 
   noop() {},
@@ -352,8 +430,17 @@ Page({
     try {
       await this.setDataAsync({ recognitionProgress: 48, recognitionStep: '第 2 步 · 统计图例与颜色' })
       const result = await this.processCurrentImage()
-      result.recognitionModeText = result.recognitionMode === 'guide-grid' ? '规则网格精确识别' : '普通图片像素识别'
+      const modeLabels = {
+        'guide-grid': '红色导线网格识别',
+        'regular-grid': '规则网格识别',
+        'pixel-grid': '像素块网格识别',
+        'native-pixel': '原生像素图识别',
+        'pixel-fallback': '普通图片转换'
+      }
+      result.recognitionModeText = modeLabels[result.recognitionMode] || '图片颜色识别'
       result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
+      result.exactRecognition = result.recognitionMode !== 'pixel-fallback' && Number(result.confidence || 0) >= 0.72
+      result.needsCalibration = result.recognitionMode === 'pixel-fallback'
       await this.setDataAsync({ recognitionProgress: 82, recognitionStep: '第 3 步 · 匹配 MARD 色号' })
       this.setData({
         recognitionProgress: 100,
@@ -370,6 +457,20 @@ Page({
         showCancel: false
       })
     }
+  },
+
+  reprocessRecognitionSize(event) {
+    const selectedSize = Number(event.currentTarget.dataset.size)
+    if (!selectedSize || selectedSize === this.data.selectedSize) return
+    this.cachedSignature = ''
+    this.cachedResult = null
+    this.setData({
+      selectedSize,
+      recognitionProgress: 0,
+      recognitionStep: '重新校准网格',
+      recognitionResult: null,
+      previewResult: null
+    }, () => this.runAiRecognition())
   },
 
   saveProcessedPattern(result, settings) {
@@ -392,7 +493,7 @@ Page({
       patternId: pattern.id,
       patternName: pattern.name,
       title: '导入图纸',
-      description: result.recognitionMode === 'guide-grid'
+      description: result.exactRecognition
         ? ('精确识别 ' + result.width + '×' + result.height + '，' + result.usedColorCount + ' 色，' + result.beadCount + ' 颗')
         : ('生成 ' + result.width + '×' + result.height + ' 图纸'),
       metadata: {
@@ -412,8 +513,8 @@ Page({
     this.setData({ recognitionSaving: true })
     try {
       const pattern = this.saveProcessedPattern(result, {
-        name: 'AI识别图纸 ' + result.width + '×' + result.height,
-        tag: 'AI智能统计'
+        name: (result.exactRecognition ? 'AI识别图纸 ' : '图片转换图纸 ') + result.width + '×' + result.height,
+        tag: result.exactRecognition ? 'AI智能统计' : '普通图片转换'
       })
       const target = event.currentTarget.dataset.target
       wx.redirectTo({
@@ -448,6 +549,7 @@ Page({
 
   processingOptions() {
     return {
+      inputMode: this.data.selectedMethod,
       cropMode: this.data.cropMode,
       optimizePreset: this.data.optimizePreset,
       qualityMode: this.data.qualityMode,
@@ -455,6 +557,7 @@ Page({
       removeBackground: this.data.removeBackground,
       whiteThreshold: this.data.whiteThreshold,
       whiteTolerance: 22,
+      fallbackQualityMode: this.data.selectedMethod === 'pixel' ? this.data.qualityMode : 'easy',
       transform: {
         offsetX: this.data.cropX / 150,
         offsetY: this.data.cropY / 150,
@@ -477,7 +580,7 @@ Page({
   async processCurrentImage() {
     const signature = this.processingSignature()
     if (this.cachedResult && this.cachedSignature === signature) return this.cachedResult
-    const recognizeGrid = ['recognize', 'diagram', 'link'].indexOf(this.data.selectedMethod) >= 0
+    const recognizeGrid = ['recognize', 'diagram', 'link', 'pixel'].indexOf(this.data.selectedMethod) >= 0
     const processor = recognizeGrid ? gridImageToPattern : imageToPattern
     const result = await processor(
       this.data.imagePath,

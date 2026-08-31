@@ -1,14 +1,15 @@
 {
   "name": "ai-beads-miniapp",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "豆仓助手微信原生小程序",
   "scripts": {
     "check": "node scripts/check.js",
     "test": "node scripts/test.js",
     "test:ux": "node scripts/ux-test.js",
+    "test:tablet": "node scripts/tablet-audit.js",
     "compile:local": "node scripts/compile-local.js",
-    "verify": "npm run check && npm test && npm run test:ux && npm run compile:local",
+    "verify": "npm run check && npm test && npm run test:ux && npm run test:tablet && npm run compile:local",
     "preview": "node scripts/preview.js"
   },
   "devDependencies": {

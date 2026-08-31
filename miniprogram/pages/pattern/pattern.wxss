@@ -35,3 +35,31 @@
 .palette-count { margin-top: 5rpx; color: #877f8e; font-size: 17rpx; }
 .palette-item.active .palette-color { border-color: #744fdb; transform: translateY(-5rpx) scale(1.08); box-shadow: 0 7rpx 20rpx rgba(103,68,208,.3); }
 .palette-item.completed { opacity: .42; }
+
+@media (min-width: 768px) {
+  .tool-scroll, .tool-inner { height: 72px; }
+  .tool-inner { padding: 0 12px; }
+  .tool-item { width: 62px; height: 56px; margin-right: 6px; border-radius: 11px; }
+  .tool-item text { font-size: 18px; }
+  .tool-item view { margin-top: 3px; font-size: 12px; }
+  .tool-item.timer-active { width: 74px; }
+  .progress-bar { height: 52px; padding: 7px 16px; }
+  .progress-number { font-size: 13px; }
+  .progress-track { height: 5px; margin-top: 6px; }
+  .canvas-shell { height: calc(100vh - 72px - 52px - 104px - env(safe-area-inset-bottom)); padding-top: 22px; }
+  .axis-x { left: 19px; right: 19px; height: 19px; font-size: 11px; }
+  .axis-y { top: 30px; bottom: 9px; width: 20px; font-size: 11px; }
+  .gesture-hint { bottom: calc(174px + env(safe-area-inset-bottom)); padding: 6px 12px; font-size: 12px; }
+  .performance-hint { top: 136px; padding: 6px 11px; font-size: 12px; }
+  .zoom-control { left: 13px; bottom: calc(120px + env(safe-area-inset-bottom)); grid-template-columns: repeat(3,46px); height: 46px; border-width: 1px; border-radius: 14px; }
+  .zoom-control view { font-size: 21px; }
+  .zoom-control text { font-size: 13px; }
+  .work-button { bottom: calc(118px + env(safe-area-inset-bottom)); width: 196px; height: 50px; border-radius: 15px; font-size: 16px; }
+  .palette-dock { height: calc(104px + env(safe-area-inset-bottom)); padding: 10px 0 env(safe-area-inset-bottom); }
+  .palette-scroll, .palette-inner { height: 84px; }
+  .palette-inner { padding-left: 12px; }
+  .palette-all { width: 52px; height: 52px; margin-right: 9px; border-width: 2px; font-size: 13px; }
+  .palette-item { width: 56px; margin-right: 8px; }
+  .palette-color { width: 47px; height: 47px; border-width: 3px; font-size: 11px; }
+  .palette-count { margin-top: 3px; font-size: 12px; }
+}

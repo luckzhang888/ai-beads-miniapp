@@ -40,7 +40,36 @@
 .detail-actions button::after { border: 0; }
 
 @media (min-width: 768px) {
-  .main-preview { min-height: 650px; }
+  .detail-page { padding-top: 24px; padding-bottom: 100px; }
+  .preview-card, .info-card, .stats-card { margin-bottom: 16px; padding: 12px; border-width: 1px; border-radius: 18px; }
+  .detail-tabs { height: 52px; margin-bottom: 12px; padding: 4px; border-radius: 14px; }
+  .detail-tab { border-radius: 11px; font-size: 16px; }
+  .main-preview { min-height: 0; height: 420px; border-radius: 15px; }
+  .effect-scroll { margin-top: 11px; }
+  .effect-inner { gap: 8px; padding: 3px; }
+  .effect-chip { width: 47px; height: 47px; border-width: 3px; font-size: 12px; }
+  .info-card, .stats-card { padding: 19px; }
+  .pattern-title { font-size: 24px; }
+  .pattern-time { margin-top: 6px; font-size: 13px; }
+  .status-chip { padding: 7px 13px; font-size: 13px; }
+  .meta-row { margin-top: 19px; padding: 15px 0; border-width: 1px 0; }
+  .meta-item { gap: 6px; }
+  .meta-value { font-size: 17px; }
+  .meta-label { font-size: 12px; }
+  .tag-row { gap: 8px; margin-top: 14px; }
+  .tag { padding: 6px 11px; font-size: 13px; }
+  .stats-title { font-size: 20px; }
+  .stats-note { margin-top: 4px; font-size: 13px; }
+  .stock-state { padding: 7px 11px; font-size: 13px; }
   .color-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .color-grid { gap: 8px; margin-top: 15px; }
+  .color-item { height: 40px; padding: 0 9px; border-width: 1px; border-radius: 10px; }
+  .color-dot { width: 19px; height: 19px; margin-right: 6px; }
+  .color-code { font-size: 14px; }
+  .color-count { font-size: 13px; }
+  .color-gap { margin-left: 5px; font-size: 11px; }
+  .safe-bottom { height: calc(86px + env(safe-area-inset-bottom)); }
   .detail-actions { left: 50%; right: auto; width: min(100%, 1080px); transform: translateX(-50%); box-sizing: border-box; }
+  .detail-actions { grid-template-columns: 1fr 1fr 64px; gap: 9px; padding: 12px 17px calc(12px + env(safe-area-inset-bottom)); }
+  .detail-actions button { height: 56px; border-radius: 15px; font-size: 18px; }
 }

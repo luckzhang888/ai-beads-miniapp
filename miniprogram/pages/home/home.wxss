@@ -81,3 +81,18 @@
   font-size: 23rpx;
   line-height: 1.55;
 }
+
+@media (min-width: 768px) {
+  .hero { padding-top: 24px; }
+  .quick-grid { gap: 13px; }
+  .quick-card { padding: 17px; }
+  .quick-title { font-size: 20px; }
+  .quick-desc { margin-top: 7px; font-size: 15px; }
+  .quick-link, .all-link { margin-top: 11px; font-size: 15px; }
+  .pattern-item { padding: 15px 0; border-top-width: 1px; }
+  .pattern-item:first-of-type { margin-top: 10px; }
+  .pattern-name { font-size: 20px; }
+  .pattern-meta { margin-top: 4px; font-size: 16px; }
+  .arrow { font-size: 31px; }
+  .notice { padding: 6px 6px 22px; font-size: 15px; }
+}

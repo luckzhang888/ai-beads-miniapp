@@ -126,3 +126,29 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+@media (min-width: 768px) {
+  .compact-card { padding: 16px; }
+  .editor-head, .palette-head { gap: 12px; }
+  .meta { font-size: 15px; }
+  .tools { gap: 7px; margin-top: 14px; }
+  .secondary-tools { margin-top: 8px; }
+  .tools button, .save-btn { font-size: 14px; }
+  .zoom-text { min-width: 44px; font-size: 16px; }
+  .tip { margin: 12px 0 10px; padding: 10px 11px; border-radius: 10px; font-size: 15px; }
+  .selected-chip { width: 36px; height: 36px; border-radius: 10px; }
+  .color-actions { gap: 7px; margin: 12px 0; }
+  .color-actions button { font-size: 14px; }
+  .candidate-section { margin: 12px 0 14px; padding: 11px; border-radius: 12px; }
+  .candidate-scroll { margin-top: 8px; }
+  .candidate-inner { gap: 7px; }
+  .candidate-chip { grid-template-columns: 26px auto; column-gap: 6px; padding: 6px 9px; border-radius: 10px; font-size: 13px; }
+  .candidate-chip > view { width: 24px; height: 24px; border-width: 1px; border-radius: 6px; }
+  .candidate-chip text:last-child { font-size: 11px; }
+  .palette-grid { grid-template-columns: repeat(8,minmax(0,1fr)); gap: 9px; }
+  .palette-item { padding: 9px 6px; border-width: 1px; border-radius: 11px; }
+  .lock-tag { top: 4px; right: 4px; font-size: 11px; }
+  .swatch { width: 36px; height: 36px; margin-bottom: 4px; border-radius: 8px; }
+  .palette-code { font-size: 15px; }
+  .palette-name { font-size: 12px; }
+}

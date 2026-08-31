@@ -1,5 +1,13 @@
 const { matchImageData } = require('./color-match')
-const { recognizeGuideGrid, sampleGridCells, classifySampleRows } = require('./grid-recognition')
+const {
+  recognizeGuideGrid,
+  recognizeGenericGrid,
+  recognizePixelGrid,
+  recognizeKnownGrid,
+  nativePixelLikelihood,
+  sampleGridCells,
+  classifySampleRows
+} = require('./grid-recognition')
 
 function getImageInfo(src) {
   return new Promise((resolve, reject) => {
@@ -241,7 +249,37 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
   if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(image, 0, 0, info.width, info.height, 0, 0, width, height)
 
-  const detected = recognizeGuideGrid(ctx.getImageData(0, 0, width, height), width, height, palette, settings)
+  const recognitionData = ctx.getImageData(0, 0, width, height)
+  if (settings.inputMode === 'pixel' && width === info.width && height === info.height && width <= 192 && height <= 192) {
+    const nativeLikelihood = nativePixelLikelihood(recognitionData, width, height)
+    if (nativeLikelihood.ok) {
+      const nativeResult = recognizeKnownGrid(
+        recognitionData,
+        width,
+        height,
+        width,
+        height,
+        palette,
+        Object.assign({}, settings, { recognitionMode: 'native-pixel', confidence: 0.93 })
+      )
+      nativeResult.sourceWidth = info.width
+      nativeResult.sourceHeight = info.height
+      nativeResult.recognitionScale = 1
+      nativeResult.nativeColorBins = nativeLikelihood.unique
+      return nativeResult
+    }
+  }
+
+  const attempts = []
+  let detected = recognizeGuideGrid(recognitionData, width, height, palette, settings)
+  if (!detected.ok) {
+    attempts.push(detected.reason)
+    detected = recognizeGenericGrid(recognitionData, width, height, palette, settings)
+  }
+  if (!detected.ok) {
+    attempts.push(detected.reason)
+    detected = recognizePixelGrid(recognitionData, width, height, palette, settings)
+  }
   if (detected.ok) {
     const sourceCellWidth = detected.grid.cellWidth / scale
     const sourceCellHeight = detected.grid.cellHeight / scale
@@ -277,7 +315,8 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
     }
     const precise = classifySampleRows(sampleRows, palette, settings, {
       confidence: detected.confidence,
-      grid: detected.grid
+      grid: detected.grid,
+      recognitionMode: detected.recognitionMode
     })
     precise.sourceWidth = info.width
     precise.sourceHeight = info.height
@@ -286,20 +325,20 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
     return precise
   }
 
-  const fallback = await imageToPattern(imagePath, shortSide, palette, settings)
+  attempts.push(detected.reason)
+  const fallback = await imageToPattern(imagePath, shortSide, palette, Object.assign({}, settings, {
+    qualityMode: settings.fallbackQualityMode || 'easy'
+  }))
   fallback.recognitionMode = 'pixel-fallback'
-  fallback.recognitionReason = detected.reason || 'guide-grid-not-detected'
-  fallback.warning = '未检测到规则网格，已按普通图片生成；可在下一步校准尺寸和色号。'
+  fallback.recognitionReason = attempts.filter(Boolean).join(',') || 'grid-not-detected'
+  fallback.warning = '这张图未检测到可靠网格，已按普通图片转换为不超过 24 色。请先确认网格尺寸，再保存。'
   return fallback
 }
 
 function recommendPatternSize(width, height) {
   const shortSide = Math.min(Number(width) || 0, Number(height) || 0)
-  if (shortSide >= 2200) return 128
-  if (shortSide >= 1200) return 96
-  if (shortSide >= 700) return 80
-  if (shortSide >= 400) return 64
-  return 48
+  if (shortSide >= 384) return 48
+  return 32
 }
 
 module.exports = {

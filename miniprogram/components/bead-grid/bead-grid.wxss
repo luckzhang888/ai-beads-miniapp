@@ -41,3 +41,8 @@ canvas {
   background: linear-gradient(145deg, #f7f5fa, #eef6f4);
   font-size: 22rpx;
 }
+
+@media (min-width: 768px) {
+  .grid-scroll, .grid-movable-area { border-width: 1px; border-radius: 12px; }
+  .grid-rendering { font-size: 15px; }
+}
