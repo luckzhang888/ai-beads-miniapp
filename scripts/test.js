@@ -1,4 +1,6 @@
 const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
 const palette = require('../miniprogram/data/colors/mard')
 const { rgbToLab, deltaE2000 } = require('../miniprogram/utils/lab')
 const { preparePalette, findNearestColor, cleanupMatrix, shouldTreatAsBlank, matchImageData, mergeSimilarColors } = require('../miniprogram/utils/color-match')
@@ -25,6 +27,14 @@ global.wx = {
 const patternUtils = require('../miniprogram/utils/pattern')
 const inventoryUtils = require('../miniprogram/utils/inventory')
 const activityUtils = require('../miniprogram/utils/activity')
+
+const appConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../miniprogram/app.json'), 'utf8'))
+const inventoryStyles = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/inventory/inventory.wxss'), 'utf8')
+const patternStyles = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/patterns/patterns.wxss'), 'utf8')
+assert.strictEqual(appConfig.resizable, true, 'iPad must be allowed to resize into the full available window')
+assert.strictEqual(appConfig.window.pageOrientation, 'auto', 'tablet preview must follow device orientation')
+assert.match(inventoryStyles, /@media \(min-width: 900px\)[\s\S]*repeat\(6/)
+assert.match(patternStyles, /\.selection-bar \{ left: 184px;/)
 
 function approximately(actual, expected, tolerance) {
   assert.ok(Math.abs(actual - expected) <= tolerance, actual + ' is not within ' + tolerance + ' of ' + expected)

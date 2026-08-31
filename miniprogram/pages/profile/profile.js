@@ -5,7 +5,7 @@ const { getActivities } = require('../../utils/activity')
 Page({
   data: {
     appName: '豆仓助手',
-    version: '0.5.0',
+    version: '0.5.1',
     patternCount: 0,
     totalStock: 0,
     recordCount: 0,

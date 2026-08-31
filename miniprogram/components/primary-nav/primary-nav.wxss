@@ -15,13 +15,13 @@
 .primary-item.active { color: #6544ca; background: #eee8fb; font-weight: 750; box-shadow: 0 6rpx 18rpx rgba(101,68,202,.08); }
 
 @media (min-width: 768px) {
-  .primary-shell { position: fixed; z-index: 30; left: 0; top: 0; bottom: 0; width: 220px; margin: 0; padding: 30px 18px; box-sizing: border-box; border-right: 1px solid #ebe8ef; background: rgba(255,255,255,.97); }
+  .primary-shell { position: fixed; z-index: 30; left: 0; top: 0; bottom: 0; width: 184px; margin: 0; padding: 26px 14px; box-sizing: border-box; border-right: 1px solid #ebe8ef; background: rgba(255,255,255,.97); }
   .brand-row { padding: 0 5px 30px; }
   .brand-mark { width: 52px; height: 52px; margin-right: 12px; border-radius: 17px; }
   .brand-cube { transform: scale(.78); }
-  .brand-name { font-size: 23px; }
+  .brand-name { font-size: 20px; }
   .brand-note { font-size: 12px; }
   .primary-scroll { height: auto; overflow: visible; }
   .primary-items { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 0; }
-  .primary-item { width: 100%; min-width: 0; padding: 15px 18px; border-radius: 14px; text-align: left; font-size: 17px; }
+  .primary-item { width: 100%; min-width: 0; padding: 13px 16px; border-radius: 12px; text-align: left; font-size: 15px; }
 }

@@ -20,6 +20,19 @@
 .empty-state button { color: white; border-radius: 18rpx; background: #694ad2; }
 
 @media (min-width: 768px) {
+  .inspiration-page { padding-top: 24px; padding-bottom: 48px; }
+  .inspiration-hero { padding: 18px; border-radius: 18px; }
+  .hero-title { font-size: 25px; }
+  .hero-note { margin-top: 5px; font-size: 14px; }
+  .inspiration-hero button { border-radius: 12px; font-size: 14px; }
+  .search-box { height: 56px; margin: 16px 0; padding: 0 16px; gap: 9px; border-width: 1px; border-radius: 15px; }
+  .search-box input { font-size: 15px; }
+  .section-title { margin: 18px 2px 13px; font-size: 21px; }
+  .section-title text { font-size: 14px; }
   .inspiration-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
-  .preview { height: 250px; }
+  .inspiration-card { border-width: 1px; border-radius: 16px; }
+  .preview { height: 220px; }
+  .collect-button { right: 10px; top: 10px; width: 38px; height: 38px; font-size: 21px; }
+  .card-name { padding: 12px 12px 4px; font-size: 17px; }
+  .card-meta { padding: 0 12px 13px; font-size: 13px; }
 }

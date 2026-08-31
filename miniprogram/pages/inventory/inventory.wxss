@@ -443,8 +443,65 @@
 }
 
 @media (min-width: 768px) {
-  .stock-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 18px; }
-  .color-grid { grid-template-columns: repeat(8,minmax(0,1fr)); }
-  .stock-entry-sheet, .consumption-sheet { max-width: 980px; margin: 0 auto; }
+  .warehouse-page { padding-top: 24px; padding-bottom: 48px; }
+  .warehouse-header { gap: 16px; padding: 8px 0 20px; }
+  .warehouse-title { font-size: 30px; }
+  .warehouse-subtitle { margin-top: 4px; font-size: 15px; }
+  .warehouse-header-actions { gap: 8px; }
+  .header-stock-action { padding: 9px 14px; border-width: 1px; font-size: 14px; }
+  .brand-scroll { margin-bottom: 14px; }
+  .brand-tabs { gap: 8px; }
+  .brand-tab { padding: 8px 15px; border-width: 1px; font-size: 14px; }
+  .summary-row { gap: 12px; margin-bottom: 15px; }
+  .summary-label { font-size: 20px; }
+  .summary-pill, .low-pill { padding: 10px 17px; border-width: 1px; border-radius: 24px; }
+  .summary-number { font-size: 22px; }
+  .summary-unit, .low-pill { font-size: 15px; }
+  .inventory-quick-actions { gap: 10px; margin-bottom: 16px; }
+  .quick-action { padding: 12px 7px; border-width: 1px; border-radius: 12px; font-size: 14px; }
+  .search-wrap { height: 54px; padding: 0 16px; border-width: 1px; border-radius: 13px; }
+  .search-icon { margin-right: 10px; font-size: 26px; }
+  .search-input { font-size: 17px; }
+  .series-scroll { margin-top: 16px; }
+  .series-tabs { gap: 8px; padding-right: 16px; }
+  .series-tab { min-width: 44px; padding: 9px 14px; border-width: 1px; border-radius: 20px; font-size: 15px; }
+  .toolbar { gap: 12px; margin: 13px 0 16px; }
+  .sort-options, .view-switch { gap: 7px; }
+  .tool-pill { padding: 9px 14px; border-width: 1px; border-radius: 18px; font-size: 14px; }
+  .view-switch { padding: 4px; border-width: 1px; border-radius: 20px; }
+  .view-button { min-width: 34px; padding: 6px 8px; border-radius: 15px; }
+  .series-header { min-height: 58px; padding: 0 5px; }
+  .series-name { font-size: 22px; }
+  .series-meta { font-size: 15px; }
+  .stock-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; padding-bottom: 12px; }
+  .stock-card { padding: 12px; border-width: 1px; border-radius: 14px; }
+  .stock-card-top { min-width: 0; gap: 6px; margin-bottom: 9px; }
+  .stock-code { flex: none; font-size: 18px; }
+  .status { padding: 3px 7px; border-width: 1px; border-radius: 12px; font-size: 12px; white-space: nowrap; }
+  .color-panel { min-height: 58px; padding: 8px 10px; border-width: 1px; border-radius: 9px; }
+  .stock-value { min-width: 0; font-size: 28px; line-height: 1.15; }
+  .stock-unit { flex: none; margin-left: 3px; font-size: 13px; }
+  .mini-actions { gap: 7px; margin-top: 8px; }
+  .mini-actions view { padding: 4px 10px; border-radius: 12px; font-size: 13px; }
+  .color-grid { grid-template-columns: repeat(8,minmax(0,1fr)); gap: 14px 10px; }
+  .tile-color { height: 78px; border-width: 1px; border-radius: 10px; }
+  .tile-code { padding: 2px 4px; font-size: 18px; }
+  .tile-stock { height: 30px; font-size: 15px; }
+  .page-note { margin-top: 20px; font-size: 13px; }
+  .transaction-section { margin-top: 22px; padding: 16px; border-width: 1px; border-radius: 15px; }
+  .transaction-head { margin-bottom: 8px; }
+  .transaction-title { font-size: 19px; }
+  .all-records { font-size: 14px; }
+  .transaction-row { gap: 10px; padding: 11px 0; border-top-width: 1px; }
+  .transaction-thumb { width: 52px; height: 52px; border-radius: 9px; }
+  .transaction-name { font-size: 16px; }
+  .transaction-meta, .undone-label { margin-top: 4px; font-size: 13px; }
   .package-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .full-mask { left: 184px; }
+  .stock-entry-page, .consumption-page { max-width: 1080px; margin: 0 auto; }
+}
+
+@media (min-width: 900px) {
+  .stock-grid { grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .color-grid { grid-template-columns: repeat(10,minmax(0,1fr)); }
 }

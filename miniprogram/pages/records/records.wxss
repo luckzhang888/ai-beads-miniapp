@@ -47,6 +47,32 @@
 .empty-records { padding: 130rpx 20rpx; color: #9d96a2; text-align: center; }
 
 @media (min-width: 768px) {
+  .records-page { padding-top: 24px; padding-bottom: 48px; }
+  .record-summary { padding: 18px 8px; border-radius: 18px; }
+  .record-summary > view { gap: 4px; }
+  .record-summary > view + view { border-left-width: 1px; }
+  .summary-value { font-size: 24px; }
+  .summary-value.timer { font-size: 18px; }
+  .summary-label { font-size: 13px; }
+  .filter-scroll { margin: 16px 0; }
+  .filter-row { gap: 8px; }
+  .filter-pill { min-width: 66px; padding: 9px 16px; border-width: 1px; font-size: 14px; }
   .record-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
-  .record-card { margin-bottom: 0; }
+  .record-card { margin-bottom: 0; padding: 16px; border-width: 1px; border-radius: 16px; }
+  .record-head { gap: 10px; }
+  .record-heading { gap: 9px; }
+  .direction-icon { width: 40px; height: 40px; border-radius: 12px; font-size: 22px; }
+  .heading-copy view { font-size: 17px; }
+  .heading-copy > text { margin-top: 4px; font-size: 12px; }
+  .record-amount { font-size: 17px; }
+  .pattern-record { margin-top: 13px; padding: 9px; gap: 10px; border-radius: 12px; }
+  .pattern-record-thumb { width: 50px; height: 50px; border-radius: 10px; }
+  .pattern-record > view:last-child view { font-size: 15px; }
+  .pattern-record > view:last-child text { margin-top: 3px; font-size: 12px; }
+  .activity-description { margin-top: 11px; padding: 10px 12px; border-radius: 11px; font-size: 14px; }
+  .change-list { gap: 6px; margin-top: 13px; }
+  .change-chip { min-width: 78px; padding: 6px 8px; gap: 5px; border-width: 1px; border-radius: 8px; font-size: 12px; }
+  .change-dot { width: 15px; height: 15px; border-width: 1px; }
+  .record-footer { min-height: 40px; gap: 10px; margin-top: 10px; padding-top: 10px; border-top-width: 1px; }
+  .detail-toggle, .item-count, .undone-label { font-size: 13px; }
 }

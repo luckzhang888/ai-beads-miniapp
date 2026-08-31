@@ -21,3 +21,23 @@
 .menu-card .menu-value { width: auto; color: #8e8596; font-size: 21rpx; }
 .menu-card .menu-arrow { width: auto; color: #b1aab7; font-size: 32rpx; font-weight: 400; }
 .privacy-note { padding: 31rpx 18rpx; color: #9a929f; font-size: 20rpx; line-height: 1.6; text-align: center; }
+
+@media (min-width: 768px) {
+  .profile-page { padding-top: 24px; padding-bottom: 48px; }
+  .profile-card { gap: 14px; padding: 19px; border-radius: 19px; }
+  .profile-logo { width: 58px; height: 58px; border-radius: 18px; }
+  .profile-name { font-size: 24px; }
+  .profile-version { margin-top: 5px; font-size: 13px; }
+  .stats-card { margin: 14px 0; padding: 18px 8px; border-radius: 18px; }
+  .stats-card view + view { border-left-width: 1px; }
+  .stats-card text { font-size: 22px; }
+  .stats-card .stat-label { margin-top: 4px; font-size: 13px; }
+  .menu-card { border-radius: 18px; }
+  .menu-card > view { min-height: 64px; padding: 0 16px; gap: 11px; }
+  .menu-card > view + view { border-top-width: 1px; }
+  .menu-card text { width: 30px; font-size: 20px; }
+  .menu-card .menu-label { font-size: 17px; }
+  .menu-card .menu-value { font-size: 14px; }
+  .menu-card .menu-arrow { font-size: 22px; }
+  .privacy-note { padding: 22px 13px; font-size: 13px; }
+}

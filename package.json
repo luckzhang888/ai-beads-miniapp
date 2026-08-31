@@ -1,6 +1,6 @@
 {
   "name": "ai-beads-miniapp",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "豆仓助手微信原生小程序",
   "scripts": {

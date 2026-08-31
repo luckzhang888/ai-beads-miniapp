@@ -74,9 +74,9 @@ page {
   .inspiration-page,
   .records-page,
   .profile-page {
-    width: calc(100% - 220px);
+    width: calc(100% - 184px);
     min-height: 100vh;
-    margin-left: 220px;
+    margin-left: 184px;
     padding-left: clamp(24px, 4vw, 52px);
     padding-right: clamp(24px, 4vw, 52px);
   }

@@ -90,11 +90,55 @@
 .folder-manage-list { overflow-y: auto; max-height: 650rpx; }
 
 @media (min-width: 768px) {
-  .pattern-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
-  .pattern-preview { height: 260px; }
-  .upload-button { right: 38px; width: 210px; }
-  .selection-bar { left: 220px; padding-left: 42px; padding-right: 42px; }
+  .library-page { padding-top: 24px; padding-bottom: 0; }
+  .brand-bar { padding: 6px 3px 18px; }
+  .brand-actions { gap: 9px; }
+  .manage-link, .inventory-link { padding: 9px 14px; font-size: 14px; }
+  .summary-card { height: 86px; padding: 0 6px; border-radius: 20px; }
+  .summary-item text { font-size: 25px; }
+  .summary-item view { margin-top: 4px; font-size: 13px; }
+  .summary-line { width: 1px; height: 38px; }
+  .search-box { height: 56px; margin-top: 16px; padding: 0 18px; border-radius: 16px; }
+  .search-box input { margin: 0 11px; font-size: 15px; }
+  .search-icon { font-size: 23px; }
+  .filter-scroll { margin-top: 14px; }
+  .filter-inner, .folder-inner { gap: 9px; }
+  .filter-pill { padding: 8px 16px; font-size: 15px; }
+  .section-head { margin: 24px 2px 14px; }
+  .section-name { font-size: 22px; }
+  .section-count { font-size: 14px; }
+  .pattern-head-actions, .folder-head-actions { gap: 9px; }
+  .create-folder, .manage-folders { padding: 7px 13px; border-width: 1px; font-size: 14px; }
+  .folder-inner { padding-right: 16px; }
+  .folder-card { width: 240px; padding: 10px; border-width: 1px; border-radius: 16px; }
+  .folder-card.selected { border-width: 2px; }
+  .folder-count { top: 14px; left: 14px; padding: 5px 10px; font-size: 13px; }
+  .folder-preview { height: 170px; border-radius: 12px; }
+  .folder-preview.empty-folder { border-width: 1px; font-size: 38px; }
+  .folder-name { padding: 12px 6px 5px; font-size: 16px; }
+  .pattern-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+  .pattern-card { border-width: 1px; border-radius: 16px; }
+  .pattern-card.selected { border-width: 2px; }
+  .select-circle { top: 10px; left: 10px; width: 36px; height: 36px; border-width: 2px; }
+  .pattern-preview { height: 210px; }
+  .pattern-copy { padding: 12px; }
+  .pattern-name { font-size: 17px; }
+  .pattern-meta { margin-top: 6px; font-size: 13px; }
+  .status-badge { top: 10px; right: 10px; padding: 5px 10px; font-size: 13px; }
+  .ready-label { margin-top: 7px; padding: 4px 8px; font-size: 12px; }
+  .pattern-grid.list-mode .pattern-card { grid-template-columns: 160px minmax(0,1fr); }
+  .pattern-grid.list-mode .pattern-preview { height: 160px; }
+  .safe-bottom { height: calc(100px + env(safe-area-inset-bottom)); }
+  .upload-button { right: 28px; bottom: calc(22px + env(safe-area-inset-bottom)); width: 190px; height: 58px; border-radius: 16px; font-size: 18px; }
+  .selection-bar { left: 184px; min-height: 100px; padding: 10px 32px calc(10px + env(safe-area-inset-bottom)); }
+  .selection-count { margin-bottom: 7px; font-size: 15px; }
+  .selection-actions { gap: 7px; }
+  .selection-bar button { height: 44px; padding: 0 4px; border-radius: 12px; font-size: 14px; line-height: 44px; }
   .filter-sheet { max-width: 760px; margin: 0 auto; }
+}
+
+@media (min-width: 1100px) {
+  .pattern-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 .folder-manage-row { min-height: 105rpx; display: grid; grid-template-columns: 60rpx minmax(0,1fr) 242rpx; align-items: center; gap: 14rpx; border-bottom: 1rpx solid #ece8f0; }
 .folder-manage-icon { width: 55rpx; height: 55rpx; display: flex; align-items: center; justify-content: center; border-radius: 16rpx; color: #6849d1; background: #eee8fa; }
