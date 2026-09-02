@@ -153,15 +153,15 @@
           <view class="entry-card batch-card">
             <view class="batch-card-head"><view class="entry-card-title">逐色号批量录入</view><view class="batch-clear" bindtap="clearBatchEntries">清空</view></view>
             <scroll-view scroll-x class="batch-series-scroll" enhanced show-scrollbar="false">
-              <view class="batch-series-row"><view wx:for="{{seriesOptions}}" wx:key="*this" class="batch-series-pill {{batchSeries === item ? 'active' : ''}}" data-series="{{item}}" bindtap="selectBatchSeries">{{item === 'ALL' ? '全部' : item}}</view></view>
+              <view class="batch-series-row"><view wx:for="{{seriesOptions}}" wx:key="code" class="batch-series-pill {{batchSeries === item.code ? 'active' : ''}}" data-series="{{item.code}}" bindtap="selectBatchSeries">{{item.label}}</view></view>
             </scroll-view>
             <view class="batch-list">
               <view class="batch-row" wx:for="{{batchRows}}" wx:key="code">
                 <view class="batch-code"><text style="background: {{item.hex}};"></text>{{item.code}}</view>
-                <input type="number" placeholder="数量" value="{{item.amount}}" data-code="{{item.code}}" bindinput="inputBatchAmount" />
-                <view class="batch-preset" data-code="{{item.code}}" data-amount="500" bindtap="quickBatchAmount">+500</view>
-                <view class="batch-preset" data-code="{{item.code}}" data-amount="1000" bindtap="quickBatchAmount">+1000</view>
-                <view class="batch-preset" data-code="{{item.code}}" data-amount="1200" bindtap="quickBatchAmount">+1200</view>
+                <input type="number" placeholder="数量" value="{{item.amount}}" data-code="{{item.code}}" data-index="{{index}}" bindinput="inputBatchAmount" />
+                <view class="batch-preset" data-code="{{item.code}}" data-index="{{index}}" data-amount="500" bindtap="quickBatchAmount">+500</view>
+                <view class="batch-preset" data-code="{{item.code}}" data-index="{{index}}" data-amount="1000" bindtap="quickBatchAmount">+1000</view>
+                <view class="batch-preset" data-code="{{item.code}}" data-index="{{index}}" data-amount="1200" bindtap="quickBatchAmount">+1200</view>
               </view>
             </view>
           </view>

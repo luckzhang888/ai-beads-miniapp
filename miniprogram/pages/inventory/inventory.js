@@ -326,24 +326,42 @@ Page({
     const batchTotalAmount = selectedCodes.reduce((sum, code) => sum + Number(amounts[code] || 0), 0)
     this.setData({ batchRows, batchSelectedCount: selectedCodes.length, batchTotalAmount })
   },
+  updateBatchAmountView(code, amount, visibleIndex) {
+    const amounts = this._batchAmounts || {}
+    const selectedCodes = Object.keys(amounts).filter((itemCode) => Number(amounts[itemCode]) > 0)
+    const updates = {
+      batchSelectedCount: selectedCodes.length,
+      batchTotalAmount: selectedCodes.reduce((sum, itemCode) => sum + Number(amounts[itemCode] || 0), 0)
+    }
+    let index = Number(visibleIndex)
+    if (!Number.isInteger(index) || !this.data.batchRows[index] || this.data.batchRows[index].code !== code) {
+      index = this.data.batchRows.findIndex((item) => item.code === code)
+    }
+    if (index >= 0) updates['batchRows[' + index + '].amount'] = amount ? String(amount) : ''
+    this.setData(updates)
+  },
   selectBatchSeries(event) {
-    this.setData({ batchSeries: event.currentTarget.dataset.series || 'ALL' }, () => this.refreshBatchRows())
+    const series = event.currentTarget.dataset.series
+    const batchSeries = series === 'ALL' || SERIES.indexOf(series) >= 0 ? series : 'ALL'
+    this.setData({ batchSeries }, () => this.refreshBatchRows())
   },
   inputBatchAmount(event) {
     const code = event.currentTarget.dataset.code
+    const visibleIndex = event.currentTarget.dataset.index
     const amount = Math.max(0, Math.floor(Number(event.detail.value) || 0))
     if (!this._batchAmounts) this._batchAmounts = {}
     if (amount) this._batchAmounts[code] = amount
     else delete this._batchAmounts[code]
-    this.refreshBatchRows()
+    this.updateBatchAmountView(code, amount, visibleIndex)
   },
   quickBatchAmount(event) {
     const code = event.currentTarget.dataset.code
+    const visibleIndex = event.currentTarget.dataset.index
     const increment = Math.max(0, Math.floor(Number(event.currentTarget.dataset.amount) || 0))
     if (!code || !increment) return
     if (!this._batchAmounts) this._batchAmounts = {}
     this._batchAmounts[code] = Number(this._batchAmounts[code] || 0) + increment
-    this.refreshBatchRows()
+    this.updateBatchAmountView(code, this._batchAmounts[code], visibleIndex)
   },
   clearBatchEntries() {
     this._batchAmounts = {}

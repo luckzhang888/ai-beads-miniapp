@@ -1,4 +1,15 @@
 const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+function applyDataUpdate(data, key, value) {
+  const parts = key.replace(/\[(\d+)\]/g, '.$1').split('.')
+  let target = data
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    target = target[parts[index]]
+  }
+  target[parts[parts.length - 1]] = value
+}
 
 async function main() {
   const storage = new Map()
@@ -39,7 +50,7 @@ async function main() {
     return Object.assign({}, definition, {
       data: JSON.parse(JSON.stringify(definition.data)),
       setData(next, callback) {
-        this.data = Object.assign({}, this.data, next)
+        Object.keys(next).forEach((key) => applyDataUpdate(this.data, key, next[key]))
         if (callback) callback()
       }
     })
@@ -113,8 +124,28 @@ async function main() {
   assert.strictEqual(navigationLog[navigationLog.length - 1], '/pages/convert/convert?mode=recognize')
   inventory.openStockEntry({ currentTarget: { dataset: { tab: 'batch', direction: 1 } } })
   assert.strictEqual(inventory.data.batchRows.length, 295)
-  inventory.inputBatchAmount({ currentTarget: { dataset: { code: 'A1' } }, detail: { value: '500' } })
-  inventory.quickBatchAmount({ currentTarget: { dataset: { code: 'A2', amount: '1000' } } })
+  inventory.selectBatchSeries({ currentTarget: { dataset: { series: 'A' } } })
+  assert.strictEqual(inventory.data.batchRows.length, 26)
+  assert.ok(inventory.data.batchRows.every((item) => item.series === 'A'))
+  inventory.selectBatchSeries({ currentTarget: { dataset: { series: 'P' } } })
+  assert.strictEqual(inventory.data.batchRows.length, 23)
+  assert.ok(inventory.data.batchRows.every((item) => item.series === 'P'))
+  inventory.selectBatchSeries({ currentTarget: { dataset: { series: 'ALL' } } })
+  assert.strictEqual(inventory.data.batchRows.length, 295)
+  const inventoryTemplate = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/inventory/inventory.wxml'), 'utf8')
+  assert.ok(inventoryTemplate.includes('data-series="{{item.code}}"'))
+  assert.ok(inventoryTemplate.includes('{{item.label}}'))
+  const batchUpdates = []
+  const updateInventoryData = inventory.setData.bind(inventory)
+  inventory.setData = (next, callback) => {
+    batchUpdates.push(next)
+    updateInventoryData(next, callback)
+  }
+  inventory.inputBatchAmount({ currentTarget: { dataset: { code: 'A1', index: 0 } }, detail: { value: '500' } })
+  const inputUpdate = batchUpdates[batchUpdates.length - 1]
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(inputUpdate, 'batchRows'), false)
+  assert.strictEqual(inputUpdate['batchRows[0].amount'], '500')
+  inventory.quickBatchAmount({ currentTarget: { dataset: { code: 'A2', index: 1, amount: '1000' } } })
   assert.strictEqual(inventory.data.batchSelectedCount, 2)
   assert.strictEqual(inventory.data.batchTotalAmount, 1500)
   inventory.confirmStockEntry()
@@ -190,7 +221,7 @@ async function main() {
   assert.strictEqual(library.data.folders.length, 0)
 
   delete global.wx
-  console.log('UX regression passed: folder ordering/lifecycle, bulk move/delete, AI entry routing, per-color batch intake, stock records, package intake + undo, multi-pattern consumption, and native 100-event pinch without controlled-state refresh.')
+  console.log('UX regression passed: folder ordering/lifecycle, bulk move/delete, AI entry routing, 295-color series filtering and incremental batch intake, stock records, package intake + undo, multi-pattern consumption, and native 100-event pinch without controlled-state refresh.')
 }
 
 main().catch((error) => {
