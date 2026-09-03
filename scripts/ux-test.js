@@ -14,25 +14,33 @@ function applyDataUpdate(data, key, value) {
 async function main() {
   const storage = new Map()
   const modalLog = []
+  const modalDetails = []
+  const toastLog = []
   const navigationLog = []
   let actionSheetTapIndex = 0
+  let storageFailure = () => false
+  const copy = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value))
   global.wx = {
     env: { USER_DATA_PATH: 'tmp' },
-    getStorageSync(key) { return storage.get(key) },
-    setStorageSync(key, value) { storage.set(key, value) },
+    getStorageSync(key) { return copy(storage.get(key)) },
+    setStorageSync(key, value) {
+      if (storageFailure(key, value)) throw new Error('setStorageSync:fail injected quota error')
+      storage.set(key, copy(value))
+    },
     removeStorageSync(key) { storage.delete(key) },
     getSystemInfoSync() { return { windowWidth: 375, windowHeight: 812, pixelRatio: 3 } },
-    showToast() {},
+    showToast(options) { toastLog.push(options.title) },
     showLoading() {},
     hideLoading() {},
     stopPullDownRefresh() {},
     navigateTo(options) { navigationLog.push(options.url) },
     navigateBack() {},
-    redirectTo() {},
+    redirectTo(options) { navigationLog.push(options.url) },
     setClipboardData() {},
     showModal(options) {
       assert.ok(!options.confirmText || Array.from(options.confirmText).length <= 4, 'showModal confirmText must not exceed 4 characters')
       modalLog.push(options.title)
+      modalDetails.push(options)
       if (options.success) options.success({ confirm: true, content: options.content || '' })
     },
     showActionSheet(options) {
@@ -220,8 +228,98 @@ async function main() {
   library.refresh()
   assert.strictEqual(library.data.folders.length, 0)
 
+  // Storage failures must leave pages usable and must never show save success.
+  const originalError = console.error
+  let expectedErrors = 0
+  try {
+    console.error = () => { expectedErrors += 1 }
+    const failPatternWrites = (key) => key.startsWith('savedPatternRecord:v2:') || key === 'savedPatternIndex:v2'
+    const editor = loadPage('../miniprogram/pages/editor/editor')
+    editor.onLoad({ id: p1.id })
+    editor.setData({ matrix: [['F5', 'A1'], ['A1', 'B7']], dirty: true })
+    const originalDrawing = patternUtils.getPatternById(p1.id)
+    storageFailure = failPatternWrites
+    const beforeToast = toastLog.length
+    assert.strictEqual(editor.persist(true), null)
+    assert.strictEqual(editor.data.dirty, true)
+    assert.strictEqual(editor.data.matrix[0][0], 'F5', 'failed save retains edits in the open editor')
+    assert.deepStrictEqual(patternUtils.getPatternById(p1.id), originalDrawing)
+    assert.strictEqual(toastLog.length, beforeToast)
+    assert.strictEqual(modalLog[modalLog.length - 1], '图纸存储失败')
+    storageFailure = () => false
+    assert.ok(editor.persist(true))
+    assert.strictEqual(editor.data.dirty, false)
+    assert.strictEqual(patternUtils.getPatternById(p1.id).matrix[0][0], 'F5')
+
+    const workspace = loadPage('../miniprogram/pages/pattern/pattern')
+    workspace.onLoad({ id: p1.id })
+    workspace.onShow()
+    workspace.setData({ highlightCode: 'A1', working: true })
+    storageFailure = failPatternWrites
+    workspace.progressUndoStack = Array.from({ length: 20 }, () => [0])
+    const undoBefore = copy(workspace.progressUndoStack)
+    const progressBefore = copy(workspace.data.completedIndices)
+    assert.strictEqual(workspace.applyProgressTargets([0]), false)
+    assert.deepStrictEqual(workspace.progressUndoStack, undoBefore)
+    workspace.undoProgress()
+    assert.deepStrictEqual(workspace.progressUndoStack, undoBefore)
+    workspace.completeSelectedColor()
+    assert.deepStrictEqual(workspace.data.completedIndices, progressBefore)
+    assert.strictEqual(workspace.data.working, true)
+    assert.notStrictEqual(toastLog[toastLog.length - 1], '该色格子已完成')
+    const beforeGestureDialogs = modalLog.length
+    workspace.persistViewState()
+    await new Promise((resolve) => setTimeout(resolve, 220))
+    workspace.persistViewState()
+    await new Promise((resolve) => setTimeout(resolve, 220))
+    assert.strictEqual(modalLog.length, beforeGestureDialogs + 1, 'repeated failed view saves show only one warning')
+
+    library.refresh()
+    library.enterSelection({ currentTarget: { dataset: { id: p1.id } } })
+    library.selectAllVisible()
+    const statusesBefore = patternUtils.getSavedPatterns().map((item) => item.status)
+    actionSheetTapIndex = 3
+    library.setSelectedStatus()
+    assert.deepStrictEqual(patternUtils.getSavedPatterns().map((item) => item.status), statusesBefore)
+    assert.strictEqual(library.data.selectionMode, true)
+    assert.strictEqual(library.data.selectedCount, 2)
+
+    const importer = loadPage('../miniprogram/pages/convert/convert')
+    const result = { matrix: [['A1', 'F5']], width: 2, height: 1, stats: [], usedColorCount: 2, beadCount: 2 }
+    importer.setData({ recognitionResult: result })
+    const countBeforeImport = patternUtils.getSavedPatterns().length
+    const navBeforeImport = navigationLog.length
+    importer.saveRecognitionResult({ currentTarget: { dataset: { target: 'detail' } } })
+    assert.strictEqual(importer.data.recognitionSaving, false)
+    assert.strictEqual(importer.data.recognitionResult, result, 'failed import remains available for retry')
+    assert.strictEqual(patternUtils.getSavedPatterns().length, countBeforeImport)
+    assert.strictEqual(navigationLog.length, navBeforeImport)
+
+    importer.getImageInfo = async () => ({ width: 2, height: 1 })
+    let processed = 0
+    importer.processCurrentImage = async () => { processed += 1; return result }
+    storageFailure = (key) => key.startsWith('savedPatternRecord:v2:') && processed >= 2
+    await importer.processBatchImages(['first.png', 'second.png', 'third.png'])
+    assert.strictEqual(processed, 2, 'batch must stop on storage failure instead of continuing to fail')
+    assert.strictEqual(patternUtils.getSavedPatterns().length, countBeforeImport + 1)
+    assert.strictEqual(importer.data.batchImporting, false)
+    assert.ok(modalDetails[modalDetails.length - 1].content.includes('已保存 1/3 张'))
+    assert.strictEqual(navigationLog.length, navBeforeImport)
+
+    // A secondary activity write failure is not an import failure.
+    storageFailure = (key) => key === 'beadActivities:v1'
+    importer.saveRecognitionResult({ currentTarget: { dataset: { target: 'detail' } } })
+    assert.strictEqual(patternUtils.getSavedPatterns().length, countBeforeImport + 2)
+    assert.strictEqual(navigationLog.length, navBeforeImport + 1)
+    assert.strictEqual(modalLog[modalLog.length - 1], '图纸已保存')
+    assert.ok(expectedErrors >= 8)
+  } finally {
+    console.error = originalError
+    storageFailure = () => false
+  }
+
   delete global.wx
-  console.log('UX regression passed: folder ordering/lifecycle, bulk move/delete, AI entry routing, 295-color series filtering and incremental batch intake, stock records, package intake + undo, multi-pattern consumption, and native 100-event pinch without controlled-state refresh.')
+  console.log('UX regression passed: folders, bulk actions, 295-color series, stock + undo, consumption, native 100-event pinch, and storage-failure feedback/retry in editor, progress and imports.')
 }
 
 main().catch((error) => {

@@ -5,7 +5,7 @@ const {
   cloneMatrix,
   getCurrentPattern,
   getPatternById,
-  savePattern,
+  trySavePattern: savePattern,
   setCurrentPattern,
   mirrorHorizontal,
   mirrorVertical,
@@ -323,6 +323,7 @@ Page({
       completedCellIndices: [],
       completedCodes: []
     }), mardPalette)
+    if (!saved) return null
     setCurrentPattern(saved)
     this.setData({ pattern: saved, dirty: false })
     if (showToast) wx.showToast({ title: '图纸已保存', icon: 'success' })

@@ -7,9 +7,10 @@
     "check": "node scripts/check.js",
     "test": "node scripts/test.js",
     "test:ux": "node scripts/ux-test.js",
+    "test:storage": "node scripts/storage-test.js",
     "test:tablet": "node scripts/tablet-audit.js",
     "compile:local": "node scripts/compile-local.js",
-    "verify": "npm run check && npm test && npm run test:ux && npm run test:tablet && npm run compile:local",
+    "verify": "npm run check && npm test && npm run test:storage && npm run test:ux && npm run test:tablet && npm run compile:local",
     "preview": "node scripts/preview.js"
   },
   "devDependencies": {

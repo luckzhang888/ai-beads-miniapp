@@ -29,10 +29,18 @@ function recordActivity(type, details) {
     durationMs: Math.max(0, Number(value.durationMs) || 0),
     metadata: value.metadata || {}
   }
-  const records = getActivities()
-  records.unshift(record)
-  saveActivities(records)
+  saveActivities([record].concat(getActivities()))
   return record
+}
+
+// The drawing is already committed when these informational records are made.
+// A full activity cache must not misreport a successful import as a failed one.
+function recordPatternActivity(type, details) {
+  try { return recordActivity(type, details) } catch (error) {
+    console.error('Pattern activity was not saved', error)
+    wx.showModal({ title: '图纸已保存', content: '图纸更改已保存，但本次操作记录写入失败。请检查本地存储空间；无需重复导入图纸。', showCancel: false })
+    return null
+  }
 }
 
 function getActiveSession() {
@@ -99,6 +107,7 @@ module.exports = {
   ACTIVE_SESSION_KEY,
   getActivities,
   recordActivity,
+  recordPatternActivity,
   getActiveSession,
   startBeadSession,
   pauseBeadSession,

@@ -3,13 +3,14 @@ const { createPaletteMap } = require('../../utils/color-match')
 const { mergeStatsWithInventory } = require('../../utils/inventory')
 const {
   getPatternById,
-  savePattern,
+  trySavePattern: savePattern,
+  showStorageError,
   setCurrentPattern,
   renamePattern,
   deletePattern,
   makeShareCode
 } = require('../../utils/pattern')
-const { recordActivity } = require('../../utils/activity')
+const { recordPatternActivity: recordActivity } = require('../../utils/activity')
 
 function formatTime(timestamp) {
   const date = new Date(Number(timestamp) || Date.now())
@@ -85,7 +86,11 @@ Page({
       content: this.data.pattern.name,
       success: (result) => {
         if (!result.confirm) return
-        const saved = renamePattern(this.patternId, result.content)
+        let saved
+        try { saved = renamePattern(this.patternId, result.content) } catch (error) {
+          showStorageError(error)
+          return
+        }
         if (!saved) {
           wx.showToast({ title: '名称不能为空', icon: 'none' })
           return
@@ -117,6 +122,7 @@ Page({
     const pattern = getPatternById(this.patternId)
     if (!pattern) return
     const saved = savePattern(Object.assign({}, pattern, { status: '正在拼' }), mardPalette)
+    if (!saved) return
     setCurrentPattern(saved)
     recordActivity('pattern-status', {
       patternId: saved.id,
@@ -136,13 +142,16 @@ Page({
       confirmColor: '#d94f5c',
       success: (result) => {
         if (!result.confirm) return
+        try { deletePattern(this.patternId) } catch (error) {
+          showStorageError(error)
+          return
+        }
         recordActivity('pattern-status', {
           patternId: this.data.pattern.id,
           patternName: this.data.pattern.name,
           title: '删除图纸',
           description: '已从图纸册删除'
         })
-        deletePattern(this.patternId)
         wx.navigateBack()
       }
     })

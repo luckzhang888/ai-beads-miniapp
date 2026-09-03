@@ -5,6 +5,8 @@ const {
   getSavedPatterns,
   getPatternById,
   savePattern,
+  trySavePatterns,
+  showStorageError,
   setCurrentPattern,
   deletePatterns,
   movePatternsFromFolder
@@ -55,7 +57,6 @@ function seedPatterns() {
   first.tags = ['原创', '萌系']
   first.folderId = 'original'
   first.status = '待拼'
-  savePattern(first, mardPalette)
 
   const second = createDemoPattern(48)
   second.id = 'demo-berry-wish'
@@ -64,7 +65,7 @@ function seedPatterns() {
   second.folderId = 'favorites'
   second.status = '已拼'
   second.completedCount = 1
-  savePattern(second, mardPalette)
+  if (!trySavePatterns([second, first], mardPalette)) return
   wx.setStorageSync(DEMO_SEEDED_KEY, true)
 }
 
@@ -313,10 +314,11 @@ Page({
       success: (result) => {
         const folder = result.tapIndex === 0 ? null : folders[result.tapIndex - 1]
         if (result.tapIndex > 0 && !folder) return
-        ids.forEach((id) => {
+        const changes = ids.map((id) => {
           const pattern = getPatternById(id)
-          if (pattern) savePattern(Object.assign({}, pattern, { folderId: folder ? folder.id : '' }), mardPalette)
-        })
+          return pattern ? Object.assign({}, pattern, { folderId: folder ? folder.id : '' }) : null
+        }).filter(Boolean)
+        if (!trySavePatterns(changes, mardPalette)) return
         this.exitSelection()
         this.refresh()
         wx.showToast({ title: folder ? ('已移动到' + folder.title) : '已移出文件夹', icon: 'success' })
@@ -379,7 +381,10 @@ Page({
       confirmColor: '#e54b5f',
       success: (result) => {
         if (!result.confirm) return
-        deletePatterns(ids)
+        try { deletePatterns(ids) } catch (error) {
+          showStorageError(error)
+          return
+        }
         this.setData({ selectionMode: false, selectedIds: [], selectedCount: 0 })
         this.refresh()
         wx.showToast({ title: '已删除 ' + ids.length + ' 张', icon: 'success' })
@@ -412,7 +417,7 @@ Page({
       success: (result) => {
         const status = statuses[result.tapIndex]
         if (!status) return
-        patterns.forEach((pattern) => savePattern(Object.assign({}, pattern, { status }), mardPalette))
+        if (!trySavePatterns(patterns.map((pattern) => Object.assign({}, pattern, { status })), mardPalette)) return
         this.exitSelection()
         this.refresh()
         wx.showToast({ title: '已更新为' + status, icon: 'success' })
@@ -479,21 +484,27 @@ Page({
       success: (result) => {
         if (!result.confirm) return
         let completed = 0
-        pending.forEach((pattern) => {
+        for (const pattern of pending) {
           const consumed = consumeStats(pattern.stats || [], {
             brand: pattern.brand || 'MARD',
             patternId: pattern.id,
             patternName: pattern.name,
             source: 'pattern-management-outbound'
           })
-          if (!consumed.ok) return
-          savePattern(Object.assign({}, pattern, {
-            status: pattern.status === '待拼' ? '正在拼' : pattern.status,
-            inventoryConsumed: true,
-            lastConsumeTransactionId: consumed.transactionId
-          }), mardPalette)
+          if (!consumed.ok) continue
+          try {
+            savePattern(Object.assign({}, pattern, {
+              status: pattern.status === '待拼' ? '正在拼' : pattern.status,
+              inventoryConsumed: true,
+              lastConsumeTransactionId: consumed.transactionId
+            }), mardPalette)
+          } catch (error) {
+            showStorageError(error, '本次出库已生成记录，但图纸状态未保存；批量操作已停止。请在记录页核对或撤销已完成的出库。')
+            this.refresh()
+            return
+          }
           completed += 1
-        })
+        }
         this.exitSelection()
         this.refresh()
         wx.showToast({ title: '已出库 ' + completed + ' 张', icon: 'success' })
@@ -514,16 +525,22 @@ Page({
       success: (result) => {
         if (!result.confirm) return
         let undoneCount = 0
-        consumed.forEach((pattern) => {
+        for (const pattern of consumed) {
           const undone = undoTransaction(pattern.lastConsumeTransactionId)
-          if (!undone.ok) return
-          savePattern(Object.assign({}, pattern, {
-            status: pattern.status === '正在拼' ? '待拼' : pattern.status,
-            inventoryConsumed: false,
-            lastConsumeTransactionId: ''
-          }), mardPalette)
+          if (!undone.ok) continue
+          try {
+            savePattern(Object.assign({}, pattern, {
+              status: pattern.status === '正在拼' ? '待拼' : pattern.status,
+              inventoryConsumed: false,
+              lastConsumeTransactionId: ''
+            }), mardPalette)
+          } catch (error) {
+            showStorageError(error, '本次退料已记录，但图纸状态未保存；批量操作已停止。请在记录页核对已经退回的库存。')
+            this.refresh()
+            return
+          }
           undoneCount += 1
-        })
+        }
         this.exitSelection()
         this.refresh()
         wx.showToast({ title: '已退料 ' + undoneCount + ' 张', icon: 'success' })

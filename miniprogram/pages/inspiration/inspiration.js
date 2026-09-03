@@ -1,6 +1,6 @@
 const mardPalette = require('../../data/colors/mard')
 const { createPaletteMap } = require('../../utils/color-match')
-const { getSavedPatterns, getPatternById, savePattern, setCurrentPattern } = require('../../utils/pattern')
+const { getSavedPatterns, getPatternById, trySavePattern: savePattern, setCurrentPattern } = require('../../utils/pattern')
 
 Page({
   data: {
@@ -41,7 +41,7 @@ Page({
     const tags = new Set(pattern.tags || [])
     if (tags.has('灵感收藏')) tags.delete('灵感收藏')
     else tags.add('灵感收藏')
-    savePattern(Object.assign({}, pattern, { tags: Array.from(tags) }), mardPalette)
+    if (!savePattern(Object.assign({}, pattern, { tags: Array.from(tags) }), mardPalette)) return
     this.refresh()
   },
 

@@ -6,6 +6,8 @@ const {
   getCurrentPattern,
   getPatternById,
   savePattern,
+  trySavePattern,
+  showStorageError,
   setCurrentPattern,
   mirrorHorizontal,
   makeShareCode,
@@ -16,7 +18,7 @@ const {
   calculateProgress
 } = require('../../utils/pattern')
 const {
-  recordActivity,
+  recordPatternActivity: recordActivity,
   getActiveSession,
   startBeadSession,
   pauseBeadSession
@@ -279,8 +281,7 @@ Page({
   applyProgressTargets(targets, forceComplete) {
     if (!targets || !targets.length) return
     this.progressUndoStack = this.progressUndoStack || []
-    this.progressUndoStack.push(this.data.completedIndices.slice())
-    if (this.progressUndoStack.length > 20) this.progressUndoStack.shift()
+    const previous = this.data.completedIndices.slice()
     let completedIndices
     if (forceComplete) {
       const completed = new Set(this.data.completedIndices)
@@ -289,7 +290,12 @@ Page({
     } else {
       completedIndices = toggleProgressIndices(this.data.completedIndices, targets)
     }
-    this.persistProgress(completedIndices)
+    if (!this.persistProgress(completedIndices)) {
+      return false
+    }
+    this.progressUndoStack.push(previous)
+    if (this.progressUndoStack.length > 20) this.progressUndoStack.shift()
+    return true
   },
 
   undoProgress() {
@@ -297,19 +303,21 @@ Page({
       wx.showToast({ title: '没有可撤销的进度', icon: 'none' })
       return
     }
-    this.persistProgress(this.progressUndoStack.pop())
+    const previous = this.progressUndoStack.pop()
+    if (!this.persistProgress(previous)) this.progressUndoStack.push(previous)
   },
 
   persistProgress(completedIndices) {
     const current = getPatternById(this.patternId) || this.data.pattern
     const info = calculateProgress(current.matrix, completedIndices)
     const previousPercent = Number(this.data.progress) || 0
-    const saved = savePattern(Object.assign({}, current, {
+    const saved = trySavePattern(Object.assign({}, current, {
       completedCellIndices: completedIndices,
       completedCodes: info.completedCodes,
       status: info.percent >= 100 ? '已拼' : (info.completed > 0 ? '正在拼' : '待拼'),
       viewState: this.currentViewState()
     }), mardPalette)
+    if (!saved) return false
     setCurrentPattern(saved)
     this.setPattern(saved)
     const previousMilestone = Math.floor(previousPercent / 25)
@@ -323,6 +331,7 @@ Page({
         metadata: { percent: info.percent, completed: info.completed, total: info.total }
       })
     }
+    return true
   },
 
   resumeTimerDisplay(session) {
@@ -379,7 +388,14 @@ Page({
     this.viewSaveTimer = setTimeout(() => {
       const current = getPatternById(this.patternId)
       if (!current) return
-      savePattern(Object.assign({}, current, { viewState: this.currentViewState() }), mardPalette)
+      try {
+        savePattern(Object.assign({}, current, { viewState: this.currentViewState() }), mardPalette)
+        this.viewSaveFailed = false
+      } catch (error) {
+        // Repeated gestures must not stack identical storage-full dialogs.
+        if (!this.viewSaveFailed) showStorageError(error)
+        this.viewSaveFailed = true
+      }
     }, 180)
   },
 
@@ -401,7 +417,8 @@ Page({
     }
     if (!this.data.working) {
       const pattern = getPatternById(this.patternId)
-      const saved = savePattern(Object.assign({}, pattern, { status: '正在拼' }), mardPalette)
+      const saved = trySavePattern(Object.assign({}, pattern, { status: '正在拼' }), mardPalette)
+      if (!saved) return
       setCurrentPattern(saved)
       this.setData({ pattern: saved, working: true }, () => this.updateWorkButton())
       this.startTimer()
@@ -419,8 +436,8 @@ Page({
   completeSelectedColor() {
     const pattern = getPatternById(this.patternId)
     const targets = indicesForCode(pattern.matrix, this.data.highlightCode)
-    this.setData({ working: false })
-    this.applyProgressTargets(targets, true)
+    if (!this.applyProgressTargets(targets, true)) return
+    this.setData({ working: false }, () => this.updateWorkButton())
     wx.showToast({ title: '该色格子已完成', icon: 'success' })
   },
 
@@ -530,12 +547,19 @@ Page({
           wx.showToast({ title: '库存已变化，请重新检查', icon: 'none' })
           return
         }
-        const saved = savePattern(Object.assign({}, this.data.pattern, {
-          completedCount: Number(this.data.pattern.completedCount || 0) + 1,
-          status: '已拼',
-          inventoryConsumed: true,
-          lastConsumeTransactionId: consumed.transactionId
-        }), mardPalette)
+        let saved
+        try {
+          saved = savePattern(Object.assign({}, this.data.pattern, {
+            completedCount: Number(this.data.pattern.completedCount || 0) + 1,
+            status: '已拼',
+            inventoryConsumed: true,
+            lastConsumeTransactionId: consumed.transactionId
+          }), mardPalette)
+        } catch (error) {
+          showStorageError(error, '库存已扣减并生成出库记录，但图纸完成状态未保存。请在记录页查看或撤销本次出库。')
+          this.setPattern(this.data.pattern)
+          return
+        }
         setCurrentPattern(saved)
         this.pauseTimer('完成作品')
         recordActivity('pattern-complete', {

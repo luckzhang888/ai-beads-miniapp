@@ -1,9 +1,13 @@
 const mardPalette = require('../data/colors/mard')
 const { buildStats } = require('./color-match')
+const patternStorage = require('./pattern-storage')
+const { getSavedPatterns, getPatternById, getCurrentPattern, setCurrentPattern, deletePatterns, showStorageError } = patternStorage
+let patternSequence = 0
 
-const CURRENT_KEY = 'currentPattern:v1'
-const PATTERNS_KEY = 'savedPatterns:v1'
-const MAX_PATTERNS = 50
+function nextPatternId(prefix) {
+  patternSequence += 1
+  return (prefix || 'pattern') + '-' + Date.now() + '-' + patternSequence
+}
 
 function cloneMatrix(matrix) {
   return Array.isArray(matrix) ? matrix.map((row) => row.slice()) : []
@@ -37,7 +41,7 @@ function createPattern(options) {
   const dims = getDimensions(matrix)
 
   return {
-    id: options.id || ('pattern-' + Date.now()),
+    id: options.id || nextPatternId(),
     name: options.name || ('拼豆图纸 ' + new Date().toLocaleString()),
     createdAt: options.createdAt || Date.now(),
     updatedAt: Date.now(),
@@ -80,25 +84,12 @@ function createDemoPattern(size) {
   }
 
   return createPattern({
-    id: 'demo-' + Date.now(),
+    id: nextPatternId('demo'),
     name: 'MARD 示例爱心图纸',
     matrix,
     palette: mardPalette,
     brand: 'MARD'
   })
-}
-
-function setCurrentPattern(pattern) {
-  wx.setStorageSync(CURRENT_KEY, pattern)
-}
-
-function getCurrentPattern() {
-  return wx.getStorageSync(CURRENT_KEY) || null
-}
-
-function getSavedPatterns() {
-  const patterns = wx.getStorageSync(PATTERNS_KEY)
-  return Array.isArray(patterns) ? patterns : []
 }
 
 function normalizePattern(pattern, palette) {
@@ -126,39 +117,33 @@ function normalizePattern(pattern, palette) {
 }
 
 function savePattern(pattern, palette) {
-  const patterns = getSavedPatterns()
-  const index = patterns.findIndex((item) => item.id === pattern.id)
   const next = normalizePattern(pattern, palette)
-
-  if (index >= 0) patterns.splice(index, 1)
-  patterns.unshift(next)
-
-  wx.setStorageSync(PATTERNS_KEY, patterns.slice(0, MAX_PATTERNS))
-  setCurrentPattern(next)
+  patternStorage.writePatterns([next], true)
   return next
 }
 
-function getPatternById(id) {
-  if (!id) return null
-  return getSavedPatterns().find((item) => item.id === id) || null
+function savePatterns(patterns, palette) {
+  const next = patterns.map((pattern) => normalizePattern(pattern, palette))
+  patternStorage.writePatterns(next, true)
+  return next
+}
+
+function trySavePattern(pattern, palette) {
+  try { return savePattern(pattern, palette) } catch (error) {
+    showStorageError(error)
+    return null
+  }
+}
+
+function trySavePatterns(patterns, palette) {
+  try { return savePatterns(patterns, palette) } catch (error) {
+    showStorageError(error)
+    return null
+  }
 }
 
 function deletePattern(id) {
-  const patterns = getSavedPatterns().filter((item) => item.id !== id)
-  wx.setStorageSync(PATTERNS_KEY, patterns)
-  const current = getCurrentPattern()
-  if (current && current.id === id) wx.removeStorageSync(CURRENT_KEY)
-  return patterns
-}
-
-function deletePatterns(ids) {
-  const targets = new Set((ids || []).map((id) => String(id)))
-  if (!targets.size) return getSavedPatterns()
-  const patterns = getSavedPatterns().filter((item) => !targets.has(String(item.id)))
-  wx.setStorageSync(PATTERNS_KEY, patterns)
-  const current = getCurrentPattern()
-  if (current && targets.has(String(current.id))) wx.removeStorageSync(CURRENT_KEY)
-  return patterns
+  return deletePatterns([id])
 }
 
 function movePatternsFromFolder(folderId, nextFolderId) {
@@ -168,21 +153,17 @@ function movePatternsFromFolder(folderId, nextFolderId) {
   if (!sourceId) return { updated: 0, patterns }
 
   const updatedAt = Date.now()
-  let updated = 0
+  const changed = []
   const nextPatterns = patterns.map((item) => {
     if (String(item.folderId || '') !== sourceId) return item
-    updated += 1
-    return Object.assign({}, item, { folderId: targetId, updatedAt })
+    const next = Object.assign({}, item, { folderId: targetId, updatedAt })
+    changed.push(next)
+    return next
   })
 
-  if (!updated) return { updated: 0, patterns }
-  wx.setStorageSync(PATTERNS_KEY, nextPatterns)
-
-  const current = getCurrentPattern()
-  if (current && String(current.folderId || '') === sourceId) {
-    setCurrentPattern(Object.assign({}, current, { folderId: targetId, updatedAt }))
-  }
-  return { updated, patterns: nextPatterns }
+  if (!changed.length) return { updated: 0, patterns }
+  patternStorage.writePatterns(changed, false)
+  return { updated: changed.length, patterns: nextPatterns }
 }
 
 function renamePattern(id, name) {
@@ -379,6 +360,10 @@ module.exports = {
   getCurrentPattern,
   getSavedPatterns,
   savePattern,
+  savePatterns,
+  trySavePattern,
+  trySavePatterns,
+  showStorageError,
   getPatternById,
   deletePattern,
   deletePatterns,

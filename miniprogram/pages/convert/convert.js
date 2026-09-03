@@ -9,10 +9,11 @@ const {
 const {
   createPattern,
   savePattern,
+  showStorageError,
   setCurrentPattern,
   getPatternByShareCode
 } = require('../../utils/pattern')
-const { recordActivity } = require('../../utils/activity')
+const { recordPatternActivity: recordActivity } = require('../../utils/activity')
 const {
   extractUrls,
   extractHtmlImageUrls,
@@ -522,6 +523,8 @@ Page({
           ? ('/pages/editor/editor?id=' + encodeURIComponent(pattern.id))
           : ('/pages/detail/detail?id=' + encodeURIComponent(pattern.id))
       })
+    } catch (error) {
+      showStorageError(error)
     } finally {
       this.setData({ recognitionSaving: false })
     }
@@ -728,6 +731,7 @@ Page({
       cropMirrored: this.data.cropMirrored,
       cropStyle: this.data.cropStyle
     }
+    let storageFailure = null
     try {
       for (let index = 0; index < paths.length; index += 1) {
         try {
@@ -768,11 +772,19 @@ Page({
           wx.showLoading({ title: '批量处理中 ' + (index + 1) + '/' + paths.length, mask: true })
         } catch (error) {
           console.error('batch image failed', index, error)
+          if (error && error.code === 'PATTERN_STORAGE_ERROR') {
+            storageFailure = error
+            break
+          }
         }
       }
     } finally {
       wx.hideLoading()
       await this.setDataAsync(Object.assign({}, original, { batchImporting: false, batchProgress: '' }))
+    }
+    if (storageFailure) {
+      showStorageError(storageFailure, '本批已保存 ' + savedPatterns.length + '/' + paths.length + ' 张，剩余图片未导入。可在图纸册查看已保存的图纸。')
+      return
     }
     if (!savedPatterns.length) {
       wx.showModal({ title: '批量导入失败', content: '所选图片均未能识别，请检查图片格式后重试。', showCancel: false })

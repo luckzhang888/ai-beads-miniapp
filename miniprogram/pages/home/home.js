@@ -2,7 +2,7 @@ const {
   createDemoPattern,
   getSavedPatterns,
   getPatternById,
-  savePattern,
+  trySavePattern: savePattern,
   setCurrentPattern
 } = require('../../utils/pattern')
 
@@ -58,6 +58,7 @@ Page({
 
   createDemo() {
     const pattern = savePattern(createDemoPattern(32))
+    if (!pattern) return
     setCurrentPattern(pattern)
     wx.navigateTo({
       url: '/pages/detail/detail?id=' + encodeURIComponent(pattern.id)
