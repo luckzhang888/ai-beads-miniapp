@@ -1,0 +1,42 @@
+name: Sync develop to GitCode
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-develop-to-gitcode
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push develop to GitCode
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GITCODE_TOKEN:-}" ]; then
+            echo "GITCODE_TOKEN secret is not configured."
+            exit 1
+          fi
+
+          AUTH="$(printf '%s' "luckzhang888:${GITCODE_TOKEN}" | base64 -w0)"
+
+          git -c http.extraHeader="Authorization: Basic ${AUTH}" \
+            push https://gitcode.com/luckzhang888/ai-beads-miniapp.git \
+            HEAD:refs/heads/develop
