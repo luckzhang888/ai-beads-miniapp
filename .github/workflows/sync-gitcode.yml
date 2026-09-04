@@ -1,9 +1,6 @@
 name: Sync develop to GitCode
 
 on:
-  push:
-    branches:
-      - develop
   workflow_dispatch:
 
 permissions:
