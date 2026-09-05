@@ -7,11 +7,13 @@ const { preparePalette, findNearestColor, cleanupMatrix, shouldTreatAsBlank, mat
 const { calculatePatternDimensions, recommendPatternSize, normalizeTransform } = require('../miniprogram/utils/image')
 const { buildPageRanges } = require('../miniprogram/utils/export')
 const {
+  detectGuideGridGeometry,
   recognizeGuideGrid,
   recognizeGenericGrid,
   recognizePixelGrid,
   nativePixelLikelihood,
-  prepareRecognitionPalette
+  prepareRecognitionPalette,
+  classifySampleRows
 } = require('../miniprogram/utils/grid-recognition')
 const { extractUrls, unwrapImageUrl, selectBestUrl, extractHtmlImageUrls, validateDownload } = require('../miniprogram/utils/link')
 
@@ -119,12 +121,73 @@ function syntheticGuideChart() {
 }
 
 const guideFixture = syntheticGuideChart()
+const guideGeometry = detectGuideGridGeometry(guideFixture.imageData, guideFixture.width, guideFixture.height)
+assert.strictEqual(guideGeometry.ok, true)
+assert.strictEqual(guideGeometry.columns, 22)
+assert.strictEqual(guideGeometry.rows, 22)
 const guideResult = recognizeGuideGrid(guideFixture.imageData, guideFixture.width, guideFixture.height, palette)
 assert.strictEqual(guideResult.ok, true)
 assert.strictEqual(guideResult.width, 22)
 assert.strictEqual(guideResult.height, 22)
 assert.strictEqual(guideResult.beadCount, 60)
 assert.strictEqual(guideResult.usedColorCount, 3)
+
+function syntheticLargeGuideChart() {
+  const columns = 99
+  const rows = 106
+  const beadCount = 6813
+  const cell = 10
+  const x0 = 20
+  const y0 = 20
+  const width = x0 * 2 + columns * cell
+  const height = y0 * 2 + rows * cell
+  const data = new Uint8ClampedArray(width * height * 4)
+  const fillRect = (left, top, right, bottom, rgb) => {
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        const offset = (y * width + x) * 4
+        data[offset] = rgb[0]
+        data[offset + 1] = rgb[1]
+        data[offset + 2] = rgb[2]
+        data[offset + 3] = 255
+      }
+    }
+  }
+  fillRect(0, 0, width, height, [255, 255, 255])
+  const chartColors = palette.slice(0, 15).map((item) => item.rgb)
+  for (let index = 0; index < beadCount; index += 1) {
+    const column = index % columns
+    const row = Math.floor(index / columns)
+    const rgb = chartColors[index % chartColors.length]
+    fillRect(x0 + column * cell + 1, y0 + row * cell + 1, x0 + (column + 1) * cell, y0 + (row + 1) * cell, rgb)
+    const ink = Math.max.apply(null, rgb) < 130 ? [255, 255, 255] : [35, 35, 35]
+    fillRect(x0 + column * cell + 4, y0 + row * cell + 4, x0 + column * cell + 6, y0 + row * cell + 7, ink)
+  }
+  for (let row = 0; row < rows; row += 1) {
+    fillRect(x0 + columns * cell + 4, y0 + row * cell + 4, x0 + columns * cell + 6, y0 + row * cell + 7, [35, 35, 35])
+  }
+  for (let column = 0; column < columns; column += 1) {
+    fillRect(x0 + column * cell + 4, y0 + rows * cell + 4, x0 + column * cell + 6, y0 + rows * cell + 7, [35, 35, 35])
+  }
+  for (let index = 1; index < columns; index += 5) {
+    fillRect(x0 + index * cell, 0, x0 + index * cell + 1, height, [230, 35, 35])
+  }
+  for (let index = 1; index < rows; index += 5) {
+    fillRect(0, y0 + index * cell, width, y0 + index * cell + 1, [230, 35, 35])
+  }
+  return { imageData: { data }, width, height }
+}
+
+const largeGuideFixture = syntheticLargeGuideChart()
+const largeGuideGeometry = detectGuideGridGeometry(largeGuideFixture.imageData, largeGuideFixture.width, largeGuideFixture.height)
+assert.strictEqual(largeGuideGeometry.ok, true, JSON.stringify(largeGuideGeometry))
+assert.strictEqual(largeGuideGeometry.columns, 99)
+assert.strictEqual(largeGuideGeometry.rows, 106)
+const largeGuideResult = recognizeGuideGrid(largeGuideFixture.imageData, largeGuideFixture.width, largeGuideFixture.height, palette)
+assert.strictEqual(largeGuideResult.width, 99)
+assert.strictEqual(largeGuideResult.height, 106)
+assert.strictEqual(largeGuideResult.beadCount, 6813)
+assert.strictEqual(largeGuideResult.usedColorCount, 15)
 
 function syntheticGridChart(options) {
   const settings = Object.assign({ columns: 12, rows: 10, cell: 12, x0: 14, y0: 16, gridLines: true }, options || {})
@@ -165,6 +228,7 @@ function syntheticGridChart(options) {
 }
 
 const regularFixture = syntheticGridChart()
+assert.strictEqual(detectGuideGridGeometry(regularFixture.imageData, regularFixture.width, regularFixture.height).ok, false)
 const regularResult = recognizeGenericGrid(regularFixture.imageData, regularFixture.width, regularFixture.height, palette)
 assert.strictEqual(regularResult.ok, true, JSON.stringify(regularResult))
 assert.strictEqual(regularResult.width, regularFixture.settings.columns)
@@ -179,6 +243,24 @@ assert.strictEqual(pixelResult.width, pixelFixture.settings.columns)
 assert.strictEqual(pixelResult.height, pixelFixture.settings.rows)
 assert.strictEqual(pixelResult.recognitionMode, 'pixel-grid')
 assert.strictEqual(nativePixelLikelihood(pixelFixture.imageData, pixelFixture.width, pixelFixture.height).ok, true)
+
+const largeChartColors = palette.slice(0, 15).map((item) => item.rgb)
+const largeChartSamples = Array.from({ length: 106 }, (_, row) => Array.from({ length: 99 }, (_, column) => ({
+  rgb: largeChartColors[(row + column) % largeChartColors.length],
+  inkRatio: 0.08,
+  lightInkRatio: 0.08,
+  whiteRatio: 0,
+  sampleCount: 64
+})))
+const largeChartStartedAt = Date.now()
+const largeChartResult = classifySampleRows(largeChartSamples, palette, {}, { recognitionMode: 'guide-grid', confidence: 0.95 })
+const largeChartElapsed = Date.now() - largeChartStartedAt
+assert.strictEqual(largeChartResult.width, 99)
+assert.strictEqual(largeChartResult.height, 106)
+assert.strictEqual(largeChartResult.beadCount, 99 * 106)
+assert.strictEqual(largeChartResult.usedColorCount, 15)
+assert.strictEqual(largeChartResult.uniqueSampleColorCount, 15, 'repeated chart colours must be matched only once')
+assert.ok(largeChartElapsed < 2500, '99x106 colour matching took ' + largeChartElapsed + 'ms')
 
 const shareText = '复制这段内容打开图纸：https://cdn.example.com/charts/demo.png，提取色号。'
 assert.deepStrictEqual(extractUrls(shareText), ['https://cdn.example.com/charts/demo.png'])
@@ -373,4 +455,9 @@ assert.deepStrictEqual(convertPage.processingOptions().transform, {
 })
 
 delete global.wx
-console.log('All unit tests passed: grid/pixel recognition, link extraction, blank detection, crop, palette merge, export paging, progress, inventory transactions and pinch zoom.')
+require('./recognition-runtime-test').run({ guideFixture: largeGuideFixture, convertPage }).then(() => {
+  console.log('All unit tests passed: large-grid recognition/performance, link extraction, blank detection, crop, palette merge, export paging, progress, inventory transactions and pinch zoom.')
+}).catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

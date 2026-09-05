@@ -424,13 +424,15 @@ Page({
     this.cachedResult = null
     this.setData({
       stage: 'recognizing',
-      recognitionProgress: 18,
-      recognitionStep: '第 1 步 · 对齐图片网格',
+      recognitionProgress: 6,
+      recognitionStep: '准备读取原始图纸',
       recognitionResult: null
     })
     try {
-      await this.setDataAsync({ recognitionProgress: 48, recognitionStep: '第 2 步 · 统计图例与颜色' })
-      const result = await this.processCurrentImage()
+      const result = await this.processCurrentImage((progress, step) => this.setDataAsync({
+        recognitionProgress: Math.min(96, Number(progress) || 0),
+        recognitionStep: step || '正在识别图纸'
+      }))
       const modeLabels = {
         'guide-grid': '红色导线网格识别',
         'regular-grid': '规则网格识别',
@@ -440,9 +442,10 @@ Page({
       }
       result.recognitionModeText = modeLabels[result.recognitionMode] || '图片颜色识别'
       result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
-      result.exactRecognition = result.recognitionMode !== 'pixel-fallback' && Number(result.confidence || 0) >= 0.72
+      result.exactRecognition = result.recognitionMode !== 'pixel-fallback' &&
+        Number(result.confidence || 0) >= 0.72 && (!result.validation || result.validation.ok)
       result.needsCalibration = result.recognitionMode === 'pixel-fallback'
-      await this.setDataAsync({ recognitionProgress: 82, recognitionStep: '第 3 步 · 匹配 MARD 色号' })
+      result.needsReview = Boolean(result.validation && !result.validation.ok)
       this.setData({
         recognitionProgress: 100,
         recognitionStep: '识别完成',
@@ -580,16 +583,21 @@ Page({
     })
   },
 
-  async processCurrentImage() {
+  async processCurrentImage(onProgress) {
     const signature = this.processingSignature()
-    if (this.cachedResult && this.cachedSignature === signature) return this.cachedResult
+    if (this.cachedResult && this.cachedSignature === signature) {
+      if (typeof onProgress === 'function') await Promise.resolve(onProgress(96, '使用已完成的识别结果'))
+      return this.cachedResult
+    }
     const recognizeGrid = ['recognize', 'diagram', 'link', 'pixel'].indexOf(this.data.selectedMethod) >= 0
     const processor = recognizeGrid ? gridImageToPattern : imageToPattern
+    const options = this.processingOptions()
+    if (typeof onProgress === 'function') options.onProgress = onProgress
     const result = await processor(
       this.data.imagePath,
       this.data.selectedSize,
       mardPalette,
-      this.processingOptions()
+      options
     )
     this.cachedSignature = signature
     this.cachedResult = result

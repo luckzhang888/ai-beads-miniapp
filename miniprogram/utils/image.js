@@ -1,12 +1,12 @@
 const { matchImageData } = require('./color-match')
 const {
-  recognizeGuideGrid,
-  recognizeGenericGrid,
-  recognizePixelGrid,
+  detectGuideGridGeometry,
+  detectGenericGridGeometry,
+  detectPixelGridGeometry,
   recognizeKnownGrid,
   nativePixelLikelihood,
   sampleGridCells,
-  classifySampleRows
+  classifySampleRowsAsync
 } = require('./grid-recognition')
 
 function getImageInfo(src) {
@@ -38,6 +38,30 @@ function createProcessorCanvas(width, height) {
     width,
     height
   })
+}
+
+async function reportProcessingProgress(settings, progress, step) {
+  if (settings && typeof settings.onProgress === 'function') {
+    await Promise.resolve(settings.onProgress(Math.max(0, Math.min(100, Math.round(progress))), step))
+  }
+}
+
+function yieldProcessingThread() {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+function validateRecognizedGrid(result, geometry) {
+  const warnings = []
+  const cellRatio = Math.max(geometry.cellWidth, geometry.cellHeight) /
+    Math.max(0.001, Math.min(geometry.cellWidth, geometry.cellHeight))
+  if (cellRatio > 1.18) warnings.push('横向与纵向网格间距不一致')
+  if (Number(result.confidence) < 0.72) warnings.push('网格定位置信度偏低')
+  if (result.recognitionMode === 'guide-grid' && Number(geometry.spacingConsistency) < 0.7) warnings.push('红色导线存在缺失或被图案遮挡')
+  if (result.recognitionMode === 'guide-grid' && Number(geometry.guideBalance) < 0.6) warnings.push('横纵导线数量差异过大')
+  if (result.recognitionMode === 'guide-grid' && !result.labeledGrid) warnings.push('没有稳定检测到格内色号文字')
+  if (!result.beadCount || result.beadCount > result.width * result.height) warnings.push('豆豆数量校验失败')
+  if (!result.usedColorCount || result.usedColorCount > 96) warnings.push('识别出的颜色数量异常')
+  return { ok: warnings.length === 0, warnings }
 }
 
 function clamp(value) {
@@ -232,6 +256,7 @@ async function imageToPattern(imagePath, shortSide, palette, options) {
 
 async function gridImageToPattern(imagePath, shortSide, palette, options) {
   const settings = options || {}
+  await reportProcessingProgress(settings, 12, '读取原始图纸')
   const info = await getImageInfo(imagePath)
   const longestSide = Math.max(info.width, info.height)
   const recognitionMaxSide = Math.max(1200, Number(settings.recognitionMaxSide) || 2000)
@@ -243,6 +268,8 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
   canvas.height = height
   const ctx = canvas.getContext('2d')
   const image = await loadCanvasImage(canvas, info.path)
+
+  await reportProcessingProgress(settings, 24, '缩放识别图像')
 
   ctx.clearRect(0, 0, width, height)
   ctx.imageSmoothingEnabled = true
@@ -266,40 +293,52 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
       nativeResult.sourceHeight = info.height
       nativeResult.recognitionScale = 1
       nativeResult.nativeColorBins = nativeLikelihood.unique
+      nativeResult.validation = validateRecognizedGrid(nativeResult, nativeResult.grid)
+      await reportProcessingProgress(settings, 100, '识别完成')
       return nativeResult
     }
   }
 
   const attempts = []
-  let detected = recognizeGuideGrid(recognitionData, width, height, palette, settings)
+  await reportProcessingProgress(settings, 34, '检测红色导线网格')
+  let detected = detectGuideGridGeometry(recognitionData, width, height, settings)
+  let recognitionMode = 'guide-grid'
   if (!detected.ok) {
     attempts.push(detected.reason)
-    detected = recognizeGenericGrid(recognitionData, width, height, palette, settings)
+    await reportProcessingProgress(settings, 40, '检测规则网格')
+    detected = detectGenericGridGeometry(recognitionData, width, height, settings)
+    recognitionMode = 'regular-grid'
   }
   if (!detected.ok) {
     attempts.push(detected.reason)
-    detected = recognizePixelGrid(recognitionData, width, height, palette, settings)
+    await reportProcessingProgress(settings, 46, '检测像素块网格')
+    detected = detectPixelGridGeometry(recognitionData, width, height, settings)
+    recognitionMode = 'pixel-grid'
   }
   if (detected.ok) {
-    const sourceCellWidth = detected.grid.cellWidth / scale
-    const sourceCellHeight = detected.grid.cellHeight / scale
-    const sampleCellSize = Math.max(24, Math.min(64, Math.round(Math.min(sourceCellWidth, sourceCellHeight))))
-    const rowCanvas = createProcessorCanvas(detected.width * sampleCellSize, sampleCellSize)
-    rowCanvas.width = detected.width * sampleCellSize
+    await reportProcessingProgress(settings, 52, '网格已定位，准备逐格采样')
+    const sourceCellWidth = detected.cellWidth / scale
+    const sourceCellHeight = detected.cellHeight / scale
+    const safeCanvasCellSize = Math.max(16, Math.floor(4096 / detected.columns))
+    const sampleCellSize = Math.max(16, Math.min(32, safeCanvasCellSize, Math.round(Math.min(sourceCellWidth, sourceCellHeight))))
+    // Reuse the same canvas and decoded image. The first-pass pixels are no
+    // longer needed after geometry detection, avoiding a second image decode.
+    const rowCanvas = canvas
+    rowCanvas.width = detected.columns * sampleCellSize
     rowCanvas.height = sampleCellSize
     const rowContext = rowCanvas.getContext('2d')
-    const rowImage = await loadCanvasImage(rowCanvas, info.path)
     rowContext.imageSmoothingEnabled = false
-    const sourceX = detected.grid.x / scale
-    const sourceY = detected.grid.y / scale
+    const sourceX = detected.x / scale
+    const sourceY = detected.y / scale
     const sampleRows = []
-    for (let row = 0; row < detected.height; row += 1) {
+    const progressEvery = Math.max(1, Math.floor(detected.rows / 20))
+    for (let row = 0; row < detected.rows; row += 1) {
       rowContext.clearRect(0, 0, rowCanvas.width, rowCanvas.height)
       rowContext.drawImage(
-        rowImage,
+        image,
         sourceX,
         sourceY + row * sourceCellHeight,
-        detected.width * sourceCellWidth,
+        detected.columns * sourceCellWidth,
         sourceCellHeight,
         0,
         0,
@@ -310,18 +349,39 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
         rowContext.getImageData(0, 0, rowCanvas.width, rowCanvas.height),
         rowCanvas.width,
         rowCanvas.height,
-        { x: 0, y: 0, cellWidth: sampleCellSize, cellHeight: sampleCellSize, columns: detected.width, rows: 1 }
+        { x: 0, y: 0, cellWidth: sampleCellSize, cellHeight: sampleCellSize, columns: detected.columns, rows: 1 }
       )[0])
+      if ((row + 1) % progressEvery === 0 || row + 1 === detected.rows) {
+        await reportProcessingProgress(settings, 52 + (row + 1) / detected.rows * 34, '逐格采样 ' + (row + 1) + '/' + detected.rows)
+        await yieldProcessingThread()
+      }
     }
-    const precise = classifySampleRows(sampleRows, palette, settings, {
+    await reportProcessingProgress(settings, 90, '匹配 MARD 295 色卡')
+    const grid = {
+      x: detected.x,
+      y: detected.y,
+      cellWidth: detected.cellWidth,
+      cellHeight: detected.cellHeight,
+      guideColumns: detected.guideColumns,
+      guideRows: detected.guideRows
+    }
+    const precise = await classifySampleRowsAsync(sampleRows, palette, Object.assign({}, settings, {
+      onClassificationProgress: (fraction) => reportProcessingProgress(settings,
+        90 + fraction * 8, '匹配色号 ' + Math.round(fraction * 100) + '%')
+    }), {
       confidence: detected.confidence,
-      grid: detected.grid,
-      recognitionMode: detected.recognitionMode
+      grid,
+      recognitionMode
     })
     precise.sourceWidth = info.width
     precise.sourceHeight = info.height
     precise.recognitionScale = scale
     precise.sampleCellSize = sampleCellSize
+    precise.validation = validateRecognizedGrid(precise, detected)
+    if (!precise.validation.ok) {
+      precise.warning = '识别结果需要人工核对：' + precise.validation.warnings.join('；') + '。请确认网格、颜色数和豆豆总数后再保存。'
+    }
+    await reportProcessingProgress(settings, 100, '识别完成')
     return precise
   }
 
@@ -332,6 +392,8 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
   fallback.recognitionMode = 'pixel-fallback'
   fallback.recognitionReason = attempts.filter(Boolean).join(',') || 'grid-not-detected'
   fallback.warning = '这张图未检测到可靠网格，已按普通图片转换为不超过 24 色。请先确认网格尺寸，再保存。'
+  fallback.validation = { ok: false, warnings: ['未检测到可靠网格'] }
+  await reportProcessingProgress(settings, 100, '已生成普通图片转换结果')
   return fallback
 }
 

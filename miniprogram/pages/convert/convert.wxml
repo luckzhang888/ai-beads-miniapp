@@ -64,7 +64,7 @@
     <progress percent="{{recognitionProgress}}" activeColor="#39c96b" stroke-width="8" />
   </view>
   <view wx:if="{{recognitionProgress === 100}}" class="recognition-actions">
-    <button data-target="detail" bindtap="saveRecognitionResult">{{recognitionResult.needsCalibration ? '确认当前尺寸并保存' : '保存到图纸册'}}</button>
+    <button data-target="detail" bindtap="saveRecognitionResult">{{recognitionResult.needsCalibration || recognitionResult.needsReview ? '核对结果后保存' : '保存到图纸册'}}</button>
     <button class="primary" data-target="editor" bindtap="saveRecognitionResult">进入色号整理</button>
   </view>
 </view>

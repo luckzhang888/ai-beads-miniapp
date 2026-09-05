@@ -21,8 +21,8 @@ jobs:
           if [ -n "$WX_APPID" ] && [ -n "$WX_PRIVATE_KEY" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "WX_APPID/WX_PRIVATE_KEY not configured; skip preview."
+            echo "::error::WX_APPID/WX_PRIVATE_KEY not configured; preview cannot be generated."
+            exit 1
           fi
 
       - uses: actions/setup-node@v4
@@ -32,6 +32,10 @@ jobs:
 
       - run: npm ci
         if: steps.wx-ci.outputs.enabled == 'true'
+
+      - name: Check, test and compile exact preview revision
+        if: steps.wx-ci.outputs.enabled == 'true'
+        run: npm run verify
 
       - name: Write WeChat private key
         if: steps.wx-ci.outputs.enabled == 'true'
