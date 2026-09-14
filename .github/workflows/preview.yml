@@ -33,6 +33,9 @@ jobs:
       - run: npm ci
         if: steps.wx-ci.outputs.enabled == 'true'
 
+      - run: npm ci --prefix server
+        if: steps.wx-ci.outputs.enabled == 'true'
+
       - name: Check, test and compile exact preview revision
         if: steps.wx-ci.outputs.enabled == 'true'
         run: npm run verify
