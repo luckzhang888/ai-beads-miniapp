@@ -621,14 +621,16 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   const recognitionPalette = pixelInput ? palette : prepareRecognitionPalette(rawPalette)
   const matcher = createCachedColorMatcher(recognitionPalette)
   const labeledCells = sampleRows.reduce((sum, row) => sum + row.filter(hasCellLabel).length, 0)
-  const labeledGrid = !pixelInput && labeledCells / Math.max(1, columns * rows) >= 0.08
+  const labeledGrid = !pixelInput && (typeof settings.hasCellLabels === 'boolean'
+    ? settings.hasCellLabels
+    : labeledCells / Math.max(1, columns * rows) >= 0.08)
   const matrix = []
   const observedVariants = Object.create(null)
   for (let row = 0; row < rows; row += 1) {
     const output = []
     for (let column = 0; column < columns; column += 1) {
       const cell = sampleRows[row][column]
-      const labeled = !pixelInput && hasCellLabel(cell)
+      const labeled = labeledGrid && hasCellLabel(cell)
       const noLabel = labeledGrid && !labeled
       if (noLabel || ((isWhiteLike(cell.rgb, Number(settings.blankThreshold) || 249) || cell.whiteRatio >= 0.36) && !labeled)) {
         output.push('')

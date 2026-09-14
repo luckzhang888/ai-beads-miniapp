@@ -1,6 +1,6 @@
 const assert = require('assert')
 const palette = require('../miniprogram/data/colors/mard')
-const { gridImageToPattern } = require('../miniprogram/utils/image')
+const { gridImageToPattern, aiGuidedImageToPattern } = require('../miniprogram/utils/image')
 const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync } = require('../miniprogram/utils/grid-recognition')
 
 // Canvas test double: exercise the production async pipeline, including resize,
@@ -103,18 +103,77 @@ async function run({ guideFixture, convertPage }) {
       assert.ok(progress[index].value >= progress[index - 1].value, 'progress cannot move backwards')
     }
 
-    global.wx = { showModal() { throw new Error('recognition unexpectedly failed') } }
+    const guidedPixels = new Uint8ClampedArray(12 * 12 * 4)
+    const guidedCodes = [['F5', 'C19'], ['B9', 'G8']]
+    for (let y = 0; y < 12; y += 1) {
+      for (let x = 0; x < 12; x += 1) {
+        const rgb = palette.find((item) => item.code === guidedCodes[Math.floor(y / 6)][Math.floor(x / 6)]).rgb
+        guidedPixels.set(rgb.concat([255]), (y * 12 + x) * 4)
+      }
+    }
+    const guidedAnalysis = {
+      imageType: 'bead_pattern', hasGrid: true, rows: 2, columns: 2,
+      confidence: 0.95, hasLabels: false, warnings: [], grid: { left: 0, top: 0, right: 1, bottom: 1 },
+      perspective: { topLeft: [0, 0], topRight: [1, 0], bottomLeft: [0, 1], bottomRight: [1, 1] }
+    }
+    global.wx = createCanvasRuntime({ width: 12, height: 12, imageData: { data: guidedPixels } })
+    const guidedProgress = []
+    const guided = await aiGuidedImageToPattern('fixture.png', palette, guidedAnalysis,
+      { onProgress: (value) => guidedProgress.push(value) })
+    assert.deepStrictEqual([guided.width, guided.height, guided.beadCount], [2, 2, 4])
+    assert.deepStrictEqual(guided.matrix, guidedCodes, 'AI geometry must produce a local MARD matrix')
+    assert.strictEqual(guided.recognitionMode, 'ai-guided-grid')
+    assert.strictEqual(guidedProgress[guidedProgress.length - 1], 100)
+
+    const rotatedPixels = new Uint8ClampedArray(12 * 12 * 4)
+    for (let y = 0; y < 12; y += 1) {
+      for (let x = 0; x < 12; x += 1) {
+        const sourceX = y
+        const sourceY = 11 - x
+        rotatedPixels.set(guidedPixels.subarray((sourceY * 12 + sourceX) * 4, (sourceY * 12 + sourceX) * 4 + 4),
+          (y * 12 + x) * 4)
+      }
+    }
+    global.wx = createCanvasRuntime({ width: 12, height: 12, imageData: { data: rotatedPixels } })
+    const rotatedAnalysis = Object.assign({}, guidedAnalysis, { rotation: 90,
+      perspective: { topLeft: [1, 0], topRight: [1, 1], bottomLeft: [0, 0], bottomRight: [0, 1] } })
+    const rotated = await aiGuidedImageToPattern('fixture.png', palette, rotatedAnalysis)
+    assert.deepStrictEqual(rotated.matrix, guidedCodes, 'AI-guided 90-degree rotation must preserve colour order')
+
+    global.wx = {}
     convertPage.setData({ imagePath: 'fixture.png', recognitionProgress: 0 })
-    convertPage.processCurrentImage = async (onProgress) => {
+    convertPage.requestAiAnalysis = async () => ({ result: guidedAnalysis })
+    convertPage.processAiGuidedImage = async (path, analysis, onProgress) => {
+      assert.strictEqual(path, 'fixture.png')
+      assert.strictEqual(analysis, guidedAnalysis)
       await onProgress(64, '逐格采样')
       assert.strictEqual(convertPage.data.recognitionProgress, 64)
       return Object.assign({}, result, { validation: { ok: false, warnings: ['Missing guides'] } })
     }
     await convertPage.runAiRecognition()
     assert.strictEqual(convertPage.data.recognitionProgress, 100)
+    assert.strictEqual(convertPage.data.recognitionSource, 'AI')
     assert.strictEqual(convertPage.data.recognitionResult.exactRecognition, false)
     assert.strictEqual(convertPage.data.recognitionResult.needsReview, true)
-    console.log('Recognition runtime passed: native pixels, rare colours, noisy-image UI yields, one decode, 99x106/15/6813 and progress.')
+    convertPage.aiAnalysisCache = null
+    convertPage.setData({ recognitionProgress: 0 })
+    convertPage.requestAiAnalysis = async () => ({ result: { imageType: 'photo', hasGrid: false, confidence: 0.88 } })
+    convertPage.processAiPhotoImage = async () => Object.assign({}, result)
+    await convertPage.runAiRecognition()
+    assert.strictEqual(convertPage.data.recognitionResult.recognitionMode, 'ai-photo')
+    assert.strictEqual(convertPage.data.recognitionResult.needsCalibration, true)
+    assert.strictEqual(convertPage.data.recognitionResult.exactRecognition, false)
+    convertPage.requestAiAnalysis = async () => { throw new Error('AI offline') }
+    convertPage.aiAnalysisCache = null
+    convertPage.setData({ recognitionProgress: 0 })
+    await convertPage.runAiRecognition()
+    assert.strictEqual(convertPage.data.recognitionProgress, 0)
+    assert.strictEqual(convertPage.data.recognitionError, 'AI offline')
+    convertPage.processCurrentImage = async () => result
+    await convertPage.runLocalRecognition()
+    assert.strictEqual(convertPage.data.recognitionSource, '本地')
+    assert.strictEqual(convertPage.data.recognitionProgress, 100)
+    console.log('Recognition runtime passed: native pixels, guided AI grid/MARD, explicit local fallback, noisy-image UI yields and progress.')
   } finally {
     if (previousWx === undefined) delete global.wx
     else global.wx = previousWx

@@ -3,6 +3,7 @@ const { createPaletteMap } = require('../../utils/color-match')
 const {
   imageToPattern,
   gridImageToPattern,
+  aiGuidedImageToPattern,
   recommendPatternSize,
   calculatePatternDimensions
 } = require('../../utils/image')
@@ -21,6 +22,7 @@ const {
   selectBestUrl,
   validateDownload
 } = require('../../utils/link')
+const { analyzeImage } = require('../../services/ai-recognition')
 
 const METHODS = [
   { id: 'diagram', icon: '▧', title: '图纸导入', description: '从相册或相机导入图纸，自动识别并匹配色号', badge: '推荐' },
@@ -65,6 +67,8 @@ Page({
     recognitionProgress: 0,
     recognitionStep: '等待图片',
     recognitionResult: null,
+    recognitionError: '',
+    recognitionSource: '',
     recognitionSaving: false,
     paletteMap: createPaletteMap(mardPalette),
     paletteName: 'MARD 295 标准色',
@@ -129,6 +133,7 @@ Page({
   },
 
   resetMethods() {
+    this.aiAnalysisCache = null
     this.setData({
       stage: 'methods',
       imagePath: '',
@@ -136,6 +141,8 @@ Page({
       pdfFile: null,
       previewResult: null,
       recognitionResult: null,
+      recognitionError: '',
+      recognitionSource: '',
       recognitionProgress: 0,
       recognitionStep: '等待图片',
       sourceVariant: 'main',
@@ -420,47 +427,117 @@ Page({
 
   async runAiRecognition() {
     if (!this.data.imagePath || (this.data.recognitionProgress > 0 && this.data.recognitionProgress < 100)) return
+    const imagePath = this.data.imagePath
     this.cachedSignature = ''
     this.cachedResult = null
     this.setData({
       stage: 'recognizing',
-      recognitionProgress: 6,
-      recognitionStep: '准备读取原始图纸',
-      recognitionResult: null
+      recognitionProgress: 10,
+      recognitionStep: '上传图片',
+      recognitionResult: null,
+      recognitionError: '',
+      recognitionSource: ''
+    })
+    try {
+      await this.setDataAsync({ recognitionProgress: 25, recognitionStep: 'DeepSeek AI 分析图纸' })
+      let analysis = this.aiAnalysisCache && this.aiAnalysisCache.path === imagePath ? this.aiAnalysisCache.value : null
+      if (!analysis) {
+        const response = await this.requestAiAnalysis(imagePath)
+        analysis = response.result
+        this.aiAnalysisCache = { path: imagePath, value: analysis }
+      }
+      if (this.data.imagePath !== imagePath) return
+      if (!analysis || typeof analysis.hasGrid !== 'boolean') throw new Error('AI 返回的图纸结构无效，请重试或使用本地识别。')
+      let result
+      if (analysis.hasGrid) {
+        result = await this.processAiGuidedImage(imagePath, analysis, (progress, step) => this.setDataAsync({
+          recognitionProgress: Math.min(98, Number(progress) || 0),
+          recognitionStep: step || '正在识别图纸'
+        }))
+      } else if (analysis.imageType === 'photo') {
+        await this.setDataAsync({ recognitionProgress: 60, recognitionStep: '照片像素化并匹配 MARD 色号' })
+        result = await this.processAiPhotoImage(imagePath)
+        result.recognitionMode = 'ai-photo'
+        result.confidence = analysis.confidence
+        result.validation = { ok: false, warnings: ['普通照片没有可精确统计的原始网格'] }
+        result.warning = 'AI 判断这是普通照片，已转换为拼豆图。请校准尺寸并核对颜色。'
+      } else {
+        throw new Error('AI 没有检测到可定位的网格。请更换清晰原图，或使用本地识别。')
+      }
+      if (this.data.imagePath !== imagePath) return
+      this.presentRecognitionResult(result, 'AI')
+    } catch (error) {
+      console.warn('AI recognition failed:', error && error.code || 'AI_RECOGNITION_FAILED')
+      if (this.data.imagePath !== imagePath) return
+      this.setData({
+        stage: 'recognizing', recognitionProgress: 0, recognitionStep: 'AI 识别暂时不可用',
+        recognitionError: error && error.message ? error.message : 'AI 识别暂时不可用，请重试或使用本地识别。'
+      })
+    }
+  },
+
+  requestAiAnalysis(imagePath) {
+    const mode = this.data.selectedMethod === 'pixel' ? 'pixel' : 'auto'
+    // selectedSize is derived from image pixels, not a counted grid size.
+    // Do not bias the vision model with that automatic recommendation.
+    return analyzeImage(imagePath, { mode })
+  },
+
+  processAiGuidedImage(imagePath, analysis, onProgress) {
+    return aiGuidedImageToPattern(imagePath, mardPalette, analysis,
+      Object.assign({}, this.processingOptions(), { onProgress }))
+  },
+
+  processAiPhotoImage(imagePath) {
+    return imageToPattern(imagePath, this.data.selectedSize, mardPalette, this.processingOptions())
+  },
+
+  retryAiRecognition() {
+    this.aiAnalysisCache = null
+    this.runAiRecognition()
+  },
+
+  async runLocalRecognition() {
+    if (!this.data.imagePath || (this.data.recognitionProgress > 0 && this.data.recognitionProgress < 100)) return
+    const imagePath = this.data.imagePath
+    this.setData({
+      stage: 'recognizing', recognitionProgress: 10, recognitionStep: '使用本地识别',
+      recognitionError: '', recognitionResult: null, recognitionSource: '本地'
     })
     try {
       const result = await this.processCurrentImage((progress, step) => this.setDataAsync({
-        recognitionProgress: Math.min(96, Number(progress) || 0),
-        recognitionStep: step || '正在识别图纸'
+        recognitionProgress: Math.min(98, Number(progress) || 0),
+        recognitionStep: step || '正在本地识别图纸'
       }))
-      const modeLabels = {
-        'guide-grid': '红色导线网格识别',
-        'regular-grid': '规则网格识别',
-        'pixel-grid': '像素块网格识别',
-        'native-pixel': '原生像素图识别',
-        'pixel-fallback': '普通图片转换'
-      }
-      result.recognitionModeText = modeLabels[result.recognitionMode] || '图片颜色识别'
-      result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
-      result.exactRecognition = result.recognitionMode !== 'pixel-fallback' &&
-        Number(result.confidence || 0) >= 0.72 && (!result.validation || result.validation.ok)
-      result.needsCalibration = result.recognitionMode === 'pixel-fallback'
-      result.needsReview = Boolean(result.validation && !result.validation.ok)
-      this.setData({
-        recognitionProgress: 100,
-        recognitionStep: '识别完成',
-        recognitionResult: result,
-        previewResult: result
-      })
+      if (this.data.imagePath !== imagePath) return
+      this.presentRecognitionResult(result, '本地')
     } catch (error) {
-      console.error('AI recognition failed', error)
-      this.setData({ stage: 'config', recognitionProgress: 0, recognitionStep: '识别失败' })
-      wx.showModal({
-        title: '智能识别失败',
-        content: error && error.message ? error.message : '无法读取这张图片，请更换清晰图纸后重试。',
-        showCancel: false
-      })
+      if (this.data.imagePath !== imagePath) return
+      this.setData({ recognitionProgress: 0, recognitionStep: '本地识别失败',
+        recognitionError: error && error.message ? error.message : '图片读取失败，请重新选择图片。' })
     }
+  },
+
+  presentRecognitionResult(result, source) {
+    const modeLabels = {
+      'ai-guided-grid': 'AI 定位网格 + MARD 本地匹配',
+      'ai-photo': 'AI 分类 + 普通照片转换',
+      'guide-grid': '红色导线网格识别',
+      'regular-grid': '规则网格识别',
+      'pixel-grid': '像素块网格识别',
+      'native-pixel': '原生像素图识别',
+      'pixel-fallback': '普通图片转换'
+    }
+    result.recognitionModeText = modeLabels[result.recognitionMode] || '图片颜色识别'
+    result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
+    result.exactRecognition = result.recognitionMode !== 'pixel-fallback' && result.recognitionMode !== 'ai-photo' &&
+      Number(result.confidence || 0) >= 0.72 && (!result.validation || result.validation.ok)
+    result.needsCalibration = result.recognitionMode === 'pixel-fallback' || result.recognitionMode === 'ai-photo'
+    result.needsReview = Boolean(result.validation && !result.validation.ok)
+    this.setData({
+      recognitionProgress: 100, recognitionStep: '识别完成', recognitionResult: result,
+      recognitionSource: source, recognitionError: '', previewResult: result
+    })
   },
 
   reprocessRecognitionSize(event) {
@@ -474,7 +551,7 @@ Page({
       recognitionStep: '重新校准网格',
       recognitionResult: null,
       previewResult: null
-    }, () => this.runAiRecognition())
+    }, () => this.data.recognitionSource === '本地' ? this.runLocalRecognition() : this.runAiRecognition())
   },
 
   saveProcessedPattern(result, settings) {
@@ -650,12 +727,15 @@ Page({
 
   acceptImagePath(path) {
     if (!path) return
+    this.aiAnalysisCache = null
     this.setData({
       imagePath: path,
       stage: 'classify',
       sourceVariant: 'main',
       recognitionProgress: 0,
       recognitionResult: null,
+      recognitionError: '',
+      recognitionSource: '',
       previewResult: null
     })
     this.updateRecommendedSize(path)

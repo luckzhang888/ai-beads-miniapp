@@ -1,4 +1,5 @@
 const { matchImageData } = require('./color-match')
+const { validateGuidedAnalysis, sampleGuidedGrid } = require('./ai-grid')
 const {
   detectGuideGridGeometry,
   detectGenericGridGeometry,
@@ -397,6 +398,50 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
   return fallback
 }
 
+async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
+  const settings = options || {}
+  validateGuidedAnalysis(analysis)
+  await reportProcessingProgress(settings, 45, '根据 AI 定位图纸区域')
+  const info = await getImageInfo(imagePath)
+  const longestSide = Math.max(info.width, info.height)
+  const scale = Math.min(1, 2400 / longestSide)
+  const width = Math.max(1, Math.round(info.width * scale))
+  const height = Math.max(1, Math.round(info.height * scale))
+  const canvas = createProcessorCanvas(width, height)
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  const image = await loadCanvasImage(canvas, info.path)
+  ctx.imageSmoothingEnabled = true
+  if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(image, 0, 0, info.width, info.height, 0, 0, width, height)
+  await reportProcessingProgress(settings, 60, '校准网格与透视')
+  const pixels = ctx.getImageData(0, 0, width, height)
+  const sampleRows = await sampleGuidedGrid(pixels, width, height, analysis, (fraction) =>
+    reportProcessingProgress(settings, 60 + fraction * 20, '逐格采样 ' + Math.round(fraction * 100) + '%'))
+  await reportProcessingProgress(settings, 85, '匹配 MARD 295 色号')
+  const result = await classifySampleRowsAsync(sampleRows, palette, Object.assign({}, settings, {
+    hasCellLabels: analysis.hasLabels,
+    onClassificationProgress: (fraction) => reportProcessingProgress(settings,
+      85 + fraction * 13, '匹配色号 ' + Math.round(fraction * 100) + '%')
+  }), {
+    confidence: analysis.confidence,
+    recognitionMode: 'ai-guided-grid',
+    grid: { bounds: analysis.grid, perspective: analysis.perspective }
+  })
+  result.sourceWidth = info.width
+  result.sourceHeight = info.height
+  result.recognitionScale = scale
+  result.aiAnalysis = analysis
+  const warnings = (analysis.warnings || []).slice()
+  if (analysis.confidence < 0.72) warnings.unshift('AI 网格定位置信度偏低')
+  if (!result.beadCount || result.beadCount > result.width * result.height) warnings.push('豆豆数量校验失败')
+  result.validation = { ok: warnings.length === 0, warnings }
+  if (warnings.length) result.warning = '识别结果需要核对：' + warnings.join('；') + '。'
+  await reportProcessingProgress(settings, 100, '识别完成')
+  return result
+}
+
 function recommendPatternSize(width, height) {
   const shortSide = Math.min(Number(width) || 0, Number(height) || 0)
   if (shortSide >= 384) return 48
@@ -406,6 +451,7 @@ function recommendPatternSize(width, height) {
 module.exports = {
   imageToPattern,
   gridImageToPattern,
+  aiGuidedImageToPattern,
   recommendPatternSize,
   calculatePatternDimensions,
   normalizeTransform,

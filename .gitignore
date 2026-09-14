@@ -2,6 +2,8 @@ node_modules/
 private.*.key
 private.key
 .env
+.env.*
+!.env.example
 secrets/
 preview-qrcode.png
 project.private.config.json

@@ -1,0 +1,16 @@
+{
+  "name": "ai-beads-vision-server",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=18.19" },
+  "scripts": {
+    "start": "node -r dotenv/config src/server.js",
+    "test": "node --test test/*.test.js",
+    "smoke:live": "node scripts/live-smoke.js"
+  },
+  "dependencies": {
+    "dotenv": "16.6.1",
+    "express": "5.2.1",
+    "multer": "2.3.0"
+  }
+}

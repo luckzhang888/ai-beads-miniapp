@@ -242,6 +242,14 @@
 .recognition-actions button { width: 100%; margin: 0; border-radius: 20rpx; color: #6548ca; background: white; }
 .recognition-actions button.primary { color: white; background: linear-gradient(135deg,#7b57e8,#6341d6); }
 .recognition-warning { margin-top: 16rpx; padding: 17rpx 20rpx; border: 1rpx solid #f0d39a; border-radius: 17rpx; color: #8a6014; background: #fff8e8; font-size: 21rpx; }
+.recognition-local-note { margin-top: 16rpx; padding: 17rpx 20rpx; border-radius: 17rpx; color: #5a438b; background: #eae3ff; font-size: 22rpx; line-height: 1.5; }
+.recognition-error { margin-top: 20rpx; padding: 25rpx; display: flex; flex-direction: column; gap: 13rpx; border: 1rpx solid #edc6c6; border-radius: 22rpx; background: #fff; }
+.recognition-error b { color: #a43838; font-size: 27rpx; }
+.recognition-error text { color: #685d68; font-size: 22rpx; line-height: 1.5; }
+.recognition-error-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 14rpx; margin-top: 10rpx; }
+.recognition-error-actions button { width: 100%; margin: 0; border: 1rpx solid #6c4bdd; border-radius: 18rpx; color: #684ad2; background: #fff; font-size: 23rpx; }
+.recognition-error-actions button.primary { color: #fff; background: #6c4bdd; }
+.recognition-error-actions button.rechoose { grid-column: 1 / -1; color: #61566b; border-color: #ddd7e7; }
 .recognition-calibration { margin-top: 16rpx; padding: 20rpx; border-radius: 18rpx; background: white; }
 .calibration-copy { display: flex; flex-direction: column; gap: 7rpx; }
 .calibration-copy b { font-size: 24rpx; }

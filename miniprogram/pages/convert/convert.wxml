@@ -38,10 +38,20 @@
 </view>
 
 <view wx:elif="{{stage === 'recognizing'}}" class="recognition-page">
-  <view class="recognition-title">AI 自动化处理</view>
+  <view class="recognition-title">{{recognitionSource === '本地' ? '本地识别处理' : 'AI 自动化处理'}}</view>
   <view class="recognition-preview">
     <bead-grid wx:if="{{recognitionResult}}" matrix="{{recognitionResult.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{330}}" show-grid="{{true}}" />
     <image wx:else src="{{imagePath}}" mode="aspectFit" />
+  </view>
+  <view wx:if="{{recognitionSource === '本地' && recognitionResult}}" class="recognition-local-note">本次使用本地识别结果，未经过 DeepSeek AI。请仔细核对网格和色号。</view>
+  <view wx:if="{{recognitionError}}" class="recognition-error">
+    <b>AI 识别暂时不可用</b>
+    <text>{{recognitionError}}</text>
+    <view class="recognition-error-actions">
+      <button bindtap="retryAiRecognition">重试 AI 识别</button>
+      <button class="primary" bindtap="runLocalRecognition">使用本地识别</button>
+      <button class="rechoose" bindtap="chooseImage">重新选择图片</button>
+    </view>
   </view>
   <view wx:if="{{recognitionResult}}" class="recognition-summary">
     <view><text>网格</text><b>{{recognitionResult.width}} × {{recognitionResult.height}}</b></view>
@@ -58,7 +68,7 @@
       <view wx:for="{{sizes}}" wx:key="*this" class="{{selectedSize == item ? 'active' : ''}}" data-size="{{item}}" bindtap="reprocessRecognitionSize">{{item}}</view>
     </view>
   </view>
-  <view class="recognition-progress-card">
+  <view wx:if="{{!recognitionError}}" class="recognition-progress-card">
     <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 检测网格</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 统计颜色</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 匹配色号</text></view>
     <view class="recognition-step"><b>{{recognitionStep}}</b><text>{{recognitionProgress}}%</text></view>
     <progress percent="{{recognitionProgress}}" activeColor="#39c96b" stroke-width="8" />
