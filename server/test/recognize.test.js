@@ -8,6 +8,7 @@ const { validateAiAnalysis, parseAiJson } = require('../src/services/vision/norm
 const validAnalysis = {
   imageType: 'bead_pattern', hasGrid: true, rows: 48, columns: 43,
   rotation: 0, confidence: 0.94, hasLabels: true, background: 'white',
+  detectedCodes: ['H2', 'G9', 'M12'],
   grid: { left: 0.05, top: 0.08, right: 0.95, bottom: 0.94 },
   perspective: { topLeft: [0.05, 0.08], topRight: [0.95, 0.08],
     bottomLeft: [0.05, 0.94], bottomRight: [0.95, 0.94] }, warnings: []
@@ -101,6 +102,7 @@ test('DeepSeek request uses vision image_url, original detail and JSON mode', as
   })
   const analyzed = await provider.analyze({ buffer: png, mimeType: 'image/png' }, { mode: 'auto' })
   assert.equal(analyzed.rows, 48)
+  assert.deepEqual(analyzed.detectedCodes, ['H2', 'G9', 'M12'])
   assert.equal(outbound.url, 'https://api.deepseek.com/chat/completions')
   assert.equal(outbound.body.model, 'deepseek-v4-flash-vision-exp')
   assert.deepEqual(outbound.body.thinking, { type: 'disabled' })
@@ -108,6 +110,7 @@ test('DeepSeek request uses vision image_url, original detail and JSON mode', as
   assert.deepEqual(outbound.body.response_format, { type: 'json_object' })
   assert.equal(outbound.body.messages[1].content[1].image_url.detail, 'original')
   assert.match(outbound.body.messages[1].content[1].image_url.url, /^data:image\/png;base64,/)
+  assert.match(outbound.body.messages[0].content, /detectedCodes/)
 })
 
 test('AI analysis parser rejects bad size, confidence, coordinates, fields and crossed corners', () => {
@@ -117,4 +120,6 @@ test('AI analysis parser rejects bad size, confidence, coordinates, fields and c
     { grid: { ...validAnalysis.grid, right: 1.2 } }, { hasLabels: undefined },
     { perspective: { ...validAnalysis.perspective, bottomRight: [0.02, 0.03] } }
   ]) assert.throws(() => validateAiAnalysis({ ...validAnalysis, ...edit }), { code: 'AI_INVALID_RESULT' })
+  assert.deepEqual(validateAiAnalysis({ ...validAnalysis,
+    detectedCodes: ['h2', 'G9', 'G9', 'not-a-code', null] }).detectedCodes, ['H2', 'G9'])
 })

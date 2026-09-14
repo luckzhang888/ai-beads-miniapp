@@ -4,13 +4,23 @@ const { preparePalette, findNearestColor, buildStats } = require('./color-match'
 // inventory swatches. These measured values keep chart recognition stable while
 // leaving the visible 295-colour inventory palette unchanged.
 const CHART_RGB_OVERRIDES = {
+  A12: [253, 159, 114],
+  A13: [252, 198, 111],
+  A17: [252, 226, 116],
+  A19: [253, 124, 114],
   E8: [255, 230, 233],
   E15: [255, 216, 220],
   E21: [210, 176, 180],
-  H2: [255, 254, 254],
+  G9: [219, 179, 136],
+  G14: [141, 101, 80],
+  H2: [255, 255, 255],
   H3: [186, 186, 186],
   H8: [246, 237, 240],
-  H17: [240, 240, 240]
+  H10: [237, 233, 233],
+  H11: [205, 204, 206],
+  H17: [240, 240, 240],
+  M6: [176, 167, 130],
+  M12: [98, 74, 74]
 }
 
 function prepareRecognitionPalette(rawPalette) {
@@ -195,22 +205,43 @@ function detectGenericGridGeometry(imageData, width, height, options) {
   const lastX = regularX.sequence[regularX.sequence.length - 1].position
   const firstY = regularY.sequence[0].position
   const lastY = regularY.sequence[regularY.sequence.length - 1].position
-  const columns = Math.round((lastX - firstX) / regularX.step)
-  const rows = Math.round((lastY - firstY) / regularY.step)
+  const completeAxis = (first, last, step, length) => {
+    const before = first
+    const after = length - 1 - last
+    // Screenshots often crop through the outermost cells. Recover at most one
+    // clipped cell on either side, while leaving genuine page margins alone.
+    const prepend = before >= step * 0.45 && before <= step * 1.08 ? 1 : 0
+    const append = after >= step * 0.32 && after <= step * 1.08 ? 1 : 0
+    return {
+      start: first - prepend * step,
+      cells: Math.round((last - first) / step) + prepend + append,
+      prepend,
+      append
+    }
+  }
+  const completedX = completeAxis(firstX, lastX, regularX.step, width)
+  const completedY = completeAxis(firstY, lastY, regularY.step, height)
+  const columns = completedX.cells
+  const rows = completedY.cells
   const maxGrid = Number(settings.maxGridSize) || 192
   if (columns < 4 || rows < 4 || columns > maxGrid || rows > maxGrid) return { ok: false, reason: 'regular-grid-size-out-of-range' }
   if ((lastX - firstX) / width < 0.22 || (lastY - firstY) / height < 0.22) return { ok: false, reason: 'regular-grid-region-too-small' }
   return {
     ok: true,
-    x: firstX,
-    y: firstY,
+    x: completedX.start,
+    y: completedY.start,
     cellWidth: regularX.step,
     cellHeight: regularY.step,
     columns,
     rows,
-    confidence: Math.min(0.94, 0.62 + (regularX.completeness + regularY.completeness) * 0.14),
+    confidence: Math.max(0, Math.min(0.94, 0.62 + (regularX.completeness + regularY.completeness) * 0.14 -
+      (completedX.prepend + completedX.append + completedY.prepend + completedY.append) * 0.012)),
     lineColumns: regularX.sequence.length,
-    lineRows: regularY.sequence.length
+    lineRows: regularY.sequence.length,
+    clippedEdges: {
+      left: Boolean(completedX.prepend), right: Boolean(completedX.append),
+      top: Boolean(completedY.prepend), bottom: Boolean(completedY.append)
+    }
   }
 }
 
@@ -393,9 +424,7 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
   const greenValues = []
   const blueValues = []
   const colorCounts = Object.create(null)
-  let darkInk = 0
-  let lightInk = 0
-  let centerPixels = 0
+  const centerSamples = []
   let whitePixels = 0
 
   for (let y = y0; y <= y1; y += stepY) {
@@ -417,12 +446,7 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
       const centerX = (x - left) / Math.max(1, right - left)
       const centerY = (y - top) / Math.max(1, bottom - top)
       if (centerX >= 0.28 && centerX <= 0.72 && centerY >= 0.25 && centerY <= 0.75) {
-        centerPixels += 1
-        const darkest = Math.max(r, g, b)
-        const lightest = Math.min(r, g, b)
-        const chroma = Math.max(r, g, b) - Math.min(r, g, b)
-        if (darkest < 115 && chroma < 55) darkInk += 1
-        if (lightest > 225 && chroma < 55) lightInk += 1
+        centerSamples.push([r, g, b])
       }
     }
   }
@@ -433,10 +457,18 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
   const dominantRgb = dominantCount >= Math.max(3, redValues.length * 0.08)
     ? dominantKey.split(',').map(Number)
     : [Math.round(median(redValues)), Math.round(median(greenValues)), Math.round(median(blueValues))]
+  const backgroundLight = luminance(dominantRgb)
+  let darkInk = 0
+  let lightInk = 0
+  centerSamples.forEach((sample) => {
+    const difference = luminance(sample) - backgroundLight
+    if (difference <= -22) darkInk += 1
+    if (difference >= 18) lightInk += 1
+  })
   return {
     rgb: dominantRgb,
-    inkRatio: centerPixels ? darkInk / centerPixels : 0,
-    lightInkRatio: centerPixels ? lightInk / centerPixels : 0,
+    inkRatio: centerSamples.length ? darkInk / centerSamples.length : 0,
+    lightInkRatio: centerSamples.length ? lightInk / centerSamples.length : 0,
     whiteRatio: whitePixels / redValues.length,
     sampleCount: redValues.length
   }
@@ -583,12 +615,8 @@ function stabilizeLabeledMatrix(sampleRows, matrix, variantsByCode) {
 }
 
 function hasCellLabel(cell) {
-  const rgb = cell.rgb || [255, 255, 255]
-  const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
-  if (luminance < 135) {
-    return ((cell.lightInkRatio >= 0.01 && cell.lightInkRatio <= 0.24) || cell.inkRatio >= 0.02) && cell.whiteRatio <= 0.18
-  }
-  return cell.inkRatio >= 0.01
+  return (cell.inkRatio >= 0.01 && cell.inkRatio <= 0.42) ||
+    (cell.lightInkRatio >= 0.01 && cell.lightInkRatio <= 0.42)
 }
 
 function sampleGridCells(imageData, width, height, geometry) {
@@ -618,7 +646,14 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   const columns = rows && sampleRows[0] ? sampleRows[0].length : 0
   const palette = preparePalette(rawPalette)
   const pixelInput = ['native-pixel', 'pixel-grid'].indexOf(details.recognitionMode) >= 0
-  const recognitionPalette = pixelInput ? palette : prepareRecognitionPalette(rawPalette)
+  const allowedCodes = Array.isArray(settings.allowedCodes)
+    ? new Set(settings.allowedCodes.map((code) => String(code || '').toUpperCase()))
+    : null
+  const allowedPalette = allowedCodes && allowedCodes.size >= 2
+    ? rawPalette.filter((item) => allowedCodes.has(item.code))
+    : []
+  const constrainedPalette = allowedPalette.length >= 2 ? allowedPalette : rawPalette
+  const recognitionPalette = pixelInput ? preparePalette(constrainedPalette) : prepareRecognitionPalette(constrainedPalette)
   const matcher = createCachedColorMatcher(recognitionPalette)
   const labeledCells = sampleRows.reduce((sum, row) => sum + row.filter(hasCellLabel).length, 0)
   const labeledGrid = !pixelInput && (typeof settings.hasCellLabels === 'boolean'

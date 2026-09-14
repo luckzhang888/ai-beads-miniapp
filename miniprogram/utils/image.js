@@ -51,6 +51,20 @@ function yieldProcessingThread() {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+function drawClippedSource(ctx, image, source, destination) {
+  const left = Math.max(0, source.x)
+  const top = Math.max(0, source.y)
+  const right = Math.min(source.imageWidth, source.x + source.width)
+  const bottom = Math.min(source.imageHeight, source.y + source.height)
+  if (right <= left || bottom <= top) return false
+  const dx = (left - source.x) / source.width * destination.width
+  const dy = (top - source.y) / source.height * destination.height
+  const dw = (right - left) / source.width * destination.width
+  const dh = (bottom - top) / source.height * destination.height
+  ctx.drawImage(image, left, top, right - left, bottom - top, dx, dy, dw, dh)
+  return true
+}
+
 function validateRecognizedGrid(result, geometry) {
   const warnings = []
   const cellRatio = Math.max(geometry.cellWidth, geometry.cellHeight) /
@@ -335,17 +349,14 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
     const progressEvery = Math.max(1, Math.floor(detected.rows / 20))
     for (let row = 0; row < detected.rows; row += 1) {
       rowContext.clearRect(0, 0, rowCanvas.width, rowCanvas.height)
-      rowContext.drawImage(
-        image,
-        sourceX,
-        sourceY + row * sourceCellHeight,
-        detected.columns * sourceCellWidth,
-        sourceCellHeight,
-        0,
-        0,
-        rowCanvas.width,
-        rowCanvas.height
-      )
+      drawClippedSource(rowContext, image, {
+        x: sourceX,
+        y: sourceY + row * sourceCellHeight,
+        width: detected.columns * sourceCellWidth,
+        height: sourceCellHeight,
+        imageWidth: info.width,
+        imageHeight: info.height
+      }, { width: rowCanvas.width, height: rowCanvas.height })
       sampleRows.push(sampleGridCells(
         rowContext.getImageData(0, 0, rowCanvas.width, rowCanvas.height),
         rowCanvas.width,
@@ -378,9 +389,15 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
     precise.sourceHeight = info.height
     precise.recognitionScale = scale
     precise.sampleCellSize = sampleCellSize
+    if (precise.labeledGrid && !(Array.isArray(settings.allowedCodes) && settings.allowedCodes.length >= 2)) {
+      precise.colorCodesLocallyEstimated = true
+      precise.confidence = Math.min(precise.confidence, 0.68)
+      precise.warning = '本地已还原网格和色块，但无法可靠读取格内小字；相近 MARD 色号仍需在“色号整理”中核对。'
+    }
     precise.validation = validateRecognizedGrid(precise, detected)
     if (!precise.validation.ok) {
-      precise.warning = '识别结果需要人工核对：' + precise.validation.warnings.join('；') + '。请确认网格、颜色数和豆豆总数后再保存。'
+      const validationWarning = '识别结果需要人工核对：' + precise.validation.warnings.join('；') + '。请确认网格、颜色数和豆豆总数后再保存。'
+      precise.warning = precise.warning ? precise.warning + validationWarning : validationWarning
     }
     await reportProcessingProgress(settings, 100, '识别完成')
     return precise
@@ -423,23 +440,43 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     error.code = 'AI_GRID_MISMATCH'
     throw error
   }
-  const sampleRows = await sampleGuidedGrid(pixels, width, height, analysis, (fraction) =>
-    reportProcessingProgress(settings, 60 + fraction * 20, '逐格采样 ' + Math.round(fraction * 100) + '%'))
+  const localCellRatio = localGrid && localGrid.ok
+    ? Math.max(localGrid.cellWidth, localGrid.cellHeight) / Math.max(0.001, Math.min(localGrid.cellWidth, localGrid.cellHeight))
+    : Infinity
+  const useLocalGrid = localGrid && localGrid.ok && Number(localGrid.confidence) >= 0.78 && localCellRatio <= 1.15 &&
+    localGrid.rows === analysis.rows && localGrid.columns === analysis.columns
+  let sampleRows
+  if (useLocalGrid) {
+    // AI is good at reading the count and printed labels; detected line pixels
+    // are more accurate for sub-cell sampling, especially when screenshots
+    // are cropped through the first or last row/column.
+    sampleRows = sampleGridCells(pixels, width, height, localGrid)
+    await reportProcessingProgress(settings, 80, '本地网格精校完成')
+    await yieldProcessingThread()
+  } else {
+    sampleRows = await sampleGuidedGrid(pixels, width, height, analysis, (fraction) =>
+      reportProcessingProgress(settings, 60 + fraction * 20, '逐格采样 ' + Math.round(fraction * 100) + '%'))
+  }
   await reportProcessingProgress(settings, 85, '匹配 MARD 295 色号')
   const result = await classifySampleRowsAsync(sampleRows, palette, Object.assign({}, settings, {
     hasCellLabels: analysis.hasLabels,
+    allowedCodes: analysis.detectedCodes,
     onClassificationProgress: (fraction) => reportProcessingProgress(settings,
       85 + fraction * 13, '匹配色号 ' + Math.round(fraction * 100) + '%')
   }), {
     confidence: analysis.confidence,
     recognitionMode: 'ai-guided-grid',
-    grid: { bounds: analysis.grid, perspective: analysis.perspective }
+    grid: { bounds: analysis.grid, perspective: analysis.perspective, local: useLocalGrid ? localGrid : null }
   })
   result.sourceWidth = info.width
   result.sourceHeight = info.height
   result.recognitionScale = scale
   result.aiAnalysis = analysis
+  result.localGridRefined = Boolean(useLocalGrid)
   const warnings = (analysis.warnings || []).slice()
+  if (analysis.hasLabels && (!Array.isArray(analysis.detectedCodes) || analysis.detectedCodes.length < 2)) {
+    warnings.unshift('AI 未能可靠读取格内色号，颜色仅按本地色差估算')
+  }
   if (analysis.confidence < 0.72) warnings.unshift('AI 网格定位置信度偏低')
   if (!result.beadCount || result.beadCount > result.width * result.height) warnings.push('豆豆数量校验失败')
   result.validation = { ok: warnings.length === 0, warnings }

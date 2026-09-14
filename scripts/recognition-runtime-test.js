@@ -2,7 +2,7 @@ const assert = require('assert')
 const palette = require('../miniprogram/data/colors/mard')
 const { gridImageToPattern, aiGuidedImageToPattern } = require('../miniprogram/utils/image')
 const { guidedGridDisagreesWithLocal } = require('../miniprogram/utils/ai-grid')
-const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync } = require('../miniprogram/utils/grid-recognition')
+const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync, hasCellLabel } = require('../miniprogram/utils/grid-recognition')
 
 // Canvas test double: exercise the production async pipeline, including resize,
 // original-image reuse, row sampling and progress, without a cloud AI service.
@@ -52,7 +52,7 @@ function createCanvasRuntime(fixture) {
   }
 }
 
-async function run({ guideFixture, convertPage }) {
+async function run({ guideFixture, edgeFixture, convertPage }) {
   const previousWx = global.wx
   try {
     const native = recognizeKnownGrid({ data: new Uint8ClampedArray([
@@ -68,6 +68,13 @@ async function run({ guideFixture, convertPage }) {
     })))
     assert.deepStrictEqual(classifySampleRows(rareSamples, palette).matrix, codes,
       'a single real bead must not be erased by neighbour smoothing')
+
+    assert.equal(hasCellLabel({ rgb: [249, 165, 121], inkRatio: 0, lightInkRatio: 0.08, whiteRatio: 0 }), true,
+      'light labels on mid-tone A12/A19 cells must be detected')
+    const constrained = classifySampleRows([[{
+      rgb: [225, 179, 131], inkRatio: 0.08, lightInkRatio: 0, whiteRatio: 0, sampleCount: 64
+    }]], palette, { hasCellLabels: true, allowedCodes: ['G9', 'A17'] })
+    assert.deepStrictEqual(constrained.matrix, [['G9']], 'AI-read labels must constrain ambiguous local colour matching')
 
     const noisySamples = Array.from({ length: 106 }, (_, row) => Array.from({ length: 99 }, (_, column) => ({
       rgb: [40 + column, 60 + row, 100 + (row + column) % 90],
@@ -114,7 +121,7 @@ async function run({ guideFixture, convertPage }) {
     }
     const guidedAnalysis = {
       imageType: 'bead_pattern', hasGrid: true, rows: 2, columns: 2,
-      confidence: 0.95, hasLabels: false, warnings: [], grid: { left: 0, top: 0, right: 1, bottom: 1 },
+      confidence: 0.95, hasLabels: false, detectedCodes: guidedCodes.flat(), warnings: [], grid: { left: 0, top: 0, right: 1, bottom: 1 },
       perspective: { topLeft: [0, 0], topRight: [1, 0], bottomLeft: [0, 1], bottomRight: [1, 1] }
     }
     global.wx = createCanvasRuntime({ width: 12, height: 12, imageData: { data: guidedPixels } })
@@ -125,6 +132,18 @@ async function run({ guideFixture, convertPage }) {
     assert.deepStrictEqual(guided.matrix, guidedCodes, 'AI geometry must produce a local MARD matrix')
     assert.strictEqual(guided.recognitionMode, 'ai-guided-grid')
     assert.strictEqual(guidedProgress[guidedProgress.length - 1], 100)
+
+    global.wx = createCanvasRuntime(edgeFixture)
+    const edgeAnalysis = {
+      imageType: 'bead_pattern', hasGrid: true, rows: 30, columns: 30,
+      confidence: 0.9, hasLabels: false, detectedCodes: [], warnings: [],
+      grid: { left: 0.03, top: 0.03, right: 0.97, bottom: 0.97 },
+      perspective: { topLeft: [0.03, 0.03], topRight: [0.97, 0.03], bottomLeft: [0.03, 0.97], bottomRight: [0.97, 0.97] }
+    }
+    const edgeGuided = await aiGuidedImageToPattern('fixture.png', palette, edgeAnalysis)
+    assert.strictEqual(edgeGuided.localGridRefined, true,
+      'matching local and AI dimensions must use the detected line pixels for precise sampling')
+    assert.deepStrictEqual([edgeGuided.width, edgeGuided.height], [30, 30])
 
     const localGrid = { ok: true, rows: 29, columns: 28, cellWidth: 40, cellHeight: 40, confidence: 0.88 }
     assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 40, columns: 40, rotation: 0 }, localGrid, 1170, 1178), true)

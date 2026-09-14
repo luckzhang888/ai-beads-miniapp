@@ -27,8 +27,24 @@ async function run() {
     }
     await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_PROVIDER_FAILED' })
 
-    global.wx.uploadFile = (options) => { options.fail({ errMsg: 'uploadFile:fail' }); return { abort() {} } }
+    let genericAttempts = 0
+    global.wx.uploadFile = (options) => {
+      genericAttempts += 1
+      options.fail({ errMsg: 'uploadFile:fail' })
+      return { abort() {} }
+    }
     await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_UPLOAD_FAILED' })
+    assert.equal(genericAttempts, 2, 'an intermittent generic upload failure must retry once')
+
+    let recoveredAttempts = 0
+    global.wx.uploadFile = (options) => {
+      recoveredAttempts += 1
+      if (recoveredAttempts === 1) options.fail({ errMsg: 'uploadFile:fail' })
+      else options.success({ statusCode: 200, data: JSON.stringify({ ok: true, result: { hasGrid: true } }) })
+      return { abort() {} }
+    }
+    assert.equal((await analyzeImage('fixture.png')).result.hasGrid, true)
+    assert.equal(recoveredAttempts, 2, 'a second upload attempt can recover without user action')
 
     const uploadFailures = [
       ['uploadFile:fail url not in domain list', 'AI_DOMAIN_NOT_ALLOWED'],

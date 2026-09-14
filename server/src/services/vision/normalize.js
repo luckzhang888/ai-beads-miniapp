@@ -37,6 +37,16 @@ function validateAiAnalysis(value) {
   let columns = null
   let grid = null
   let perspective = null
+  const detectedCodes = []
+  const seenCodes = new Set()
+  if (Array.isArray(value.detectedCodes)) {
+    value.detectedCodes.forEach((rawCode) => {
+      const code = String(rawCode || '').trim().toUpperCase()
+      if (!/^[A-Z][0-9]{1,3}$/.test(code) || seenCodes.has(code) || detectedCodes.length >= 96) return
+      seenCodes.add(code)
+      detectedCodes.push(code)
+    })
+  }
   if (value.hasGrid) {
     rows = value.rows
     columns = value.columns
@@ -70,6 +80,7 @@ function validateAiAnalysis(value) {
     imageType: value.imageType, hasGrid: value.hasGrid, rows, columns,
     rotation: value.rotation, confidence, hasLabels: value.hasLabels,
     background: value.background, grid, perspective,
+    detectedCodes,
     warnings: value.warnings.slice(0, 12).map((item) => item.slice(0, 160))
   }
 }

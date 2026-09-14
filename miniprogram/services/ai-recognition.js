@@ -34,14 +34,7 @@ function getImageSize(imagePath) {
   })
 }
 
-async function analyzeImage(imagePath, options = {}) {
-  const origin = String(apiConfig.apiBaseUrl || '').replace(/\/$/, '')
-  if (!/^https:\/\/[a-z0-9.-]+(?::[0-9]{2,5})?$/i.test(origin)) {
-    throw aiError('AI_NOT_CONFIGURED', '尚未配置豆仓 HTTPS 识别服务，请使用本地识别。')
-  }
-  if (!imagePath) throw aiError('IMAGE_REQUIRED', '请先选择一张图片。')
-  const size = await getImageSize(imagePath)
-  if (size && size > MAX_BYTES) throw aiError('IMAGE_TOO_LARGE', '图片超过 10 MB，请选择较小但清晰的原图。')
+function uploadImageOnce(origin, imagePath, options) {
   return new Promise((resolve, reject) => {
     let settled = false
     let task
@@ -91,6 +84,30 @@ async function analyzeImage(imagePath, options = {}) {
       })
     } catch (error) { finish(uploadFailure(error, origin)) }
   })
+}
+
+async function analyzeImage(imagePath, options = {}) {
+  const origin = String(apiConfig.apiBaseUrl || '').replace(/\/$/, '')
+  if (!/^https:\/\/[a-z0-9.-]+(?::[0-9]{2,5})?$/i.test(origin)) {
+    throw aiError('AI_NOT_CONFIGURED', '尚未配置豆仓 HTTPS 识别服务，请使用本地识别。')
+  }
+  if (!imagePath) throw aiError('IMAGE_REQUIRED', '请先选择一张图片。')
+  const size = await getImageSize(imagePath)
+  if (size && size > MAX_BYTES) throw aiError('IMAGE_TOO_LARGE', '图片超过 10 MB，请选择较小但清晰的原图。')
+  let lastError
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await uploadImageOnce(origin, imagePath, options)
+    } catch (error) {
+      lastError = error
+      if (!error || error.code !== 'AI_UPLOAD_FAILED' || attempt > 0) break
+      await new Promise((resolve) => setTimeout(resolve, 360))
+    }
+  }
+  if (lastError && lastError.code === 'AI_UPLOAD_FAILED') {
+    lastError.message = '图片连续两次未上传到 AI 服务。请检查网络和小程序 uploadFile 合法域名，或先使用本地识别。'
+  }
+  throw lastError
 }
 
 module.exports = { analyzeImage, uploadFailure, MAX_BYTES, TIMEOUT_MS }

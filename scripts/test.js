@@ -8,6 +8,7 @@ const { calculatePatternDimensions, recommendPatternSize, normalizeTransform } =
 const { buildPageRanges } = require('../miniprogram/utils/export')
 const {
   detectGuideGridGeometry,
+  detectGenericGridGeometry,
   recognizeGuideGrid,
   recognizeGenericGrid,
   recognizePixelGrid,
@@ -79,6 +80,8 @@ assert.deepStrictEqual(normalizeTransform({ scale: 10, offsetX: -4, rotation: 90
 const recognitionPalette = prepareRecognitionPalette(palette)
 assert.strictEqual(findNearestColor([210, 176, 180], recognitionPalette).code, 'E21')
 assert.strictEqual(findNearestColor([240, 240, 240], recognitionPalette).code, 'H17')
+assert.strictEqual(findNearestColor([255, 255, 255], recognitionPalette).code, 'H2')
+assert.strictEqual(findNearestColor([219, 179, 136], recognitionPalette).code, 'G9')
 
 function syntheticGuideChart() {
   const columns = 22
@@ -239,6 +242,25 @@ assert.strictEqual(regularResult.width, regularFixture.settings.columns)
 assert.strictEqual(regularResult.height, regularFixture.settings.rows)
 assert.strictEqual(regularResult.beadCount, regularFixture.settings.columns * regularFixture.settings.rows)
 assert.strictEqual(regularResult.recognitionMode, 'regular-grid')
+
+function cropFixture(source, left, top, width, height) {
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const from = ((top + y) * source.width + left + x) * 4
+      data.set(source.imageData.data.subarray(from, from + 4), (y * width + x) * 4)
+    }
+  }
+  return { imageData: { data }, width, height }
+}
+
+const edgeSource = syntheticGridChart({ columns: 30, rows: 30, cell: 10, x0: 0, y0: 0 })
+const edgeCropped = cropFixture(edgeSource, 3, 0, edgeSource.width - 7, edgeSource.height - 4)
+const edgeGeometry = detectGenericGridGeometry(edgeCropped.imageData, edgeCropped.width, edgeCropped.height)
+assert.strictEqual(edgeGeometry.ok, true, JSON.stringify(edgeGeometry))
+assert.deepStrictEqual([edgeGeometry.columns, edgeGeometry.rows], [30, 30],
+  'a screenshot cropped through its outside cells must retain the complete grid dimensions')
+assert.deepStrictEqual(edgeGeometry.clippedEdges, { left: true, right: true, top: true, bottom: true })
 
 const pixelFixture = syntheticGridChart({ columns: 14, rows: 11, cell: 7, x0: 0, y0: 0, gridLines: false })
 const pixelResult = recognizePixelGrid(pixelFixture.imageData, pixelFixture.width, pixelFixture.height, palette)
@@ -459,7 +481,7 @@ assert.deepStrictEqual(convertPage.processingOptions().transform, {
 })
 
 delete global.wx
-require('./recognition-runtime-test').run({ guideFixture: largeGuideFixture, convertPage }).then(() => {
+require('./recognition-runtime-test').run({ guideFixture: largeGuideFixture, edgeFixture: edgeCropped, convertPage }).then(() => {
   console.log('All unit tests passed: large-grid recognition/performance, link extraction, blank detection, crop, palette merge, export paging, progress, inventory transactions and pinch zoom.')
 }).catch((error) => {
   console.error(error)
