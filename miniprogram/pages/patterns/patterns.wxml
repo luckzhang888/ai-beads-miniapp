@@ -1,6 +1,11 @@
 <view class="library-page">
   <primary-nav active="patterns" />
 
+  <view class="library-toolbar">
+    <view class="library-toolbar-title">我的图纸</view>
+    <button wx:if="{{!selectionMode}}" class="upload-button" bindtap="goCreate">＋ 上传图纸</button>
+  </view>
+
   <view class="summary-card">
     <view class="summary-item"><text>{{stats.folders}}</text><view>图纸夹</view></view>
     <view class="summary-line"></view>
@@ -47,7 +52,6 @@
     <view class="section-name">我的图纸</view>
     <view class="pattern-head-actions"><view class="section-count">{{visiblePatterns.length}} 张</view><view class="manage-link" bindtap="toggleManagement">{{selectionMode ? '完成' : '管理'}}</view></view>
   </view>
-  <button wx:if="{{!selectionMode}}" class="upload-button" bindtap="goCreate">＋ 上传图纸</button>
   <view wx:if="{{visiblePatterns.length}}" class="pattern-grid {{viewMode === 'list' ? 'list-mode' : ''}}">
     <view class="pattern-card {{item.selected ? 'selected' : ''}}" wx:for="{{visiblePatterns}}" wx:key="id" data-id="{{item.id}}" bindtap="openPattern" bindlongpress="enterSelection">
       <view wx:if="{{selectionMode}}" class="select-circle {{item.selected ? 'checked' : ''}}">{{item.selected ? '✓' : ''}}</view>

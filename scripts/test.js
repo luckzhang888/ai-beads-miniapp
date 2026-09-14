@@ -45,7 +45,8 @@ assert.strictEqual(appConfig.resizable, true, 'iPad must be allowed to resize in
 assert.strictEqual(appConfig.window.pageOrientation, 'auto', 'tablet preview must follow device orientation')
 assert.match(inventoryStyles, /@media \(min-width: 900px\)[\s\S]*repeat\(6/)
 assert.match(patternStyles, /\.selection-bar \{ left: 184px;/)
-assert.ok(patternMarkup.indexOf('class="upload-button"') < patternMarkup.indexOf('class="pattern-grid'), 'upload button must be before pattern cards')
+assert.ok(patternMarkup.indexOf('class="upload-button"') < patternMarkup.indexOf('class="summary-card"'), 'upload button must be in the top toolbar')
+assert.match(patternStyles, /\.library-toolbar\s*\{[^}]*justify-content:\s*space-between/, 'top toolbar must align upload button to the right')
 assert.doesNotMatch(patternStyles, /\.upload-button\s*\{[^}]*position:\s*fixed/, 'upload button must not cover pattern cards')
 
 function approximately(actual, expected, tolerance) {

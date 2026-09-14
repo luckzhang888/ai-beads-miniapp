@@ -103,6 +103,8 @@ test('DeepSeek request uses vision image_url, original detail and JSON mode', as
   assert.equal(analyzed.rows, 48)
   assert.equal(outbound.url, 'https://api.deepseek.com/chat/completions')
   assert.equal(outbound.body.model, 'deepseek-v4-flash-vision-exp')
+  assert.deepEqual(outbound.body.thinking, { type: 'disabled' })
+  assert.equal(outbound.body.max_tokens, 1800)
   assert.deepEqual(outbound.body.response_format, { type: 'json_object' })
   assert.equal(outbound.body.messages[1].content[1].image_url.detail, 'original')
   assert.match(outbound.body.messages[1].content[1].image_url.url, /^data:image\/png;base64,/)

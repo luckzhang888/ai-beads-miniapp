@@ -27,8 +27,9 @@ function createDeepSeekProvider(config = {}, fetchImpl = fetch) {
           body: JSON.stringify({
             model,
             stream: false,
+            thinking: { type: 'disabled' },
             response_format: { type: 'json_object' },
-            max_tokens: 1200,
+            max_tokens: 1800,
             messages: [
               { role: 'system', content: SYSTEM_PROMPT },
               { role: 'user', content: [
