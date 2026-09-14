@@ -47,6 +47,7 @@
     <view class="section-name">我的图纸</view>
     <view class="pattern-head-actions"><view class="section-count">{{visiblePatterns.length}} 张</view><view class="manage-link" bindtap="toggleManagement">{{selectionMode ? '完成' : '管理'}}</view></view>
   </view>
+  <button wx:if="{{!selectionMode}}" class="upload-button" bindtap="goCreate">＋ 上传图纸</button>
   <view wx:if="{{visiblePatterns.length}}" class="pattern-grid {{viewMode === 'list' ? 'list-mode' : ''}}">
     <view class="pattern-card {{item.selected ? 'selected' : ''}}" wx:for="{{visiblePatterns}}" wx:key="id" data-id="{{item.id}}" bindtap="openPattern" bindlongpress="enterSelection">
       <view wx:if="{{selectionMode}}" class="select-circle {{item.selected ? 'checked' : ''}}">{{item.selected ? '✓' : ''}}</view>
@@ -64,8 +65,7 @@
   </view>
   <view wx:else class="empty-state">没有匹配的图纸，换个关键词试试。</view>
 
-  <view class="safe-bottom"></view>
-  <button wx:if="{{!selectionMode}}" class="upload-button" bindtap="goCreate">＋ 上传图纸</button>
+  <view wx:if="{{selectionMode}}" class="safe-bottom"></view>
 
   <view wx:if="{{selectionMode}}" class="selection-bar">
     <view class="selection-count">已选 {{selectedCount}} 张图纸</view>

@@ -40,10 +40,13 @@ const activityUtils = require('../miniprogram/utils/activity')
 const appConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../miniprogram/app.json'), 'utf8'))
 const inventoryStyles = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/inventory/inventory.wxss'), 'utf8')
 const patternStyles = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/patterns/patterns.wxss'), 'utf8')
+const patternMarkup = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/patterns/patterns.wxml'), 'utf8')
 assert.strictEqual(appConfig.resizable, true, 'iPad must be allowed to resize into the full available window')
 assert.strictEqual(appConfig.window.pageOrientation, 'auto', 'tablet preview must follow device orientation')
 assert.match(inventoryStyles, /@media \(min-width: 900px\)[\s\S]*repeat\(6/)
 assert.match(patternStyles, /\.selection-bar \{ left: 184px;/)
+assert.ok(patternMarkup.indexOf('class="upload-button"') < patternMarkup.indexOf('class="pattern-grid'), 'upload button must be before pattern cards')
+assert.doesNotMatch(patternStyles, /\.upload-button\s*\{[^}]*position:\s*fixed/, 'upload button must not cover pattern cards')
 
 function approximately(actual, expected, tolerance) {
   assert.ok(Math.abs(actual - expected) <= tolerance, actual + ' is not within ' + tolerance + ' of ' + expected)

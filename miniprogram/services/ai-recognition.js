@@ -8,6 +8,25 @@ function aiError(code, message) {
   return error
 }
 
+function uploadFailure(error, origin) {
+  const detail = String(error && (error.errMsg || error.message) || '')
+  const lower = detail.toLowerCase()
+  let mapped
+  if (/domain|合法域名|白名单/.test(lower)) {
+    mapped = aiError('AI_DOMAIN_NOT_ALLOWED', `微信未放行图片上传域名 ${origin}。请在小程序后台将它加入 uploadFile 合法域名，保存后重新打开小程序。`)
+  } else if (/timeout|timed out|超时/.test(lower)) {
+    mapped = aiError('AI_TIMEOUT', '图片上传超时，请切换网络或选用较小的清晰图片重试。')
+  } else if (/no such file|file not found|file path|invalid file|enoent|文件不存在|路径无效/.test(lower)) {
+    mapped = aiError('AI_IMAGE_UNAVAILABLE', '所选图片临时文件已失效，请重新选择原图。')
+  } else if (/ssl|tls|certificate|handshake|证书/.test(lower)) {
+    mapped = aiError('AI_TLS_FAILED', '安全连接失败，请检查手机时间或稍后重试。')
+  } else {
+    mapped = aiError('AI_UPLOAD_FAILED', '图片未上传到 AI 服务。请检查网络和小程序的 uploadFile 合法域名，或先使用本地识别。')
+  }
+  mapped.wxMessage = detail.slice(0, 160)
+  return mapped
+}
+
 function getImageSize(imagePath) {
   return new Promise((resolve) => {
     if (typeof wx.getFileInfo !== 'function') return resolve(null)
@@ -49,12 +68,18 @@ async function analyzeImage(imagePath, options = {}) {
         },
         timeout: TIMEOUT_MS,
         success(response) {
-          let body
-          try { body = JSON.parse(response.data) } catch (error) {
-            finish(aiError('AI_INVALID_RESPONSE', '服务器返回格式无效，请使用本地识别。'))
+          const statusCode = Number(response && response.statusCode) || 0
+          if (statusCode === 413) {
+            finish(aiError('IMAGE_TOO_LARGE', '服务器拒绝了过大的图片，请选择小于 10 MB 的原图。'))
             return
           }
-          if (!Number.isInteger(response.statusCode) || response.statusCode < 200 || response.statusCode >= 300 ||
+          let body
+          try { body = JSON.parse(response && response.data) } catch (error) {
+            finish(aiError(statusCode >= 500 ? 'AI_SERVER_ERROR' : 'AI_INVALID_RESPONSE',
+              statusCode >= 500 ? 'AI 服务暂时不可用，请稍后重试或使用本地识别。' : '服务器返回格式无效，请使用本地识别。'))
+            return
+          }
+          if (statusCode < 200 || statusCode >= 300 ||
               !body || body.ok !== true || !body.result) {
             const message = body && body.error && body.error.message
             finish(aiError(body && body.error && body.error.code || 'AI_SERVER_ERROR', message || 'AI 服务暂时不可用，请使用本地识别。'))
@@ -62,10 +87,10 @@ async function analyzeImage(imagePath, options = {}) {
           }
           finish(null, body)
         },
-        fail() { finish(aiError('AI_UPLOAD_FAILED', '图片上传失败，请检查网络或使用本地识别。')) }
+        fail(error) { finish(uploadFailure(error, origin)) }
       })
-    } catch (error) { finish(aiError('AI_UPLOAD_FAILED', '无法上传图片，请使用本地识别。')) }
+    } catch (error) { finish(uploadFailure(error, origin)) }
   })
 }
 
-module.exports = { analyzeImage, MAX_BYTES, TIMEOUT_MS }
+module.exports = { analyzeImage, uploadFailure, MAX_BYTES, TIMEOUT_MS }

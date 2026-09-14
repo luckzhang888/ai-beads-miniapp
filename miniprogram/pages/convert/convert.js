@@ -467,7 +467,7 @@ Page({
       if (this.data.imagePath !== imagePath) return
       this.presentRecognitionResult(result, 'AI')
     } catch (error) {
-      console.warn('AI recognition failed:', error && error.code || 'AI_RECOGNITION_FAILED')
+      console.warn('AI recognition failed:', error && error.code || 'AI_RECOGNITION_FAILED', error && error.wxMessage || '')
       if (this.data.imagePath !== imagePath) return
       this.setData({
         stage: 'recognizing', recognitionProgress: 0, recognitionStep: 'AI 识别暂时不可用',

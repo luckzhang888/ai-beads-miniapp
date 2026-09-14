@@ -30,13 +30,41 @@ async function run() {
     global.wx.uploadFile = (options) => { options.fail({ errMsg: 'uploadFile:fail' }); return { abort() {} } }
     await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_UPLOAD_FAILED' })
 
+    const uploadFailures = [
+      ['uploadFile:fail url not in domain list', 'AI_DOMAIN_NOT_ALLOWED'],
+      ['uploadFile:fail timeout', 'AI_TIMEOUT'],
+      ['uploadFile:fail no such file', 'AI_IMAGE_UNAVAILABLE'],
+      ['uploadFile:fail ssl handshake failed', 'AI_TLS_FAILED']
+    ]
+    for (const [errMsg, code] of uploadFailures) {
+      global.wx.uploadFile = (options) => { options.fail({ errMsg }); return { abort() {} } }
+      await assert.rejects(analyzeImage('fixture.png'), (error) => {
+        assert.equal(error.code, code)
+        assert.equal(error.wxMessage, errMsg)
+        if (code === 'AI_DOMAIN_NOT_ALLOWED') assert.match(error.message, /https:\/\/beads\.example\.test/)
+        return true
+      })
+    }
+
+    global.wx.uploadFile = (options) => {
+      options.success({ statusCode: 413, data: '<html>Request Entity Too Large</html>' })
+      return { abort() {} }
+    }
+    await assert.rejects(analyzeImage('fixture.png'), { code: 'IMAGE_TOO_LARGE' })
+
+    global.wx.uploadFile = (options) => {
+      options.success({ statusCode: 502, data: '<html>Bad Gateway</html>' })
+      return { abort() {} }
+    }
+    await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_SERVER_ERROR' })
+
     global.wx.uploadFile = () => { throw new Error('should not upload') }
     global.wx.getFileInfo = ({ success }) => success({ size: MAX_BYTES + 1 })
     await assert.rejects(analyzeImage('fixture.png'), { code: 'IMAGE_TOO_LARGE' })
 
     apiConfig.apiBaseUrl = ''
     await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_NOT_CONFIGURED' })
-    console.log('AI upload service passed: success, HTTP 500, upload failure, 10 MB guard and unconfigured HTTPS origin.')
+    console.log('AI upload service passed: success, HTTP errors, specific upload failures, 10 MB guard and unconfigured HTTPS origin.')
   } finally {
     apiConfig.apiBaseUrl = previousOrigin
     if (previousWx === undefined) delete global.wx
