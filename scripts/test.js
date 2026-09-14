@@ -46,7 +46,7 @@ assert.strictEqual(appConfig.window.pageOrientation, 'auto', 'tablet preview mus
 assert.match(inventoryStyles, /@media \(min-width: 900px\)[\s\S]*repeat\(6/)
 assert.match(patternStyles, /\.selection-bar \{ left: 184px;/)
 assert.ok(patternMarkup.indexOf('class="upload-button"') < patternMarkup.indexOf('class="summary-card"'), 'upload button must be in the top toolbar')
-assert.match(patternStyles, /\.library-toolbar\s*\{[^}]*justify-content:\s*space-between/, 'top toolbar must align upload button to the right')
+assert.match(patternStyles, /\.library-toolbar\s*\{[^}]*position:\s*absolute;[^}]*top:[^}]*right:/, 'upload button must sit at the mobile top right')
 assert.doesNotMatch(patternStyles, /\.upload-button\s*\{[^}]*position:\s*fixed/, 'upload button must not cover pattern cards')
 
 function approximately(actual, expected, tolerance) {

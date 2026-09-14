@@ -2,7 +2,6 @@
   <primary-nav active="patterns" />
 
   <view class="library-toolbar">
-    <view class="library-toolbar-title">我的图纸</view>
     <button wx:if="{{!selectionMode}}" class="upload-button" bindtap="goCreate">＋ 上传图纸</button>
   </view>
 
