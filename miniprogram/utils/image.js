@@ -1,5 +1,5 @@
 const { matchImageData } = require('./color-match')
-const { validateGuidedAnalysis, sampleGuidedGrid } = require('./ai-grid')
+const { validateGuidedAnalysis, guidedGridDisagreesWithLocal, sampleGuidedGrid } = require('./ai-grid')
 const {
   detectGuideGridGeometry,
   detectGenericGridGeometry,
@@ -417,6 +417,12 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   ctx.drawImage(image, 0, 0, info.width, info.height, 0, 0, width, height)
   await reportProcessingProgress(settings, 60, '校准网格与透视')
   const pixels = ctx.getImageData(0, 0, width, height)
+  const localGrid = detectGenericGridGeometry(pixels, width, height, settings)
+  if (guidedGridDisagreesWithLocal(analysis, localGrid, width, height)) {
+    const error = new Error('AI 估算的网格行列与图片中的规则网格明显不符。')
+    error.code = 'AI_GRID_MISMATCH'
+    throw error
+  }
   const sampleRows = await sampleGuidedGrid(pixels, width, height, analysis, (fraction) =>
     reportProcessingProgress(settings, 60 + fraction * 20, '逐格采样 ' + Math.round(fraction * 100) + '%'))
   await reportProcessingProgress(settings, 85, '匹配 MARD 295 色号')

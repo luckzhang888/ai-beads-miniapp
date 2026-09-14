@@ -1,6 +1,7 @@
 const assert = require('assert')
 const palette = require('../miniprogram/data/colors/mard')
 const { gridImageToPattern, aiGuidedImageToPattern } = require('../miniprogram/utils/image')
+const { guidedGridDisagreesWithLocal } = require('../miniprogram/utils/ai-grid')
 const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync } = require('../miniprogram/utils/grid-recognition')
 
 // Canvas test double: exercise the production async pipeline, including resize,
@@ -125,6 +126,11 @@ async function run({ guideFixture, convertPage }) {
     assert.strictEqual(guided.recognitionMode, 'ai-guided-grid')
     assert.strictEqual(guidedProgress[guidedProgress.length - 1], 100)
 
+    const localGrid = { ok: true, rows: 29, columns: 28, cellWidth: 40, cellHeight: 40, confidence: 0.88 }
+    assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 40, columns: 40, rotation: 0 }, localGrid, 1170, 1178), true)
+    assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 30, columns: 30, rotation: 0 }, localGrid, 1170, 1178), false)
+    assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 40, columns: 40, rotation: 90 }, localGrid, 1170, 1178), false)
+
     const rotatedPixels = new Uint8ClampedArray(12 * 12 * 4)
     for (let y = 0; y < 12; y += 1) {
       for (let x = 0; x < 12; x += 1) {
@@ -155,6 +161,23 @@ async function run({ guideFixture, convertPage }) {
     assert.strictEqual(convertPage.data.recognitionSource, 'AI')
     assert.strictEqual(convertPage.data.recognitionResult.exactRecognition, false)
     assert.strictEqual(convertPage.data.recognitionResult.needsReview, true)
+    convertPage.aiAnalysisCache = null
+    convertPage.setData({ recognitionProgress: 0 })
+    convertPage.processAiGuidedImage = async () => {
+      const error = new Error('AI dimensions disagree')
+      error.code = 'AI_GRID_MISMATCH'
+      throw error
+    }
+    convertPage.processCurrentImage = async (onProgress) => {
+      await onProgress(50, '本地校验中')
+      assert.ok(convertPage.data.recognitionProgress >= 60, 'AI-to-local fallback must not reset progress')
+      return Object.assign({}, result, { validation: { ok: true, warnings: [] } })
+    }
+    await convertPage.runAiRecognition()
+    assert.strictEqual(convertPage.data.recognitionProgress, 100)
+    assert.strictEqual(convertPage.data.recognitionSource, '本地')
+    assert.strictEqual(convertPage.data.recognitionResult.needsReview, true)
+    assert.match(convertPage.data.recognitionResult.warning, /AI 行列估算与本地网格检测不一致/)
     convertPage.aiAnalysisCache = null
     convertPage.setData({ recognitionProgress: 0 })
     convertPage.requestAiAnalysis = async () => ({ result: { imageType: 'photo', hasGrid: false, confidence: 0.88 } })

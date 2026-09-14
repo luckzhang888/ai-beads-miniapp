@@ -38,6 +38,19 @@ function validateGuidedAnalysis(analysis) {
   return corners
 }
 
+function guidedGridDisagreesWithLocal(analysis, detected, width, height) {
+  if (!detected || !detected.ok || Number(detected.confidence) < 0.85 ||
+      Math.abs(Number(analysis.rotation) || 0) > 2 ||
+      !Number.isFinite(detected.cellWidth) || !Number.isFinite(detected.cellHeight)) return false
+  const cellRatio = Math.max(detected.cellWidth, detected.cellHeight) /
+    Math.max(0.001, Math.min(detected.cellWidth, detected.cellHeight))
+  const columnCoverage = detected.columns * detected.cellWidth / width
+  const rowCoverage = detected.rows * detected.cellHeight / height
+  if (cellRatio > 1.15 || columnCoverage < 0.7 || rowCoverage < 0.7) return false
+  return Math.abs(analysis.columns - detected.columns) > Math.max(2, Math.round(detected.columns * 0.12)) ||
+    Math.abs(analysis.rows - detected.rows) > Math.max(2, Math.round(detected.rows * 0.12))
+}
+
 function createGridMapper(corners) {
   const p00 = corners.topLeft
   const p10 = corners.topRight
@@ -99,4 +112,4 @@ async function sampleGuidedGrid(imageData, width, height, analysis, onProgress) 
   return rows
 }
 
-module.exports = { validateGuidedAnalysis, createGridMapper, sampleGuidedGrid }
+module.exports = { validateGuidedAnalysis, guidedGridDisagreesWithLocal, createGridMapper, sampleGuidedGrid }

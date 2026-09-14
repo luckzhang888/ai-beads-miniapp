@@ -449,11 +449,28 @@ Page({
       if (this.data.imagePath !== imagePath) return
       if (!analysis || typeof analysis.hasGrid !== 'boolean') throw new Error('AI 返回的图纸结构无效，请重试或使用本地识别。')
       let result
+      let recognitionSource = 'AI'
       if (analysis.hasGrid) {
-        result = await this.processAiGuidedImage(imagePath, analysis, (progress, step) => this.setDataAsync({
-          recognitionProgress: Math.min(98, Number(progress) || 0),
-          recognitionStep: step || '正在识别图纸'
-        }))
+        try {
+          result = await this.processAiGuidedImage(imagePath, analysis, (progress, step) => this.setDataAsync({
+            recognitionProgress: Math.min(98, Number(progress) || 0),
+            recognitionStep: step || '正在识别图纸'
+          }))
+        } catch (error) {
+          if (!error || error.code !== 'AI_GRID_MISMATCH') throw error
+          await this.setDataAsync({ recognitionProgress: 60, recognitionStep: 'AI 行列不可靠，改用本地网格识别' })
+          result = await this.processCurrentImage((progress, step) => this.setDataAsync({
+            recognitionProgress: Math.min(98, 60 + (Number(progress) || 0) * 0.38),
+            recognitionStep: step || '正在本地识别图纸'
+          }))
+          recognitionSource = '本地'
+          const warning = 'AI 行列估算与本地网格检测不一致，已改用本地识别。请核对网格尺寸、色号和豆数。'
+          result.warning = result.warning ? warning + result.warning : warning
+          result.validation = Object.assign({}, result.validation, {
+            ok: false,
+            warnings: [warning].concat(result.validation && result.validation.warnings || [])
+          })
+        }
       } else if (analysis.imageType === 'photo') {
         await this.setDataAsync({ recognitionProgress: 60, recognitionStep: '照片像素化并匹配 MARD 色号' })
         result = await this.processAiPhotoImage(imagePath)
@@ -465,7 +482,7 @@ Page({
         throw new Error('AI 没有检测到可定位的网格。请更换清晰原图，或使用本地识别。')
       }
       if (this.data.imagePath !== imagePath) return
-      this.presentRecognitionResult(result, 'AI')
+      this.presentRecognitionResult(result, recognitionSource)
     } catch (error) {
       console.warn('AI recognition failed:', error && error.code || 'AI_RECOGNITION_FAILED', error && error.wxMessage || '')
       if (this.data.imagePath !== imagePath) return

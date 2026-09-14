@@ -43,7 +43,7 @@
     <bead-grid wx:if="{{recognitionResult}}" matrix="{{recognitionResult.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{330}}" show-grid="{{true}}" />
     <image wx:else src="{{imagePath}}" mode="aspectFit" />
   </view>
-  <view wx:if="{{recognitionSource === '本地' && recognitionResult}}" class="recognition-local-note">本次使用本地识别结果，未经过 DeepSeek AI。请仔细核对网格和色号。</view>
+  <view wx:if="{{recognitionSource === '本地' && recognitionResult}}" class="recognition-local-note">本次图纸网格和色号由本地识别生成，请仔细核对尺寸和颜色。</view>
   <view wx:if="{{recognitionError}}" class="recognition-error">
     <b>AI 识别暂时不可用</b>
     <text>{{recognitionError}}</text>
