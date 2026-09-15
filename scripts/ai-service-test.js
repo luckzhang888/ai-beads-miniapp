@@ -36,6 +36,27 @@ async function run() {
     await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_UPLOAD_FAILED' })
     assert.equal(genericAttempts, 2, 'an intermittent generic upload failure must retry once')
 
+    let fallbackRequests = 0
+    global.wx.getFileSystemManager = () => ({
+      readFile(options) {
+        assert.equal(options.filePath, 'fixture.png')
+        assert.equal(options.encoding, 'base64')
+        options.success({ data: 'fixture-base64' })
+      }
+    })
+    global.wx.request = (options) => {
+      fallbackRequests += 1
+      assert.equal(options.url, 'https://beads.example.test/api/v1/beads/analyze-base64')
+      assert.equal(options.method, 'POST')
+      assert.equal(options.data.imageBase64, 'fixture-base64')
+      assert.equal(options.data.palette, 'MARD')
+      options.success({ statusCode: 200, data: { ok: true, result: { hasGrid: true, rows: 30, columns: 30 } } })
+      return { abort() {} }
+    }
+    assert.equal((await analyzeImage('fixture.png')).result.rows, 30,
+      'Base64 request fallback must recover when uploadFile cannot leave the phone')
+    assert.equal(fallbackRequests, 1)
+
     let recoveredAttempts = 0
     global.wx.uploadFile = (options) => {
       recoveredAttempts += 1
@@ -80,7 +101,7 @@ async function run() {
 
     apiConfig.apiBaseUrl = ''
     await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_NOT_CONFIGURED' })
-    console.log('AI upload service passed: success, HTTP errors, specific upload failures, 10 MB guard and unconfigured HTTPS origin.')
+    console.log('AI upload service passed: multipart, Base64 fallback, HTTP errors, specific failures, 10 MB guard and HTTPS origin.')
   } finally {
     apiConfig.apiBaseUrl = previousOrigin
     if (previousWx === undefined) delete global.wx

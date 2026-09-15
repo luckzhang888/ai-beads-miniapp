@@ -51,20 +51,6 @@ function yieldProcessingThread() {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-function drawClippedSource(ctx, image, source, destination) {
-  const left = Math.max(0, source.x)
-  const top = Math.max(0, source.y)
-  const right = Math.min(source.imageWidth, source.x + source.width)
-  const bottom = Math.min(source.imageHeight, source.y + source.height)
-  if (right <= left || bottom <= top) return false
-  const dx = (left - source.x) / source.width * destination.width
-  const dy = (top - source.y) / source.height * destination.height
-  const dw = (right - left) / source.width * destination.width
-  const dh = (bottom - top) / source.height * destination.height
-  ctx.drawImage(image, left, top, right - left, bottom - top, dx, dy, dw, dh)
-  return true
-}
-
 function validateRecognizedGrid(result, geometry) {
   const warnings = []
   const cellRatio = Math.max(geometry.cellWidth, geometry.cellHeight) /
@@ -332,36 +318,24 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
   }
   if (detected.ok) {
     await reportProcessingProgress(settings, 52, '网格已定位，准备逐格采样')
-    const sourceCellWidth = detected.cellWidth / scale
-    const sourceCellHeight = detected.cellHeight / scale
-    const safeCanvasCellSize = Math.max(16, Math.floor(4096 / detected.columns))
-    const sampleCellSize = Math.max(16, Math.min(32, safeCanvasCellSize, Math.round(Math.min(sourceCellWidth, sourceCellHeight))))
-    // Reuse the same canvas and decoded image. The first-pass pixels are no
-    // longer needed after geometry detection, avoiding a second image decode.
-    const rowCanvas = canvas
-    rowCanvas.width = detected.columns * sampleCellSize
-    rowCanvas.height = sampleCellSize
-    const rowContext = rowCanvas.getContext('2d')
-    rowContext.imageSmoothingEnabled = false
-    const sourceX = detected.x / scale
-    const sourceY = detected.y / scale
+    // Sample from the same pixels used to locate the grid. Resizing each row
+    // through Canvas used to introduce device-dependent interpolation and
+    // could turn printed labels into blank cells on real phones.
     const sampleRows = []
     const progressEvery = Math.max(1, Math.floor(detected.rows / 20))
     for (let row = 0; row < detected.rows; row += 1) {
-      rowContext.clearRect(0, 0, rowCanvas.width, rowCanvas.height)
-      drawClippedSource(rowContext, image, {
-        x: sourceX,
-        y: sourceY + row * sourceCellHeight,
-        width: detected.columns * sourceCellWidth,
-        height: sourceCellHeight,
-        imageWidth: info.width,
-        imageHeight: info.height
-      }, { width: rowCanvas.width, height: rowCanvas.height })
       sampleRows.push(sampleGridCells(
-        rowContext.getImageData(0, 0, rowCanvas.width, rowCanvas.height),
-        rowCanvas.width,
-        rowCanvas.height,
-        { x: 0, y: 0, cellWidth: sampleCellSize, cellHeight: sampleCellSize, columns: detected.columns, rows: 1 }
+        recognitionData,
+        width,
+        height,
+        {
+          x: detected.x,
+          y: detected.y + row * detected.cellHeight,
+          cellWidth: detected.cellWidth,
+          cellHeight: detected.cellHeight,
+          columns: detected.columns,
+          rows: 1
+        }
       )[0])
       if ((row + 1) % progressEvery === 0 || row + 1 === detected.rows) {
         await reportProcessingProgress(settings, 52 + (row + 1) / detected.rows * 34, '逐格采样 ' + (row + 1) + '/' + detected.rows)
@@ -388,7 +362,7 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
     precise.sourceWidth = info.width
     precise.sourceHeight = info.height
     precise.recognitionScale = scale
-    precise.sampleCellSize = sampleCellSize
+    precise.sampleCellSize = Math.min(detected.cellWidth, detected.cellHeight)
     if (precise.labeledGrid && !(Array.isArray(settings.allowedCodes) && settings.allowedCodes.length >= 2)) {
       precise.colorCodesLocallyEstimated = true
       precise.confidence = Math.min(precise.confidence, 0.68)
@@ -443,8 +417,17 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   const localCellRatio = localGrid && localGrid.ok
     ? Math.max(localGrid.cellWidth, localGrid.cellHeight) / Math.max(0.001, Math.min(localGrid.cellWidth, localGrid.cellHeight))
     : Infinity
-  const useLocalGrid = localGrid && localGrid.ok && Number(localGrid.confidence) >= 0.78 && localCellRatio <= 1.15 &&
-    localGrid.rows === analysis.rows && localGrid.columns === analysis.columns
+  const reliableLocalGrid = localGrid && localGrid.ok && Number(localGrid.confidence) >= 0.78 && localCellRatio <= 1.15
+  const dimensionsAreClose = reliableLocalGrid &&
+    Math.abs(localGrid.rows - analysis.rows) <= Math.max(2, Math.round(localGrid.rows * 0.12)) &&
+    Math.abs(localGrid.columns - analysis.columns) <= Math.max(2, Math.round(localGrid.columns * 0.12))
+  // Vision models read tiny printed labels better than the device, but can
+  // fluctuate by one or two border lines on the same image. A strong local
+  // line detector is deterministic, so use its grid whenever the two results
+  // describe the same chart and keep AI only for the allowed MARD code set.
+  const useLocalGrid = Boolean(reliableLocalGrid && dimensionsAreClose)
+  const aiDimensionsCorrected = useLocalGrid &&
+    (localGrid.rows !== analysis.rows || localGrid.columns !== analysis.columns)
   let sampleRows
   if (useLocalGrid) {
     // AI is good at reading the count and printed labels; detected line pixels
@@ -473,6 +456,10 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.recognitionScale = scale
   result.aiAnalysis = analysis
   result.localGridRefined = Boolean(useLocalGrid)
+  result.aiDimensionsCorrected = Boolean(aiDimensionsCorrected)
+  if (aiDimensionsCorrected) {
+    result.aiOriginalDimensions = { rows: analysis.rows, columns: analysis.columns }
+  }
   const warnings = (analysis.warnings || []).slice()
   if (analysis.hasLabels && (!Array.isArray(analysis.detectedCodes) || analysis.detectedCodes.length < 2)) {
     warnings.unshift('AI 未能可靠读取格内色号，颜色仅按本地色差估算')

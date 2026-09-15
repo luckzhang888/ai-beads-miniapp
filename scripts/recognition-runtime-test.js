@@ -4,8 +4,8 @@ const { gridImageToPattern, aiGuidedImageToPattern } = require('../miniprogram/u
 const { guidedGridDisagreesWithLocal } = require('../miniprogram/utils/ai-grid')
 const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync, hasCellLabel } = require('../miniprogram/utils/grid-recognition')
 
-// Canvas test double: exercise the production async pipeline, including resize,
-// original-image reuse, row sampling and progress, without a cloud AI service.
+// Canvas test double: exercise the production async pipeline, including
+// original-pixel sampling and progress, without a cloud AI service.
 function createCanvasRuntime(fixture) {
   const calls = { decodes: 0, canvases: 0, widths: [] }
   return {
@@ -20,8 +20,8 @@ function createCanvasRuntime(fixture) {
         clearRect() { draw = null },
         drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh) { draw = { sx, sy, sw, sh, dx, dy, dw, dh } },
         getImageData(left, top, outputWidth, outputHeight) {
-          assert.ok(draw, 'draw must be restored after resizing the canvas')
-          assert.ok(outputWidth <= 4096, 'row canvas must stay within the dimension limit')
+          assert.ok(draw, 'source image must be drawn before pixel sampling')
+          assert.ok(outputWidth <= 4096, 'processor canvas must stay within the dimension limit')
           calls.widths.push(outputWidth)
           const data = new Uint8ClampedArray(outputWidth * outputHeight * 4)
           for (let y = 0; y < outputHeight; y += 1) {
@@ -71,6 +71,8 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
 
     assert.equal(hasCellLabel({ rgb: [249, 165, 121], inkRatio: 0, lightInkRatio: 0.08, whiteRatio: 0 }), true,
       'light labels on mid-tone A12/A19 cells must be detected')
+    assert.equal(hasCellLabel({ rgb: [222, 181, 138], inkRatio: 0.44, lightInkRatio: 0, whiteRatio: 0 }), true,
+      'dense two-character labels next to compressed grid lines must not become blank cells')
     const constrained = classifySampleRows([[{
       rgb: [225, 179, 131], inkRatio: 0.08, lightInkRatio: 0, whiteRatio: 0, sampleCount: 64
     }]], palette, { hasCellLabels: true, allowedCodes: ['G9', 'A17'] })
@@ -144,6 +146,15 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.strictEqual(edgeGuided.localGridRefined, true,
       'matching local and AI dimensions must use the detected line pixels for precise sampling')
     assert.deepStrictEqual([edgeGuided.width, edgeGuided.height], [30, 30])
+
+    global.wx = createCanvasRuntime(edgeFixture)
+    const fluctuatingAnalysis = Object.assign({}, edgeAnalysis, { rows: 32, columns: 31 })
+    const correctedGuided = await aiGuidedImageToPattern('fixture.png', palette, fluctuatingAnalysis)
+    assert.strictEqual(correctedGuided.localGridRefined, true)
+    assert.strictEqual(correctedGuided.aiDimensionsCorrected, true,
+      'a reliable local grid must correct small non-deterministic AI dimension errors')
+    assert.deepStrictEqual([correctedGuided.width, correctedGuided.height], [30, 30])
+    assert.deepStrictEqual(correctedGuided.aiOriginalDimensions, { rows: 32, columns: 31 })
 
     const localGrid = { ok: true, rows: 29, columns: 28, cellWidth: 40, cellHeight: 40, confidence: 0.88 }
     assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 40, columns: 40, rotation: 0 }, localGrid, 1170, 1178), true)

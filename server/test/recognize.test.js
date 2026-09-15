@@ -35,6 +35,18 @@ async function postImage(baseUrl, buffer, name = 'image.jpg') {
   return { status: response.status, body: await response.json() }
 }
 
+async function postBase64Image(baseUrl, buffer, extra = {}) {
+  const response = await fetch(baseUrl + '/api/v1/beads/analyze-base64', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(Object.assign({
+      imageBase64: buffer && buffer.toString('base64'),
+      mode: 'auto', expectedSize: 48, palette: 'MARD'
+    }, extra))
+  })
+  return { status: response.status, body: await response.json() }
+}
+
 test('healthz does not call provider; image validation and JPEG/PNG routes', async () => {
   const received = []
   await withApp({ model: 'mock', analyze: async (image) => { received.push(image.mimeType); return validAnalysis } }, async (url) => {
@@ -69,6 +81,29 @@ test('API rejects missing, illegal and oversized uploads; accepts JPEG, PNG, GIF
     assert.equal((await postImage(url, gif, 'image.gif')).status, 200)
     assert.equal((await postImage(url, webp, 'image.webp')).status, 200)
     assert.deepEqual(received, ['image/jpeg', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+  })
+})
+
+test('Base64 fallback validates input and reaches the same recognition provider', async () => {
+  const received = []
+  await withApp({ model: 'mock', analyze: async (image) => { received.push(image.mimeType); return validAnalysis } }, async (url) => {
+    const result = await postBase64Image(url, jpeg)
+    assert.equal(result.status, 200)
+    assert.equal(result.body.result.columns, 43)
+    assert.deepEqual(received, ['image/jpeg'])
+
+    const missing = await postBase64Image(url, null)
+    assert.equal(missing.status, 400)
+    assert.equal(missing.body.error.code, 'IMAGE_REQUIRED')
+    const invalid = await postBase64Image(url, Buffer.from('not an image'))
+    assert.equal(invalid.status, 415)
+    assert.equal(invalid.body.error.code, 'INVALID_IMAGE')
+    const malformed = await postBase64Image(url, jpeg, { imageBase64: '%%%' })
+    assert.equal(malformed.status, 400)
+    assert.equal(malformed.body.error.code, 'INVALID_UPLOAD')
+    const oversized = await postBase64Image(url, Buffer.alloc(MAX_BYTES + 1))
+    assert.equal(oversized.status, 413)
+    assert.equal(oversized.body.error.code, 'IMAGE_TOO_LARGE')
   })
 })
 

@@ -615,8 +615,11 @@ function stabilizeLabeledMatrix(sampleRows, matrix, variantsByCode) {
 }
 
 function hasCellLabel(cell) {
-  return (cell.inkRatio >= 0.01 && cell.inkRatio <= 0.42) ||
-    (cell.lightInkRatio >= 0.01 && cell.lightInkRatio <= 0.42)
+  // Two-character labels plus a nearby grid line can occupy about 43-44% of
+  // a small edge cell after JPEG compression. Keep the upper bound below a
+  // solid colour block while accepting those valid, densely inked labels.
+  return (cell.inkRatio >= 0.01 && cell.inkRatio <= 0.48) ||
+    (cell.lightInkRatio >= 0.01 && cell.lightInkRatio <= 0.48)
 }
 
 function sampleGridCells(imageData, width, height, geometry) {
