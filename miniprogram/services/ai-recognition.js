@@ -8,6 +8,28 @@ function aiError(code, message) {
   return error
 }
 
+function runtimeAppId() {
+  try {
+    if (typeof wx === 'undefined' || typeof wx.getAccountInfoSync !== 'function') return ''
+    const account = wx.getAccountInfoSync()
+    return String(account && account.miniProgram && account.miniProgram.appId || '')
+  } catch (error) {
+    return ''
+  }
+}
+
+function attachWechatDiagnostic(error, detail) {
+  const wxMessage = String(detail || '').slice(0, 160)
+  const appId = runtimeAppId()
+  error.wxMessage = wxMessage
+  error.appId = appId
+  const diagnostics = []
+  if (wxMessage) diagnostics.push(`微信错误：${wxMessage}`)
+  if (appId) diagnostics.push(`AppID：${appId}`)
+  if (diagnostics.length) error.message += `\n${diagnostics.join('；')}`
+  return error
+}
+
 function uploadFailure(error, origin) {
   const detail = String(error && (error.errMsg || error.message) || '')
   const lower = detail.toLowerCase()
@@ -23,8 +45,7 @@ function uploadFailure(error, origin) {
   } else {
     mapped = aiError('AI_UPLOAD_FAILED', '图片未上传到 AI 服务。请检查网络和小程序的 uploadFile 合法域名，或先使用本地识别。')
   }
-  mapped.wxMessage = detail.slice(0, 160)
-  return mapped
+  return attachWechatDiagnostic(mapped, detail)
 }
 
 function requestFailure(error, origin) {
@@ -35,11 +56,12 @@ function requestFailure(error, origin) {
     mapped = aiError('AI_DOMAIN_NOT_ALLOWED', `微信未放行 AI 服务域名 ${origin}。请把它同时加入 request 和 uploadFile 合法域名，保存后重新打开小程序。`)
   } else if (/timeout|timed out|超时/.test(lower)) {
     mapped = aiError('AI_TIMEOUT', 'AI 备用传输超时，请切换网络或选用较小的清晰图片重试。')
+  } else if (/ssl|tls|certificate|handshake|证书/.test(lower)) {
+    mapped = aiError('AI_TLS_FAILED', 'AI 服务安全连接失败，请检查手机时间或稍后重试。')
   } else {
     mapped = aiError('AI_REQUEST_FAILED', '图片上传与备用传输均未到达 AI 服务。请检查网络，以及小程序的 request、uploadFile 合法域名。')
   }
-  mapped.wxMessage = detail.slice(0, 160)
-  return mapped
+  return attachWechatDiagnostic(mapped, detail)
 }
 
 function parseApiResponse(response) {
@@ -183,4 +205,4 @@ async function analyzeImage(imagePath, options = {}) {
   throw lastError
 }
 
-module.exports = { analyzeImage, uploadFailure, requestFailure, MAX_BYTES, TIMEOUT_MS }
+module.exports = { analyzeImage, uploadFailure, requestFailure, runtimeAppId, MAX_BYTES, TIMEOUT_MS }

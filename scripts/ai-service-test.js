@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict')
 const apiConfig = require('../miniprogram/config/api')
-const { analyzeImage, MAX_BYTES } = require('../miniprogram/services/ai-recognition')
+const { analyzeImage, requestFailure, MAX_BYTES } = require('../miniprogram/services/ai-recognition')
 
 async function run() {
   const previousWx = global.wx
@@ -10,6 +10,7 @@ async function run() {
     let uploaded = 0
     global.wx = {
       getFileInfo({ success }) { success({ size: 1024 }) },
+      getAccountInfoSync() { return { miniProgram: { appId: 'wx-test-app-id' } } },
       uploadFile(options) {
         uploaded += 1
         assert.equal(options.url, 'https://beads.example.test/api/v1/beads/analyze')
@@ -78,10 +79,17 @@ async function run() {
       await assert.rejects(analyzeImage('fixture.png'), (error) => {
         assert.equal(error.code, code)
         assert.equal(error.wxMessage, errMsg)
+        assert.equal(error.appId, 'wx-test-app-id')
+        assert.match(error.message, /AppID：wx-test-app-id/)
         if (code === 'AI_DOMAIN_NOT_ALLOWED') assert.match(error.message, /https:\/\/beads\.example\.test/)
         return true
       })
     }
+
+    const requestTlsError = requestFailure({ errMsg: 'request:fail ssl handshake failed' }, 'https://beads.example.test')
+    assert.equal(requestTlsError.code, 'AI_TLS_FAILED')
+    assert.match(requestTlsError.message, /微信错误：request:fail ssl handshake failed/)
+    assert.match(requestTlsError.message, /AppID：wx-test-app-id/)
 
     global.wx.uploadFile = (options) => {
       options.success({ statusCode: 413, data: '<html>Request Entity Too Large</html>' })
