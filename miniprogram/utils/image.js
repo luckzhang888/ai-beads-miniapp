@@ -72,19 +72,12 @@ function validateRecognizedGrid(result, geometry) {
 
 function trustedDetectedCodes(analysis) {
   const legendCounts = trustedLegendCodeCounts(analysis)
-  if (legendCounts) return Object.keys(legendCounts)
-  const codes = analysis && Array.isArray(analysis.detectedCodes)
-    ? analysis.detectedCodes.filter(Boolean)
-    : []
-  if (codes.length < 2) return []
-  const warnings = analysis && Array.isArray(analysis.warnings) ? analysis.warnings : []
-  const unreliable = warnings.some((warning) => {
-    const text = String(warning || '')
-    return /detectedcodes.*(?:图例|非逐格|无法|不能|不可|看不清|辨认|推测)/i.test(text) ||
-      /格内色号.*(?:图例|非逐格|无法|不能|不可|看不清|辨认|推测)/i.test(text) ||
-      /(?:来自|取自).*图例.*(?:而非|不是).*逐格/i.test(text)
-  })
-  return unreliable ? [] : codes
+  // A vision model can usually read a handful of large labels but cannot
+  // prove that the list covers every colour in a dense chart. Restricting the
+  // matcher to that partial list is destructive (for example, 15 colours can
+  // collapse to 8). Only a complete legend whose counts add up to the printed
+  // total is strong enough to constrain the MARD 221 palette.
+  return legendCounts ? Object.keys(legendCounts) : []
 }
 
 function trustedLegendCodeCounts(analysis) {

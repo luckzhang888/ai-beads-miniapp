@@ -77,9 +77,9 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
         inkRatio: 0, lightInkRatio: 0, whiteRatio: onRing ? 0 : 0.7, sampleCount: 64
       }
     }))
-    const topologyResult = classifySampleRows(backgroundSamples, palette, { hasCellLabels: false })
+    const topologyResult = classifySampleRows(backgroundSamples, palette, { hasCellLabels: true })
     assert.strictEqual(topologyResult.blankCount, 16,
-      'light background connected to the grid edge must not be counted as beads')
+      'light background connected to the grid edge must not be counted as beads even when AI incorrectly claims labels')
     assert.ok(topologyResult.matrix[2][2],
       'an enclosed light cell must remain an intentional white bead instead of becoming a hole')
     assert.strictEqual(topologyResult.backgroundTopologyApplied, true)
@@ -159,6 +159,8 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     const unreliableLegendWarning = '底部图例色号可读，格内色号因分辨率过小无法辨认；detectedCodes来自底部图例而非逐格读取'
     assert.deepStrictEqual(trustedDetectedCodes({ detectedCodes: ['B7', 'E8'], warnings: [unreliableLegendWarning] }), [],
       'AI-admitted legend guesses must not constrain the local palette')
+    assert.deepStrictEqual(trustedDetectedCodes({ detectedCodes: ['B7', 'E8', 'G9'], warnings: [] }), [],
+      'a partial model-read code list must never collapse a larger chart palette')
     global.wx = createCanvasRuntime(guideFixture)
     const largeGuided = await aiGuidedImageToPattern('fixture.png', palette, {
       imageType: 'bead_pattern', hasGrid: true, rows: 106, columns: 99,

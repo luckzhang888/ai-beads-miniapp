@@ -913,9 +913,11 @@ function restoreEnclosedBackgroundCells(sampleRows, matrix, matcher, backgroundR
   const rows = matrix.length
   const columns = matrix[0].length
   const outside = Array.from({ length: rows }, () => new Uint8Array(columns))
+  const candidate = sampleRows.map((row) => row.map((cell) =>
+    isBackgroundCell(cell, backgroundRgb, 249) || isWhiteLike(cell.rgb, 249) || cell.whiteRatio >= 0.36))
   const queue = []
   const visit = (row, column) => {
-    if (row < 0 || row >= rows || column < 0 || column >= columns || outside[row][column] || matrix[row][column]) return
+    if (row < 0 || row >= rows || column < 0 || column >= columns || outside[row][column] || !candidate[row][column]) return
     outside[row][column] = 1
     queue.push([row, column])
   }
@@ -936,15 +938,18 @@ function restoreEnclosedBackgroundCells(sampleRows, matrix, matcher, backgroundR
   }
   let restored = 0
   const output = matrix.map((row) => row.slice())
-  for (let row = 1; row < rows - 1; row += 1) {
-    for (let column = 1; column < columns - 1; column += 1) {
-      if (matrix[row][column] || outside[row][column]) continue
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      if (!candidate[row][column]) continue
+      if (outside[row][column]) {
+        output[row][column] = ''
+        continue
+      }
       const cell = sampleRows[row][column]
-      if (!isBackgroundCell(cell, backgroundRgb, 249)) continue
       const nearest = matcher.find(cell.rgb)
       if (nearest) {
+        if (!matrix[row][column]) restored += 1
         output[row][column] = nearest.code
-        restored += 1
       }
     }
   }
@@ -968,9 +973,11 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   const recognitionPalette = pixelInput ? preparePalette(constrainedPalette) : prepareRecognitionPalette(constrainedPalette)
   const matcher = createCachedColorMatcher(recognitionPalette)
   const labeledCells = sampleRows.reduce((sum, row) => sum + row.filter(hasCellLabel).length, 0)
-  const labeledGrid = !pixelInput && (typeof settings.hasCellLabels === 'boolean'
-    ? settings.hasCellLabels
-    : labeledCells / Math.max(1, columns * rows) >= 0.08)
+  const detectedLabelRatio = labeledCells / Math.max(1, columns * rows)
+  // AI hasLabels is only a hint. Thin grid lines are often mistaken for tiny
+  // printed codes, which turns every white background square into an H2 bead.
+  // Require local centre-ink evidence before enabling labelled-chart rules.
+  const labeledGrid = !pixelInput && settings.hasCellLabels !== false && detectedLabelRatio >= 0.08
   const blankThreshold = Number(settings.blankThreshold) || 249
   const borderBackground = !labeledGrid && !pixelInput ? estimateBorderBackground(sampleRows) : null
   const matrix = []
@@ -1023,6 +1030,7 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     recognitionMode: details.recognitionMode || 'guide-grid',
     confidence: Math.max(0, Math.min(0.99, Number(details.confidence) || 0.9)),
     labeledGrid,
+    detectedLabelRatio,
     backgroundTopologyApplied: Boolean(borderBackground),
     enclosedLightCellCount: topology.restored,
     expectedBeadCountApplied: balanced.adjusted,
