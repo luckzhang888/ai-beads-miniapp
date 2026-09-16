@@ -420,13 +420,7 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
   const y1 = Math.min(height - 1, Math.ceil(bottom) - 1, Math.floor(bottom - marginY))
   const stepX = Math.max(1, Math.ceil((x1 - x0 + 1) / 24))
   const stepY = Math.max(1, Math.ceil((y1 - y0 + 1) / 24))
-  const redValues = []
-  const greenValues = []
-  const blueValues = []
-  const colorBuckets = Object.create(null)
-  const centerSamples = []
-  const sampledPixels = []
-  let whitePixels = 0
+  const rawSamples = []
 
   for (let y = y0; y <= y1; y += stepY) {
     for (let x = x0; x <= x1; x += stepX) {
@@ -437,25 +431,51 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
       const a = data[offset + 3]
       if (a < 32) continue
 
-      redValues.push(r)
-      greenValues.push(g)
-      blueValues.push(b)
-      const bucketKey = (r >> 3) + ',' + (g >> 3) + ',' + (b >> 3)
-      if (!colorBuckets[bucketKey]) colorBuckets[bucketKey] = { count: 0, red: 0, green: 0, blue: 0 }
-      colorBuckets[bucketKey].count += 1
-      colorBuckets[bucketKey].red += r
-      colorBuckets[bucketKey].green += g
-      colorBuckets[bucketKey].blue += b
-      if (Math.min(r, g, b) >= 248 && Math.max(r, g, b) - Math.min(r, g, b) <= 9) whitePixels += 1
-
       const centerX = (x - left) / Math.max(1, right - left)
       const centerY = (y - top) / Math.max(1, bottom - top)
-      sampledPixels.push({ x: centerX, y: centerY, rgb: [r, g, b] })
-      if (centerX >= 0.28 && centerX <= 0.72 && centerY >= 0.25 && centerY <= 0.75) {
-        centerSamples.push([r, g, b])
-      }
+      rawSamples.push({
+        x: centerX,
+        y: centerY,
+        rgb: [r, g, b],
+        // Printed red copyright text and thick red guide lines are overlays,
+        // not bead colours. Only remove them when they occupy a minority of
+        // the cell; a genuine red bead remains predominantly red and is kept.
+        overlayRed: r >= 165 && r - g >= 55 && r - b >= 45
+      })
     }
   }
+
+  const overlayRedCount = rawSamples.filter((sample) => sample.overlayRed).length
+  const overlayPixelRatio = overlayRedCount / Math.max(1, rawSamples.length)
+  const overlaySuppressed = overlayRedCount > 0 && overlayPixelRatio <= 0.58 &&
+    rawSamples.length - overlayRedCount >= 3
+  const sampledPixels = overlaySuppressed
+    ? rawSamples.filter((sample) => !sample.overlayRed)
+    : rawSamples
+  const redValues = []
+  const greenValues = []
+  const blueValues = []
+  const colorBuckets = Object.create(null)
+  const centerSamples = []
+  let whitePixels = 0
+  sampledPixels.forEach((sample) => {
+    const r = sample.rgb[0]
+    const g = sample.rgb[1]
+    const b = sample.rgb[2]
+    redValues.push(r)
+    greenValues.push(g)
+    blueValues.push(b)
+    const bucketKey = (r >> 3) + ',' + (g >> 3) + ',' + (b >> 3)
+    if (!colorBuckets[bucketKey]) colorBuckets[bucketKey] = { count: 0, red: 0, green: 0, blue: 0 }
+    colorBuckets[bucketKey].count += 1
+    colorBuckets[bucketKey].red += r
+    colorBuckets[bucketKey].green += g
+    colorBuckets[bucketKey].blue += b
+    if (Math.min(r, g, b) >= 248 && Math.max(r, g, b) - Math.min(r, g, b) <= 9) whitePixels += 1
+    if (sample.x >= 0.28 && sample.x <= 0.72 && sample.y >= 0.25 && sample.y <= 0.75) {
+      centerSamples.push(sample.rgb)
+    }
+  })
 
   if (!redValues.length) return { rgb: [255, 255, 255], inkRatio: 0, lightInkRatio: 0, whiteRatio: 1, sampleCount: 0 }
   const dominantKey = Object.keys(colorBuckets).reduce((best, key) =>
@@ -493,7 +513,9 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
     lightInkRatio: centerSamples.length ? lightInk / centerSamples.length : 0,
     whiteRatio: whitePixels / redValues.length,
     sampleCount: redValues.length,
-    labelSignature
+    labelSignature,
+    overlaySuppressed,
+    overlayPixelRatio
   }
 }
 
@@ -1055,6 +1077,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   const recognitionPalette = pixelInput ? preparePalette(constrainedPalette) : prepareRecognitionPalette(constrainedPalette)
   const matcher = createCachedColorMatcher(recognitionPalette)
   const labeledCells = sampleRows.reduce((sum, row) => sum + row.filter(hasCellLabel).length, 0)
+  const overlaySuppressedCellCount = sampleRows.reduce((sum, row) =>
+    sum + row.filter((cell) => cell && cell.overlaySuppressed).length, 0)
   const detectedLabelRatio = labeledCells / Math.max(1, columns * rows)
   // AI hasLabels is only a hint. Thin grid lines are often mistaken for tiny
   // printed codes, which turns every white background square into an H2 bead.
@@ -1123,6 +1147,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     chartColorCalibrationApplied: Boolean(exactCounts.chartColorCalibrationApplied),
     labelTileRefinementApplied: Boolean(exactCounts.labelTileRefinementApplied),
     labelTemplateCount: Number(exactCounts.labelTemplateCount) || 0,
+    watermarkSuppressionApplied: overlaySuppressedCellCount > 0,
+    overlaySuppressedCellCount,
     chartColorCenters: exactCounts.chartColorCenters || [],
     reviewCells: exactCounts.reviewCells || [],
     uncertainCellCount: Number(exactCounts.uncertainCellCount) || 0,

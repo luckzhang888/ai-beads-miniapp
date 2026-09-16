@@ -2,7 +2,13 @@ const assert = require('assert')
 const palette = require('../miniprogram/data/colors/mard')
 const { gridImageToPattern, aiGuidedImageToPattern, trustedDetectedCodes, trustedLegendCodeCounts } = require('../miniprogram/utils/image')
 const { guidedGridDisagreesWithLocal, fitDetectedGridToDeclaredDimensions } = require('../miniprogram/utils/ai-grid')
-const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync, hasCellLabel } = require('../miniprogram/utils/grid-recognition')
+const {
+  recognizeKnownGrid,
+  classifySampleRows,
+  classifySampleRowsAsync,
+  hasCellLabel,
+  dominantCellColor
+} = require('../miniprogram/utils/grid-recognition')
 
 // Canvas test double: exercise the production async pipeline, including
 // original-pixel sampling and progress, without a cloud AI service.
@@ -59,6 +65,22 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
       231, 0, 47, 255, 24, 135, 162, 255, 0, 0, 0, 0
     ]) }, 3, 1, 3, 1, palette, { recognitionMode: 'native-pixel' })
     assert.deepStrictEqual(native.matrix, [['F5', 'C19', '']], 'one-pixel cells must retain their own colour and alpha')
+
+    const watermarkPixels = new Uint8ClampedArray(12 * 12 * 4)
+    for (let y = 0; y < 12; y += 1) {
+      for (let x = 0; x < 12; x += 1) {
+        const overlay = x === 5 || y === 6
+        watermarkPixels.set((overlay ? [244, 62, 52] : [252, 252, 252]).concat([255]), (y * 12 + x) * 4)
+      }
+    }
+    const cleanedWatermark = dominantCellColor({ data: watermarkPixels }, 12, 12, 0, 0, 12, 12)
+    assert.strictEqual(cleanedWatermark.overlaySuppressed, true,
+      'minority red watermark strokes must be removed before cell colour reading')
+    assert.ok(Math.min.apply(null, cleanedWatermark.rgb) >= 248)
+    const realRedPixels = new Uint8ClampedArray(12 * 12 * 4)
+    for (let index = 0; index < 12 * 12; index += 1) realRedPixels.set([220, 45, 55, 255], index * 4)
+    const realRed = dominantCellColor({ data: realRedPixels }, 12, 12, 0, 0, 12, 12)
+    assert.strictEqual(realRed.overlaySuppressed, false, 'a genuine predominantly red bead must be preserved')
 
     const codes = Array.from({ length: 5 }, (_, row) => Array(5).fill(row < 3 ? 'A1' : 'C19'))
     codes[1][1] = 'F5'
@@ -255,6 +277,9 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
 
     const localGrid = { ok: true, rows: 29, columns: 28, cellWidth: 40, cellHeight: 40, confidence: 0.88 }
     assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 40, columns: 40, rotation: 0 }, localGrid, 1170, 1178), true)
+    assert.strictEqual(guidedGridDisagreesWithLocal({
+      rows: 93, columns: 77, rotation: 0, dimensionSource: 'title'
+    }, localGrid, 1170, 1178), false, 'red guide lines must not override title-declared dimensions')
     assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 30, columns: 30, rotation: 0 }, localGrid, 1170, 1178), false)
     assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 40, columns: 40, rotation: 90 }, localGrid, 1170, 1178), false)
 
@@ -313,6 +338,11 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.strictEqual(convertPage.data.recognitionResult.recognitionMode, 'ai-no-grid')
     assert.strictEqual(convertPage.data.recognitionResult.needsCalibration, true)
     assert.strictEqual(convertPage.data.recognitionResult.exactRecognition, false)
+    convertPage.editRecognitionCrop()
+    assert.strictEqual(convertPage.data.stage, 'classify')
+    assert.strictEqual(convertPage.data.recognitionCropEnabled, true)
+    assert.strictEqual(convertPage.data.cropMode, 'cover')
+    convertPage.setData({ imagePath: 'fixture.png', recognitionProgress: 0 })
     convertPage.requestAiAnalysis = async () => { throw new Error('AI offline') }
     convertPage.aiAnalysisCache = null
     convertPage.setData({ recognitionProgress: 0 })

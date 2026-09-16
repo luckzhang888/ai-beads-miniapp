@@ -529,6 +529,9 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   if (result.labelTileRefinementApplied) {
     calibrationNotes.push(`已逐格归一化放大，并用 ${result.labelTemplateCount} 组格内文字模板复核相近色号`)
   }
+  if (result.watermarkSuppressionApplied) {
+    calibrationNotes.push(`已在 ${result.overlaySuppressedCellCount} 个受影响格中抑制红色水印/辅助线后再读取底色`)
+  }
   if (result.expectedCodeCountsApplied) {
     calibrationNotes.push('已按图例逐色号数量进行全局校准，仅使用图例中的 MARD 221 标准色')
   }

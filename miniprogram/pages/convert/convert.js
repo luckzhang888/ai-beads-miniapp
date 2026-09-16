@@ -83,6 +83,7 @@ Page({
     cropScale: 1,
     cropRotation: 0,
     cropMirrored: false,
+    recognitionCropEnabled: false,
     cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
     optimizeOptions: [
       { value: 'soft', label: '柔和' },
@@ -151,6 +152,7 @@ Page({
       cropScale: 1,
       cropRotation: 0,
       cropMirrored: false,
+      recognitionCropEnabled: false,
       cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);'
     })
   },
@@ -368,6 +370,7 @@ Page({
   },
 
   cropTouchStart(event) {
+    if (this.data.stage === 'classify' && !this.data.recognitionCropEnabled) return
     const touches = event.touches || []
     if (touches.length >= 2) {
       const dx = touches[0].clientX - touches[1].clientX
@@ -397,7 +400,8 @@ Page({
       const dx = touches[0].clientX - touches[1].clientX
       const dy = touches[0].clientY - touches[1].clientY
       const distance = Math.sqrt(dx * dx + dy * dy)
-      const cropScale = Math.max(0.5, Math.min(4, this.cropGesture.scale * distance / this.cropGesture.distance))
+      const minimumScale = this.data.cropMode === 'cover' ? 1 : 0.5
+      const cropScale = Math.max(minimumScale, Math.min(4, this.cropGesture.scale * distance / this.cropGesture.distance))
       this.updateCropTransform({ cropScale })
       return
     }
@@ -410,6 +414,27 @@ Page({
 
   cropTouchEnd() {
     this.cropGesture = null
+  },
+
+  toggleRecognitionCrop() {
+    const recognitionCropEnabled = !this.data.recognitionCropEnabled
+    const cropMode = recognitionCropEnabled ? 'cover' : 'ratio'
+    this.cachedSignature = ''
+    this.cachedResult = null
+    this.aiAnalysisCache = null
+    this.setData({
+      recognitionCropEnabled,
+      cropMode,
+      imageMode: recognitionCropEnabled ? 'aspectFill' : 'aspectFit',
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1,
+      cropRotation: 0,
+      cropMirrored: false,
+      cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
+      previewResult: null
+    })
+    this.refreshOutputSize({ recognitionCropEnabled, cropMode })
   },
 
   selectSourceVariant(event) {
@@ -479,7 +504,10 @@ Page({
         result.confidence = analysis.confidence
         result.aiAnalysis = analysis
         result.validation = { ok: false, warnings: ['原图没有可逐格复原的网格，当前结果是重新像素化生成'] }
-        result.warning = 'AI 未检测到原始网格，已切换为“主体图片像素化”。这类图片需要选择输出尺寸，不能宣称为原图逐格复原。'
+        result.cropApplied = Boolean(this.data.recognitionCropEnabled)
+        result.warning = this.data.recognitionCropEnabled
+          ? 'AI 未检测到原始网格，已按你拖动和缩放后的选区重新像素化。可继续选择输出尺寸；这不是原图逐格复原。'
+          : 'AI 未检测到原始网格，已切换为“主体图片像素化”。长图可返回重新选择并开启“移动裁剪主体”，再选择输出尺寸。'
         recognitionSource = 'AI 分类 + 本地像素化'
       }
       if (this.data.imagePath !== imagePath) return
@@ -585,6 +613,38 @@ Page({
     }, () => this.data.recognitionSource === '本地' ? this.runLocalRecognition() : this.runAiRecognition())
   },
 
+  editRecognitionCrop() {
+    this.cachedSignature = ''
+    this.cachedResult = null
+    this.aiAnalysisCache = null
+    const wasEnabled = Boolean(this.data.recognitionCropEnabled)
+    this.setData({
+      stage: 'classify',
+      recognitionCropEnabled: true,
+      cropMode: 'cover',
+      imageMode: 'aspectFill',
+      cropX: wasEnabled ? this.data.cropX : 0,
+      cropY: wasEnabled ? this.data.cropY : 0,
+      cropScale: wasEnabled ? Math.max(1, this.data.cropScale) : 1,
+      cropRotation: wasEnabled ? this.data.cropRotation : 0,
+      cropMirrored: wasEnabled ? this.data.cropMirrored : false,
+      recognitionProgress: 0,
+      recognitionStep: '等待确认选区',
+      recognitionResult: null,
+      recognitionError: '',
+      previewResult: null
+    }, () => {
+      this.updateCropTransform({
+        cropX: this.data.cropX,
+        cropY: this.data.cropY,
+        cropScale: this.data.cropScale,
+        cropRotation: this.data.cropRotation,
+        cropMirrored: this.data.cropMirrored
+      })
+      this.refreshOutputSize({ cropMode: 'cover' })
+    })
+  },
+
   saveProcessedPattern(result, settings) {
     const options = settings || {}
     const variant = this.data.sourceVariants.find((item) => item.value === this.data.sourceVariant)
@@ -607,6 +667,8 @@ Page({
           chartColorCalibrationApplied: Boolean(result.chartColorCalibrationApplied),
           labelTileRefinementApplied: Boolean(result.labelTileRefinementApplied),
           labelTemplateCount: Number(result.labelTemplateCount) || 0,
+          watermarkSuppressionApplied: Boolean(result.watermarkSuppressionApplied),
+          overlaySuppressedCellCount: Number(result.overlaySuppressedCellCount) || 0,
           uploadIntegrityVerified: Boolean(result.uploadIntegrityVerified)
         }
       })
@@ -628,6 +690,8 @@ Page({
         chartColorCalibrationApplied: Boolean(result.chartColorCalibrationApplied),
         labelTileRefinementApplied: Boolean(result.labelTileRefinementApplied),
         labelTemplateCount: Number(result.labelTemplateCount) || 0,
+        watermarkSuppressionApplied: Boolean(result.watermarkSuppressionApplied),
+        overlaySuppressedCellCount: Number(result.overlaySuppressedCellCount) || 0,
         uploadIntegrityVerified: Boolean(result.uploadIntegrityVerified)
       }
     })
@@ -782,7 +846,16 @@ Page({
       recognitionResult: null,
       recognitionError: '',
       recognitionSource: '',
-      previewResult: null
+      previewResult: null,
+      cropMode: 'ratio',
+      imageMode: 'aspectFit',
+      recognitionCropEnabled: false,
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1,
+      cropRotation: 0,
+      cropMirrored: false,
+      cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);'
     })
     this.updateRecommendedSize(path)
   },

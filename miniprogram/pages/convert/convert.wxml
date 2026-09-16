@@ -27,8 +27,22 @@
 <view wx:elif="{{stage === 'classify'}}" class="classify-page">
   <view class="classify-card">
     <view class="classify-title">{{selectedMethodTitle || '图纸导入'}}</view>
-    <view class="classify-note">确认图片类型后再开始识别</view>
-    <view class="classify-preview"><image src="{{imagePath}}" mode="aspectFit" /></view>
+    <view class="classify-note">图纸请保留整图；普通长图可移动、缩放后截取主体</view>
+    <view
+      class="classify-preview {{recognitionCropEnabled ? 'cropping' : ''}}"
+      bindtouchstart="cropTouchStart"
+      catchtouchmove="cropTouchMove"
+      bindtouchend="cropTouchEnd"
+      bindtouchcancel="cropTouchEnd"
+    >
+      <image src="{{imagePath}}" mode="{{recognitionCropEnabled ? 'aspectFill' : 'aspectFit'}}" style="{{recognitionCropEnabled ? cropStyle : ''}}" />
+      <view wx:if="{{recognitionCropEnabled}}" class="classify-crop-frame"><text>最终截取区域</text></view>
+    </view>
+    <view class="classify-crop-controls">
+      <button class="{{recognitionCropEnabled ? 'active' : ''}}" bindtap="toggleRecognitionCrop">{{recognitionCropEnabled ? '取消裁剪，使用整图' : '移动裁剪主体'}}</button>
+      <button wx:if="{{recognitionCropEnabled}}" bindtap="resetCrop">重置位置</button>
+    </view>
+    <view wx:if="{{recognitionCropEnabled}}" class="classify-crop-hint">单指拖动图片，双指缩放；框内内容会生成方形拼豆图纸。</view>
     <view class="variant-row">
       <view wx:for="{{sourceVariants}}" wx:key="value" class="variant-item {{sourceVariant === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectSourceVariant"><view>{{sourceVariant === item.value ? '●' : '○'}}</view><text>{{item.label}}</text></view>
     </view>
@@ -76,6 +90,7 @@
     <view class="calibration-sizes">
       <view wx:for="{{sizes}}" wx:key="*this" class="{{selectedSize == item ? 'active' : ''}}" data-size="{{item}}" bindtap="reprocessRecognitionSize">{{item}}</view>
     </view>
+    <button class="calibration-crop-button" bindtap="editRecognitionCrop">移动并重新裁剪主体</button>
   </view>
   <view wx:if="{{!recognitionError}}" class="recognition-progress-card">
     <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 定位网格面积</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 修复并切格</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 匹配色号</text></view>

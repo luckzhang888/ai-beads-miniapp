@@ -477,6 +477,15 @@ convertPage.setData({ cropX: 75, cropY: -75, cropScale: 2, cropRotation: 90, cro
 assert.deepStrictEqual(convertPage.processingOptions().transform, {
   offsetX: 0.5, offsetY: -0.5, scale: 2, rotation: 90, mirrored: true
 })
+convertPage.setData({ stage: 'classify', imageInfo: { width: 1080, height: 2340 } })
+convertPage.toggleRecognitionCrop()
+assert.strictEqual(convertPage.data.recognitionCropEnabled, true)
+assert.strictEqual(convertPage.data.cropMode, 'cover')
+assert.deepStrictEqual([convertPage.data.outputWidth, convertPage.data.outputHeight],
+  [convertPage.data.selectedSize, convertPage.data.selectedSize])
+convertPage.toggleRecognitionCrop()
+assert.strictEqual(convertPage.data.recognitionCropEnabled, false)
+assert.strictEqual(convertPage.data.cropMode, 'ratio')
 
 delete global.wx
 require('./recognition-runtime-test').run({ guideFixture: largeGuideFixture, edgeFixture: edgeCropped, convertPage }).then(() => {
