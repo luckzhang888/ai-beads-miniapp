@@ -3,7 +3,7 @@ name: wechat-preview
 on:
   workflow_dispatch:
   push:
-    branches: [develop]
+    branches: [develop, cloud-development]
 
 jobs:
   preview:
@@ -34,6 +34,9 @@ jobs:
         if: steps.wx-ci.outputs.enabled == 'true'
 
       - run: npm ci --prefix server
+        if: steps.wx-ci.outputs.enabled == 'true'
+
+      - run: npm ci --prefix cloudfunctions/beads-ai
         if: steps.wx-ci.outputs.enabled == 'true'
 
       - name: Check, test and compile exact preview revision

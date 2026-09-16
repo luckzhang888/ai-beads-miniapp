@@ -1,11 +1,14 @@
 const assert = require('node:assert/strict')
 const apiConfig = require('../miniprogram/config/api')
+const cloudConfig = require('../miniprogram/config/cloud')
 const { analyzeImage, requestFailure, MAX_BYTES } = require('../miniprogram/services/ai-recognition')
 
 async function run() {
   const previousWx = global.wx
   const previousOrigin = apiConfig.apiBaseUrl
+  const previousTransport = cloudConfig.transport
   apiConfig.apiBaseUrl = 'https://beads.example.test'
+  cloudConfig.transport = 'server'
   try {
     let uploaded = 0
     global.wx = {
@@ -107,11 +110,55 @@ async function run() {
     global.wx.getFileInfo = ({ success }) => success({ size: MAX_BYTES + 1 })
     await assert.rejects(analyzeImage('fixture.png'), { code: 'IMAGE_TOO_LARGE' })
 
+    global.wx.getFileInfo = ({ success }) => success({ size: 1024 })
     apiConfig.apiBaseUrl = ''
     await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_NOT_CONFIGURED' })
-    console.log('AI upload service passed: multipart, Base64 fallback, HTTP errors, specific failures, 10 MB guard and HTTPS origin.')
+
+    cloudConfig.transport = 'cloud'
+    let deletedFileID = ''
+    global.wx = {
+      getFileInfo({ success }) { success({ size: 2048 }) },
+      getAccountInfoSync() { return { miniProgram: { appId: 'wx-test-app-id' } } },
+      cloud: {
+        uploadFile(options) {
+          assert.equal(options.filePath, 'fixture.png')
+          assert.match(options.cloudPath, /^ai-inputs\/.+\.png$/)
+          options.success({ fileID: 'cloud://test-env/ai-inputs/fixture.png' })
+        },
+        getTempFileURL(options) {
+          assert.deepEqual(options.fileList, ['cloud://test-env/ai-inputs/fixture.png'])
+          options.success({ fileList: [{ status: 0, tempFileURL: 'https://test-env.tcb.qcloud.la/ai-inputs/fixture.png?sign=test' }] })
+        },
+        callFunction(options) {
+          assert.equal(options.name, 'beads-ai')
+          assert.equal(options.data.fileID, 'cloud://test-env/ai-inputs/fixture.png')
+          assert.equal(options.data.imageUrl, 'https://test-env.tcb.qcloud.la/ai-inputs/fixture.png?sign=test')
+          assert.equal(options.data.palette, 'MARD')
+          options.success({ result: { ok: true, result: { hasGrid: true, rows: 40, columns: 36 } } })
+        },
+        deleteFile(options) {
+          deletedFileID = options.fileList[0]
+          if (options.success) options.success({ fileList: options.fileList })
+        }
+      }
+    }
+    assert.equal((await analyzeImage('fixture.png')).result.rows, 40)
+    assert.equal(deletedFileID, 'cloud://test-env/ai-inputs/fixture.png')
+
+    global.wx.cloud.callFunction = (options) => options.fail({ errMsg: 'cloud.callFunction:fail function not found -501000' })
+    await assert.rejects(analyzeImage('fixture.png'), (error) => {
+      assert.equal(error.code, 'AI_CLOUD_FUNCTION_MISSING')
+      assert.match(error.message, /beads-ai/)
+      assert.match(error.message, /AppID：wx-test-app-id/)
+      return true
+    })
+
+    delete global.wx.cloud
+    await assert.rejects(analyzeImage('fixture.png'), { code: 'AI_CLOUD_NOT_CONFIGURED' })
+    console.log('AI upload service passed: WeChat cloud transport, cleanup, diagnostics, server fallback, HTTP errors and 10 MB guard.')
   } finally {
     apiConfig.apiBaseUrl = previousOrigin
+    cloudConfig.transport = previousTransport
     if (previousWx === undefined) delete global.wx
     else global.wx = previousWx
   }

@@ -1,12 +1,12 @@
 # 豆仓助手微信小程序
 
-基于 `develop` 分支实现的微信原生拼豆效率工具，围绕“导入图纸 → 智能转色 → 管理图纸 → 高亮辅助拼豆 → 库存核销”完成可运行闭环。
+`cloud-development` 分支是微信云开发版本，围绕“导入图纸 → 智能转色 → 管理图纸 → 高亮辅助拼豆 → 库存核销”完成可运行闭环。原 `develop` 分支继续保留独立 HTTPS 服务版本。
 
 ## 当前功能
 
 - 豆仓助手统一品牌与可用主导航：豆仓、图纸册、灵感库、记录、我的均为真实页面；手机、平板与 iPad 自动旋转/适配实际窗口，横屏使用紧凑侧边导航、固定像素字号和 4/6 列响应式库存布局
 - 六种创作入口：图纸导入、PDF 文件入口、分享口令、图片直链、像素画转图纸、AI 智能统计；图片可标记为主图/镜像图/效果图
-- AI 智能统计第一阶段可经独立 HTTPS 服务调用 DeepSeek Vision 定位网格，再由小程序本地进行 MARD 295 色逐格匹配；未配置服务或 AI 失败时会明确提示并提供手动本地识别。部署配置与限制见 [`server/README.md`](server/README.md)。
+- AI 智能统计通过微信云存储和 `beads-ai` 云函数调用 DeepSeek Vision 定位网格，再由小程序本地进行 MARD 295 色逐格匹配；不再依赖 `api.luckwork.ltd`，也不需要配置 `request/uploadFile` 合法域名。部署步骤见 [`cloudfunctions/beads-ai/README.md`](cloudfunctions/beads-ai/README.md)。
 - MARD 295 标准色，RGB → XYZ → CIELAB → CIEDE2000 最近色匹配
 - 保持比例、方形裁剪、方形留白，支持单指移动、双指缩放、旋转、镜像和生成前像素预览
 - 自动去除透明/近白背景，空白格不计入豆数、色号、进度和库存
@@ -39,6 +39,7 @@
 
 ```bash
 npm ci
+npm ci --prefix cloudfunctions/beads-ai
 npm run verify
 ```
 
@@ -69,7 +70,7 @@ npm run compile:local
 - `WX_APPID`
 - `WX_PRIVATE_KEY`
 
-推送到 `develop` 后，`wechat-preview` 工作流会生成 `preview-qrcode.png`，并上传为 `wechat-preview-qrcode` Artifact。私钥仅在工作流运行时写入，不会提交到 Git。
+推送到 `develop` 或 `cloud-development` 后，`wechat-preview` 工作流会生成 `preview-qrcode.png`，并上传为 `wechat-preview-qrcode` Artifact。私钥仅在工作流运行时写入，不会提交到 Git。注意：预览包不会自动部署云函数，首次使用前仍需按云函数 README 在微信开发者工具中完成部署。
 
 本地也可以运行：
 
@@ -88,6 +89,8 @@ npm run preview
 ## 目录
 
 ```text
+cloudfunctions/
+└── beads-ai/                   # DeepSeek Vision 微信云函数
 miniprogram/
 ├── components/bead-grid/      # Canvas 拼豆网格
 ├── data/colors/mard.js        # MARD 295 色

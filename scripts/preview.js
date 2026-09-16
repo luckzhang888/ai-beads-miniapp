@@ -7,6 +7,7 @@ const appid = process.env.WX_APPID
 const privateKeyPath = process.env.WX_PRIVATE_KEY_PATH
   ? path.resolve(root, process.env.WX_PRIVATE_KEY_PATH)
   : path.resolve(root, 'private.key')
+const branchName = process.env.GITHUB_REF_NAME || 'local'
 
 if (!appid) {
   throw new Error('Missing WX_APPID')
@@ -34,7 +35,7 @@ async function main() {
   try {
     await ci.preview({
       project,
-      desc: '豆仓助手 develop 预览',
+      desc: `豆仓助手 ${branchName} 预览`,
       setting: {
         useProjectConfig: true
       },

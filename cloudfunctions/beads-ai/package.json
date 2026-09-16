@@ -1,0 +1,12 @@
+{
+  "name": "beads-ai-cloud-function",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "node-fetch": "2.7.0"
+  }
+}

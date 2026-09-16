@@ -1,4 +1,5 @@
 const apiConfig = require('../config/api')
+const cloudConfig = require('../config/cloud')
 const MAX_BYTES = 10 * 1024 * 1024
 const TIMEOUT_MS = 120000
 
@@ -28,6 +29,24 @@ function attachWechatDiagnostic(error, detail) {
   if (appId) diagnostics.push(`AppID：${appId}`)
   if (diagnostics.length) error.message += `\n${diagnostics.join('；')}`
   return error
+}
+
+function cloudFailure(error) {
+  const detail = String(error && (error.errMsg || error.message) || '')
+  const lower = detail.toLowerCase()
+  let mapped
+  if (/function.*not found|cloud function not found|函数不存在|-501000|-501001/.test(lower)) {
+    mapped = aiError('AI_CLOUD_FUNCTION_MISSING', `云函数 ${cloudConfig.cloudFunctionName} 尚未部署，请在微信开发者工具中上传并部署云函数。`)
+  } else if (/environment|env.*not found|cloud.*not.*init|未开通云开发|环境不存在|-601002|-601003/.test(lower)) {
+    mapped = aiError('AI_CLOUD_NOT_CONFIGURED', '微信云开发环境尚未开通或环境 ID 不正确，请先创建并关联云环境。')
+  } else if (/timeout|timed out|超时/.test(lower)) {
+    mapped = aiError('AI_TIMEOUT', '云端 AI 识别超时，请重试或使用本地识别。')
+  } else if (/quota|limit|exceed|资源不足|配额/.test(lower)) {
+    mapped = aiError('AI_CLOUD_QUOTA', '微信云开发资源或调用额度不足，请检查云开发套餐与用量。')
+  } else {
+    mapped = aiError('AI_CLOUD_FAILED', '图片未能通过微信云开发完成识别，请检查云环境、云函数和 DeepSeek 密钥配置。')
+  }
+  return attachWechatDiagnostic(mapped, detail)
 }
 
 function uploadFailure(error, origin) {
@@ -79,6 +98,16 @@ function parseApiResponse(response) {
     throw aiError(body && body.error && body.error.code || 'AI_SERVER_ERROR', message || 'AI 服务暂时不可用，请使用本地识别。')
   }
   return body
+}
+
+function parseCloudResponse(response) {
+  let body = response && response.result
+  try {
+    if (typeof body === 'string') body = JSON.parse(body)
+  } catch (error) {
+    throw aiError('AI_INVALID_RESPONSE', '云函数返回格式无效，请重新部署云函数。')
+  }
+  return parseApiResponse({ statusCode: body && body.ok === true ? 200 : 503, data: body })
 }
 
 function getImageSize(imagePath) {
@@ -176,14 +205,99 @@ async function requestImageAsBase64(origin, imagePath, options) {
   })
 }
 
-async function analyzeImage(imagePath, options = {}) {
+function cloudExtension(imagePath) {
+  const match = String(imagePath || '').toLowerCase().match(/\.([a-z0-9]{2,5})(?:\?|$)/)
+  return match && ['jpg', 'jpeg', 'png', 'gif', 'webp'].indexOf(match[1]) >= 0 ? match[1] : 'jpg'
+}
+
+function uploadImageToCloud(imagePath) {
+  return new Promise((resolve, reject) => {
+    if (typeof wx === 'undefined' || !wx.cloud || typeof wx.cloud.uploadFile !== 'function') {
+      return reject(cloudFailure(new Error('cloud environment not initialized')))
+    }
+    const cloudPath = `ai-inputs/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${cloudExtension(imagePath)}`
+    try {
+      wx.cloud.uploadFile({
+        cloudPath,
+        filePath: imagePath,
+        success(result) {
+          if (!result || !result.fileID) return reject(cloudFailure(new Error('cloud upload returned no fileID')))
+          resolve(result.fileID)
+        },
+        fail(error) { reject(cloudFailure(error)) }
+      })
+    } catch (error) { reject(cloudFailure(error)) }
+  })
+}
+
+function deleteCloudFile(fileID) {
+  if (!fileID || !wx.cloud || typeof wx.cloud.deleteFile !== 'function') return
+  try { wx.cloud.deleteFile({ fileList: [fileID], fail() {} }) } catch (error) {}
+}
+
+function getCloudTempUrl(fileID) {
+  return new Promise((resolve, reject) => {
+    try {
+      wx.cloud.getTempFileURL({
+        fileList: [fileID],
+        success(result) {
+          const item = result && result.fileList && result.fileList[0]
+          if (!item || item.status || !item.tempFileURL) return reject(cloudFailure(new Error('cloud getTempFileURL returned no URL')))
+          resolve(item.tempFileURL)
+        },
+        fail(error) { reject(cloudFailure(error)) }
+      })
+    } catch (error) { reject(cloudFailure(error)) }
+  })
+}
+
+function callCloudRecognition(fileID, imageUrl, options) {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const finish = (error, value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      if (error) reject(error)
+      else resolve(value)
+    }
+    const timer = setTimeout(() => finish(aiError('AI_TIMEOUT', '云端 AI 识别超时，请重试或使用本地识别。')), TIMEOUT_MS)
+    try {
+      wx.cloud.callFunction({
+        name: cloudConfig.cloudFunctionName,
+        data: {
+          action: 'analyze',
+          fileID,
+          imageUrl,
+          mode: options.mode || 'auto',
+          expectedSize: options.expectedSize || '',
+          palette: 'MARD'
+        },
+        success(response) {
+          try { finish(null, parseCloudResponse(response)) } catch (error) { finish(error) }
+        },
+        fail(error) { finish(cloudFailure(error)) }
+      })
+    } catch (error) { finish(cloudFailure(error)) }
+  })
+}
+
+async function analyzeImageWithCloud(imagePath, options) {
+  let fileID
+  try {
+    fileID = await uploadImageToCloud(imagePath)
+    const imageUrl = await getCloudTempUrl(fileID)
+    return await callCloudRecognition(fileID, imageUrl, options)
+  } finally {
+    deleteCloudFile(fileID)
+  }
+}
+
+async function analyzeImageWithServer(imagePath, options) {
   const origin = String(apiConfig.apiBaseUrl || '').replace(/\/$/, '')
   if (!/^https:\/\/[a-z0-9.-]+(?::[0-9]{2,5})?$/i.test(origin)) {
     throw aiError('AI_NOT_CONFIGURED', '尚未配置豆仓 HTTPS 识别服务，请使用本地识别。')
   }
-  if (!imagePath) throw aiError('IMAGE_REQUIRED', '请先选择一张图片。')
-  const size = await getImageSize(imagePath)
-  if (size && size > MAX_BYTES) throw aiError('IMAGE_TOO_LARGE', '图片超过 10 MB，请选择较小但清晰的原图。')
   let lastError
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -205,4 +319,16 @@ async function analyzeImage(imagePath, options = {}) {
   throw lastError
 }
 
-module.exports = { analyzeImage, uploadFailure, requestFailure, runtimeAppId, MAX_BYTES, TIMEOUT_MS }
+async function analyzeImage(imagePath, options = {}) {
+  if (!imagePath) throw aiError('IMAGE_REQUIRED', '请先选择一张图片。')
+  const size = await getImageSize(imagePath)
+  if (size && size > MAX_BYTES) throw aiError('IMAGE_TOO_LARGE', '图片超过 10 MB，请选择较小但清晰的原图。')
+  return cloudConfig.transport === 'cloud'
+    ? analyzeImageWithCloud(imagePath, options)
+    : analyzeImageWithServer(imagePath, options)
+}
+
+module.exports = {
+  analyzeImage, analyzeImageWithCloud, analyzeImageWithServer,
+  uploadFailure, requestFailure, cloudFailure, runtimeAppId, MAX_BYTES, TIMEOUT_MS
+}
