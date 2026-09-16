@@ -54,11 +54,9 @@ function approximately(actual, expected, tolerance) {
   assert.ok(Math.abs(actual - expected) <= tolerance, actual + ' is not within ' + tolerance + ' of ' + expected)
 }
 
-assert.strictEqual(palette.length, 295)
-assert.deepStrictEqual(
-  ['P', 'Q', 'R', 'T', 'Y', 'Z'].map((series) => palette.filter((item) => item.code[0] === series).length),
-  [23, 5, 28, 1, 9, 8]
-)
+assert.strictEqual(palette.length, 221)
+assert.deepStrictEqual([...new Set(palette.map((item) => item.series))], ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'M'])
+assert.strictEqual(palette.some((item) => /^[PQRTYZ]/.test(item.code)), false)
 const white = rgbToLab([255, 255, 255])
 approximately(white[0], 100, 0.02)
 approximately(white[1], 0, 0.03)
@@ -471,7 +469,7 @@ assert.strictEqual(editorPage.data.candidates.length, 6)
 
 const inventoryPage = loadPage('../miniprogram/pages/inventory/inventory')
 inventoryPage.onShow()
-assert.strictEqual(inventoryPage.data.colorCount, 295)
+assert.strictEqual(inventoryPage.data.colorCount, 221)
 assert.ok(Array.isArray(inventoryPage.data.transactions))
 
 const convertPage = loadPage('../miniprogram/pages/convert/convert')

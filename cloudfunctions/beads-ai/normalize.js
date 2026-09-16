@@ -1,5 +1,6 @@
 const IMAGE_TYPES = new Set(['bead_pattern', 'pixel_art', 'photo', 'screenshot', 'unknown'])
 const BACKGROUNDS = new Set(['white', 'transparent', 'colored', 'complex', 'unknown'])
+const MARD_221_LIMITS = { A: 26, B: 32, C: 29, D: 26, E: 24, F: 25, G: 21, H: 23, M: 15 }
 
 class InvalidAnalysisError extends Error {
   constructor(reason) {
@@ -30,11 +31,28 @@ function parseCodes(value) {
   if (!Array.isArray(value)) return codes
   value.forEach((rawCode) => {
     const code = String(rawCode || '').trim().toUpperCase()
-    if (!/^[A-Z][0-9]{1,3}$/.test(code) || seen.has(code) || codes.length >= 96) return
+    const match = code.match(/^([A-Z])([0-9]{1,3})$/)
+    if (!match || !MARD_221_LIMITS[match[1]] || Number(match[2]) < 1 ||
+      Number(match[2]) > MARD_221_LIMITS[match[1]] || seen.has(code) || codes.length >= 96) return
     seen.add(code)
     codes.push(code)
   })
   return codes
+}
+
+function parseLegendEntries(value) {
+  const entries = []
+  const seen = new Set()
+  if (!Array.isArray(value)) return entries
+  value.forEach((item) => {
+    if (!item || typeof item !== 'object') return
+    const code = parseCodes([item.code])[0]
+    const count = Number(item.count)
+    if (!code || seen.has(code) || !Number.isInteger(count) || count < 1 || count > 65536 || entries.length >= 96) return
+    seen.add(code)
+    entries.push({ code, count })
+  })
+  return entries
 }
 
 function optionalInteger(value, minimum, maximum, label) {
@@ -58,6 +76,7 @@ function validateAiAnalysis(value) {
   let perspective = null
   const detectedCodes = parseCodes(value.detectedCodes)
   const legendCodes = parseCodes(value.legendCodes)
+  const legendEntries = parseLegendEntries(value.legendEntries)
   const declaredColorCount = optionalInteger(value.declaredColorCount, 1, 96, 'declaredColorCount')
   const declaredBeadCount = optionalInteger(value.declaredBeadCount, 1, 65536, 'declaredBeadCount')
   if (value.hasGrid) {
@@ -92,7 +111,7 @@ function validateAiAnalysis(value) {
   return {
     imageType: value.imageType, hasGrid: value.hasGrid, rows, columns,
     rotation: value.rotation, confidence, hasLabels: value.hasLabels,
-    background: value.background, grid, perspective, detectedCodes, legendCodes,
+    background: value.background, grid, perspective, detectedCodes, legendCodes, legendEntries,
     declaredColorCount, declaredBeadCount,
     warnings: value.warnings.slice(0, 12).map((item) => item.slice(0, 160))
   }

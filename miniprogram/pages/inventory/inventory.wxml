@@ -3,7 +3,7 @@
   <view class="warehouse-header">
     <view>
       <view class="warehouse-title">我的豆仓</view>
-      <view class="warehouse-subtitle">MARD 295 标准色库存</view>
+      <view class="warehouse-subtitle">MARD 221 标准色库存</view>
     </view>
     <view class="warehouse-header-actions">
       <view class="header-stock-action out" data-tab="batch" data-direction="-1" bindtap="openStockEntry">⊖ 手动出库</view>
@@ -126,7 +126,7 @@
     </view>
   </view>
 
-  <view class="page-note">库存按品牌隔离保存；当前已接入完整 MARD 295 色卡。</view>
+  <view class="page-note">库存按品牌隔离保存；当前仅使用 MARD 221 标准色卡。</view>
 
   <view wx:if="{{showStockEntry}}" class="full-mask">
     <view class="stock-entry-page">

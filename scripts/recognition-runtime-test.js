@@ -1,6 +1,6 @@
 const assert = require('assert')
 const palette = require('../miniprogram/data/colors/mard')
-const { gridImageToPattern, aiGuidedImageToPattern, trustedDetectedCodes } = require('../miniprogram/utils/image')
+const { gridImageToPattern, aiGuidedImageToPattern, trustedDetectedCodes, trustedLegendCodeCounts } = require('../miniprogram/utils/image')
 const { guidedGridDisagreesWithLocal } = require('../miniprogram/utils/ai-grid')
 const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync, hasCellLabel } = require('../miniprogram/utils/grid-recognition')
 
@@ -89,6 +89,17 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.strictEqual(declared.usedColorCount, 2, 'an explicit title colour count must merge compression variants')
     assert.strictEqual(declared.expectedBeadCountApplied, true)
     assert.strictEqual(declared.expectedColorCountApplied, true)
+    const exactCounts = classifySampleRows(declaredSamples, palette, {
+      hasCellLabels: true, expectedBeadCount: 12, expectedColorCount: 2,
+      expectedCodeCounts: { F5: 7, C19: 5 }
+    })
+    assert.deepStrictEqual(exactCounts.stats.map((item) => [item.code, item.required]), [['F5', 7], ['C19', 5]],
+      'complete legend quotas must control both the allowed codes and each exact count')
+    assert.strictEqual(exactCounts.expectedCodeCountsApplied, true)
+    assert.deepStrictEqual(trustedLegendCodeCounts({
+      declaredColorCount: 2, declaredBeadCount: 12,
+      legendEntries: [{ code: 'F5', count: 7 }, { code: 'C19', count: 5 }]
+    }), Object.assign(Object.create(null), { F5: 7, C19: 5 }))
 
     const noisySamples = Array.from({ length: 106 }, (_, row) => Array.from({ length: 99 }, (_, column) => ({
       rgb: [40 + column, 60 + row, 100 + (row + column) % 90],

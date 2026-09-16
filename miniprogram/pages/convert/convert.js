@@ -29,7 +29,7 @@ const METHODS = [
   { id: 'pdf', icon: '▤', title: 'PDF 导入', description: '选择聊天文件中的 PDF 图纸，当前为 Beta 入口', badge: 'Beta' },
   { id: 'share', icon: '⌘', title: '分享口令导入', description: '通过豆仓助手分享口令打开同设备上的图纸' },
   { id: 'link', icon: '↗', title: '图片链接提取', description: '粘贴可公开访问的 JPG/PNG 图片直链后识别' },
-  { id: 'pixel', icon: '▦', title: '像素画转图纸', description: '将像素画重新匹配为 MARD 295 色图纸' },
+  { id: 'pixel', icon: '▦', title: '像素画转图纸', description: '将像素画重新匹配为 MARD 221 标准色图纸' },
   { id: 'recognize', icon: '◎', title: 'AI 智能统计', description: '上传图片后自动识别网格、匹配色号并统计数量' }
 ]
 
@@ -71,7 +71,7 @@ Page({
     recognitionSource: '',
     recognitionSaving: false,
     paletteMap: createPaletteMap(mardPalette),
-    paletteName: 'MARD 295 标准色',
+    paletteName: 'MARD 221 标准色',
     cropMode: 'ratio',
     imageMode: 'aspectFit',
     optimizePreset: 'photo',

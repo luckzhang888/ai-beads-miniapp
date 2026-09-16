@@ -4,7 +4,7 @@ const cloudConfig = require('./config/cloud')
 App({
   globalData: {
     appName: '豆仓助手',
-    paletteName: 'MARD 295'
+    paletteName: 'MARD 221'
   },
 
   onLaunch() {

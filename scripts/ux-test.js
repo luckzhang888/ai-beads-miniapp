@@ -131,15 +131,12 @@ async function main() {
   inventory.openAiEntry()
   assert.strictEqual(navigationLog[navigationLog.length - 1], '/pages/convert/convert?mode=recognize')
   inventory.openStockEntry({ currentTarget: { dataset: { tab: 'batch', direction: 1 } } })
-  assert.strictEqual(inventory.data.batchRows.length, 295)
+  assert.strictEqual(inventory.data.batchRows.length, 221)
   inventory.selectBatchSeries({ currentTarget: { dataset: { series: 'A' } } })
   assert.strictEqual(inventory.data.batchRows.length, 26)
   assert.ok(inventory.data.batchRows.every((item) => item.series === 'A'))
-  inventory.selectBatchSeries({ currentTarget: { dataset: { series: 'P' } } })
-  assert.strictEqual(inventory.data.batchRows.length, 23)
-  assert.ok(inventory.data.batchRows.every((item) => item.series === 'P'))
   inventory.selectBatchSeries({ currentTarget: { dataset: { series: 'ALL' } } })
-  assert.strictEqual(inventory.data.batchRows.length, 295)
+  assert.strictEqual(inventory.data.batchRows.length, 221)
   const inventoryTemplate = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/inventory/inventory.wxml'), 'utf8')
   assert.ok(inventoryTemplate.includes('data-series="{{item.code}}"'))
   assert.ok(inventoryTemplate.includes('{{item.label}}'))
@@ -164,16 +161,16 @@ async function main() {
   assert.strictEqual(inventoryUtils.undoTransaction(batchTransaction.id).ok, true)
 
   inventory.openStockEntry({ currentTarget: { dataset: { tab: 'package', direction: 1 } } })
-  assert.strictEqual(inventory.data.packageOptions.find((item) => item.count === 295).unavailable, false)
-  inventory.selectPackage({ currentTarget: { dataset: { count: 295 } } })
-  assert.strictEqual(inventory.data.selectedPackage, 295)
-  inventory.setData({ selectedPackage: 295, packageAmount: 500, entryDirection: 1 })
+  assert.strictEqual(inventory.data.packageOptions.some((item) => item.count === 295), false)
+  inventory.selectPackage({ currentTarget: { dataset: { count: 221 } } })
+  assert.strictEqual(inventory.data.selectedPackage, 221)
+  inventory.setData({ selectedPackage: 221, packageAmount: 500, entryDirection: 1 })
   inventory.confirmStockEntry()
   const stocked = inventoryUtils.getInventory('MARD')
-  assert.strictEqual(Object.keys(stocked).length, 295)
+  assert.strictEqual(Object.keys(stocked).length, 221)
   assert.ok(palette.every((item) => stocked[item.code] === 500))
   const transaction = inventoryUtils.getTransactions()[0]
-  assert.strictEqual(transaction.items.length, 295)
+  assert.strictEqual(transaction.items.length, 221)
   assert.strictEqual(inventoryUtils.undoTransaction(transaction.id).ok, true)
   assert.ok(palette.every((item) => inventoryUtils.getInventory('MARD')[item.code] === 0))
 
@@ -319,7 +316,7 @@ async function main() {
   }
 
   delete global.wx
-  console.log('UX regression passed: folders, bulk actions, 295-color series, stock + undo, consumption, native 100-event pinch, and storage-failure feedback/retry in editor, progress and imports.')
+  console.log('UX regression passed: folders, bulk actions, 221-color series, stock + undo, consumption, native 100-event pinch, and storage-failure feedback/retry in editor, progress and imports.')
 }
 
 main().catch((error) => {

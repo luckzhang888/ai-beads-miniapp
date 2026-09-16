@@ -80,7 +80,7 @@
 </view>
 
 <view wx:elif="{{stage === 'config'}}" class="container config-page">
-  <view class="config-head"><view><view class="config-title">{{selectedMethodTitle || '图纸导入'}}</view><view class="config-note">使用 MARD 295 标准色与 CIEDE2000 匹配</view></view><view class="config-actions"><view class="batch-import" bindtap="chooseBatchImages">▧ 批量导入</view><view class="back-methods" bindtap="resetMethods">更换方式</view></view></view>
+  <view class="config-head"><view><view class="config-title">{{selectedMethodTitle || '图纸导入'}}</view><view class="config-note">使用 MARD 221 标准色与 CIEDE2000 匹配</view></view><view class="config-actions"><view class="batch-import" bindtap="chooseBatchImages">▧ 批量导入</view><view class="back-methods" bindtap="resetMethods">更换方式</view></view></view>
   <view class="card">
     <view class="step-title">1. 选择图片</view>
     <view
@@ -161,7 +161,7 @@
     <view class="palette-row">
       <view>
         <view class="palette-name">{{paletteName}}</view>
-        <view class="hint">MARD A–M 基础色与 P/Q/R/T/Y/Z 特效色，共 295 色。</view>
+        <view class="hint">仅使用 MARD A–H、M 系列，共 221 个标准色号。</view>
       </view>
       <view class="badge">Lab / ΔE2000</view>
     </view>

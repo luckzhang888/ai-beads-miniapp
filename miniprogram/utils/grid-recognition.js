@@ -1,8 +1,8 @@
-const { preparePalette, findNearestColor, buildStats } = require('./color-match')
+const { preparePalette, findNearestColor, findNearestColors, buildStats } = require('./color-match')
 
 // Printed/exported MARD charts use screen colors that differ slightly from the
 // inventory swatches. These measured values keep chart recognition stable while
-// leaving the visible 295-colour inventory palette unchanged.
+// leaving the visible 221-colour standard inventory palette unchanged.
 const CHART_RGB_OVERRIDES = {
   A12: [253, 159, 114],
   A13: [252, 198, 111],
@@ -611,6 +611,41 @@ function constrainMatrixColorCount(sampleRows, matrix, rawPalette, expectedColor
   }
 }
 
+function assignMatrixByExpectedCodeCounts(sampleRows, matrix, rawPalette, expectedCodeCounts, pixelInput) {
+  if (!expectedCodeCounts || typeof expectedCodeCounts !== 'object') return { matrix, adjusted: false }
+  const paletteCodes = new Set(rawPalette.map((item) => item.code))
+  const quotas = Object.keys(expectedCodeCounts).reduce((result, code) => {
+    const count = Number(expectedCodeCounts[code])
+    if (paletteCodes.has(code) && Number.isInteger(count) && count > 0) result[code] = count
+    return result
+  }, Object.create(null))
+  const codes = Object.keys(quotas)
+  const occupiedCount = matrix.reduce((sum, row) => sum + row.filter(Boolean).length, 0)
+  const quotaTotal = codes.reduce((sum, code) => sum + quotas[code], 0)
+  if (codes.length < 2 || quotaTotal !== occupiedCount) return { matrix, adjusted: false }
+  const selectedPalette = rawPalette.filter((item) => quotas[item.code])
+  const recognitionPalette = pixelInput ? preparePalette(selectedPalette) : prepareRecognitionPalette(selectedPalette)
+  const cells = []
+  matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
+    if (!code) return
+    const candidates = findNearestColors(sampleRows[rowIndex][columnIndex].rgb, recognitionPalette, recognitionPalette.length)
+    const firstDistance = candidates[0] ? candidates[0].distance : Infinity
+    const secondDistance = candidates[1] ? candidates[1].distance : firstDistance
+    cells.push({ row: rowIndex, column: columnIndex, candidates, confidenceMargin: secondDistance - firstDistance })
+  }))
+  cells.sort((left, right) => right.confidenceMargin - left.confidenceMargin)
+  const remaining = Object.assign(Object.create(null), quotas)
+  const output = matrix.map((row) => row.slice())
+  cells.forEach((cell) => {
+    const choice = cell.candidates.find((candidate) => remaining[candidate.code] > 0)
+    if (!choice) return
+    output[cell.row][cell.column] = choice.code
+    remaining[choice.code] -= 1
+  })
+  if (Object.keys(remaining).some((code) => remaining[code] !== 0)) return { matrix, adjusted: false }
+  return { matrix: output, adjusted: true }
+}
+
 function createCachedColorMatcher(palette) {
   const cache = Object.create(null)
   let misses = 0
@@ -754,7 +789,10 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   }
   const stabilizedMatrix = labeledGrid ? stabilizeLabeledMatrix(sampleRows, matrix, observedVariants) : matrix
   const balanced = rebalanceMatrixToExpectedCount(sampleRows, stabilizedMatrix, settings.expectedBeadCount, matcher)
-  const constrained = constrainMatrixColorCount(sampleRows, balanced.matrix, rawPalette, settings.expectedColorCount, pixelInput)
+  const exactCounts = assignMatrixByExpectedCodeCounts(sampleRows, balanced.matrix, rawPalette, settings.expectedCodeCounts, pixelInput)
+  const constrained = exactCounts.adjusted
+    ? { matrix: exactCounts.matrix, adjusted: false }
+    : constrainMatrixColorCount(sampleRows, balanced.matrix, rawPalette, settings.expectedColorCount, pixelInput)
   const finalMatrix = constrained.matrix
   const counts = buildCounts(finalMatrix)
   const beadCount = Object.keys(counts).reduce((sum, code) => sum + counts[code], 0)
@@ -773,6 +811,7 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     labeledGrid,
     expectedBeadCountApplied: balanced.adjusted,
     expectedColorCountApplied: constrained.adjusted,
+    expectedCodeCountsApplied: exactCounts.adjusted,
     observedVariants: Object.keys(observedVariants).reduce((result, code) => {
       result[code] = Object.keys(observedVariants[code])
         .map((rgb) => ({ rgb: rgb.split(',').map(Number), count: observedVariants[code][rgb] }))

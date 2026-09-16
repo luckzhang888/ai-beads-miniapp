@@ -16,8 +16,8 @@ const {
   saveInventorySettings
 } = require('../../utils/inventory')
 
-const SERIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'M', 'P', 'Q', 'R', 'T', 'Y', 'Z']
-const SERIES_LABELS = { P: 'P（珠光）', Q: 'Q（温变）', R: 'R（果冻）', T: 'T（透明）', Y: 'Y（夜光）', Z: 'Z（光变）' }
+const SERIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'M']
+const SERIES_LABELS = {}
 
 function naturalCodeNumber(code) {
   return Number(String(code).replace(/\D/g, '')) || 0
@@ -63,8 +63,7 @@ Page({
       { count: 168, label: '168色' },
       { count: 192, label: '192色' },
       { count: 216, label: '216色' },
-      { count: 221, label: '221全实色' },
-      { count: 295, label: '295全色', unavailable: false }
+      { count: 221, label: '221标准色' }
     ],
     selectedPackage: 221,
     packageAmount: 1000,

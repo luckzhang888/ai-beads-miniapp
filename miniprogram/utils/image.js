@@ -66,6 +66,8 @@ function validateRecognizedGrid(result, geometry) {
 }
 
 function trustedDetectedCodes(analysis) {
+  const legendCounts = trustedLegendCodeCounts(analysis)
+  if (legendCounts) return Object.keys(legendCounts)
   const codes = analysis && Array.isArray(analysis.detectedCodes)
     ? analysis.detectedCodes.filter(Boolean)
     : []
@@ -78,6 +80,24 @@ function trustedDetectedCodes(analysis) {
       /(?:来自|取自).*图例.*(?:而非|不是).*逐格/i.test(text)
   })
   return unreliable ? [] : codes
+}
+
+function trustedLegendCodeCounts(analysis) {
+  const entries = analysis && Array.isArray(analysis.legendEntries) ? analysis.legendEntries : []
+  const declaredColors = Number(analysis && analysis.declaredColorCount)
+  const declaredBeads = Number(analysis && analysis.declaredBeadCount)
+  if (!Number.isInteger(declaredColors) || !Number.isInteger(declaredBeads) ||
+    entries.length !== declaredColors || entries.length < 2) return null
+  const counts = Object.create(null)
+  let total = 0
+  for (let index = 0; index < entries.length; index += 1) {
+    const code = String(entries[index] && entries[index].code || '').toUpperCase()
+    const count = Number(entries[index] && entries[index].count)
+    if (!/^[A-HM][0-9]+$/.test(code) || counts[code] || !Number.isInteger(count) || count < 1) return null
+    counts[code] = count
+    total += count
+  }
+  return total === declaredBeads ? counts : null
 }
 
 function clamp(value) {
@@ -357,7 +377,7 @@ async function gridImageToPattern(imagePath, shortSide, palette, options) {
         await yieldProcessingThread()
       }
     }
-    await reportProcessingProgress(settings, 90, '匹配 MARD 295 色卡')
+    await reportProcessingProgress(settings, 90, '匹配 MARD 221 标准色卡')
     const grid = {
       x: detected.x,
       y: detected.y,
@@ -467,13 +487,15 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     sampleRows = await sampleGuidedGrid(pixels, width, height, analysis, (fraction) =>
       reportProcessingProgress(settings, 60 + fraction * 20, '逐格采样 ' + Math.round(fraction * 100) + '%'))
   }
-  await reportProcessingProgress(settings, 85, '匹配 MARD 295 色号')
+  await reportProcessingProgress(settings, 85, '匹配 MARD 221 标准色号')
   const allowedCodes = trustedDetectedCodes(analysis)
+  const expectedCodeCounts = trustedLegendCodeCounts(analysis)
   const result = await classifySampleRowsAsync(sampleRows, palette, Object.assign({}, settings, {
     hasCellLabels: analysis.hasLabels,
     allowedCodes,
     expectedColorCount: analysis.declaredColorCount,
     expectedBeadCount: analysis.declaredBeadCount,
+    expectedCodeCounts,
     onClassificationProgress: (fraction) => reportProcessingProgress(settings,
       85 + fraction * 13, '匹配色号 ' + Math.round(fraction * 100) + '%')
   }), {
@@ -492,6 +514,9 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     result.aiOriginalDimensions = { rows: analysis.rows, columns: analysis.columns }
   }
   const warnings = (analysis.warnings || []).slice()
+  if (result.expectedCodeCountsApplied) {
+    warnings.unshift('已按图例逐色号数量进行全局校准，仅使用图例中的 MARD 221 标准色')
+  }
   if (Array.isArray(analysis.detectedCodes) && analysis.detectedCodes.length >= 2 && allowedCodes.length < 2) {
     warnings.unshift('AI 图例色号未经过逐格核实，已改用本地色块匹配，避免错误压缩颜色数量')
   }
@@ -523,6 +548,7 @@ module.exports = {
   gridImageToPattern,
   aiGuidedImageToPattern,
   trustedDetectedCodes,
+  trustedLegendCodeCounts,
   recommendPatternSize,
   calculatePatternDimensions,
   normalizeTransform,

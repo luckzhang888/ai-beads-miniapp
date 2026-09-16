@@ -9,7 +9,8 @@ function validAnalysis() {
   return {
     imageType: 'bead_pattern', hasGrid: true, rows: 30, columns: 30,
     rotation: 0, confidence: 0.92, hasLabels: true,
-    detectedCodes: ['h2', 'G9', 'H2'], legendCodes: ['M12', 'G9'],
+    detectedCodes: ['h2', 'G9', 'H2', 'P1', 'H24'], legendCodes: ['M12', 'G9'],
+    legendEntries: [{ code: 'H2', count: 500 }, { code: 'G9', count: 400 }, { code: 'M12', count: 300 }, { code: 'P1', count: 5 }],
     declaredColorCount: 3, declaredBeadCount: 1200, background: 'white',
     grid: { left: 0.05, top: 0.05, right: 0.95, bottom: 0.95 },
     perspective: null, warnings: []
@@ -39,6 +40,7 @@ test('cloud DeepSeek provider sends vision request and normalizes response', asy
   assert.equal(result.rows, 30)
   assert.deepEqual(result.detectedCodes, ['H2', 'G9'])
   assert.deepEqual(result.legendCodes, ['M12', 'G9'])
+  assert.deepEqual(result.legendEntries, [{ code: 'H2', count: 500 }, { code: 'G9', count: 400 }, { code: 'M12', count: 300 }])
   assert.equal(result.declaredColorCount, 3)
   assert.equal(result.declaredBeadCount, 1200)
   assert.match(request.url, /\/chat\/completions$/)
