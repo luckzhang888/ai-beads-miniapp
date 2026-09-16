@@ -491,7 +491,7 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     sampleRows = await sampleGuidedGrid(pixels, width, height, analysis, (fraction) =>
       reportProcessingProgress(settings, 60 + fraction * 20, '逐格采样 ' + Math.round(fraction * 100) + '%'))
   }
-  await reportProcessingProgress(settings, 85, '匹配 MARD 221 标准色号')
+  await reportProcessingProgress(settings, 85, '逐格归一化放大并匹配 MARD 221')
   const allowedCodes = trustedDetectedCodes(analysis)
   const expectedCodeCounts = trustedLegendCodeCounts(analysis)
   const result = await classifySampleRowsAsync(sampleRows, palette, Object.assign({}, settings, {
@@ -501,7 +501,7 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     expectedBeadCount: analysis.declaredBeadCount,
     expectedCodeCounts,
     onClassificationProgress: (fraction) => reportProcessingProgress(settings,
-      85 + fraction * 13, '匹配色号 ' + Math.round(fraction * 100) + '%')
+      85 + fraction * 13, '分块复核色号 ' + Math.round(fraction * 100) + '%')
   }), {
     confidence: analysis.confidence,
     recognitionMode: 'ai-guided-grid',
@@ -526,6 +526,9 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   const calibrationNotes = []
   if (result.uploadIntegrityVerified) calibrationNotes.push('上传前后文件大小和 MD5 完全一致，云端使用的是手机所选原图')
   if (result.chartColorCalibrationApplied) calibrationNotes.push('已从本图学习实际色块，校正截图、屏幕和导出造成的整体偏色')
+  if (result.labelTileRefinementApplied) {
+    calibrationNotes.push(`已逐格归一化放大，并用 ${result.labelTemplateCount} 组格内文字模板复核相近色号`)
+  }
   if (result.expectedCodeCountsApplied) {
     calibrationNotes.push('已按图例逐色号数量进行全局校准，仅使用图例中的 MARD 221 标准色')
   }

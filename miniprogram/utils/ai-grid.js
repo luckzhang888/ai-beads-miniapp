@@ -121,7 +121,10 @@ async function sampleGuidedGrid(imageData, width, height, analysis, onProgress) 
   const corners = validateGuidedAnalysis(analysis)
   const map = createGridMapper(corners)
   const source = imageData.data || imageData
-  const side = 12
+  // Normalize every source cell to a larger tile before extracting its fill
+  // colour and centre-ink signature. This is deterministic enlargement, not
+  // generative repair, so it cannot invent pixels that are absent in source.
+  const side = 16
   const cellData = new Uint8ClampedArray(side * side * 4)
   const rows = []
   for (let row = 0; row < analysis.rows; row += 1) {

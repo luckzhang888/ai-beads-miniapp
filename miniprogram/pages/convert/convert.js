@@ -548,6 +548,9 @@ Page({
       'pixel-fallback': '普通图片转换'
     }
     result.recognitionModeText = modeLabels[result.recognitionMode] || '图片颜色识别'
+    if (result.recognitionMode === 'ai-guided-grid' && result.labelTileRefinementApplied) {
+      result.recognitionModeText = 'AI 定位 + 分块放大文字复核 + MARD 匹配'
+    }
     result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
     result.exactRecognition = result.recognitionMode !== 'pixel-fallback' && result.recognitionMode !== 'ai-photo' &&
       result.recognitionMode !== 'ai-no-grid' &&
@@ -602,6 +605,8 @@ Page({
           uncertainCellCount: Number(result.uncertainCellCount) || 0,
           cells: (result.reviewCells || []).slice(0, 240),
           chartColorCalibrationApplied: Boolean(result.chartColorCalibrationApplied),
+          labelTileRefinementApplied: Boolean(result.labelTileRefinementApplied),
+          labelTemplateCount: Number(result.labelTemplateCount) || 0,
           uploadIntegrityVerified: Boolean(result.uploadIntegrityVerified)
         }
       })
@@ -621,6 +626,8 @@ Page({
         usedColorCount: Number(result.usedColorCount) || 0,
         uncertainCellCount: Number(result.uncertainCellCount) || 0,
         chartColorCalibrationApplied: Boolean(result.chartColorCalibrationApplied),
+        labelTileRefinementApplied: Boolean(result.labelTileRefinementApplied),
+        labelTemplateCount: Number(result.labelTemplateCount) || 0,
         uploadIntegrityVerified: Boolean(result.uploadIntegrityVerified)
       }
     })

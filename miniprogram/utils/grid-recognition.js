@@ -423,8 +423,9 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
   const redValues = []
   const greenValues = []
   const blueValues = []
-  const colorCounts = Object.create(null)
+  const colorBuckets = Object.create(null)
   const centerSamples = []
+  const sampledPixels = []
   let whitePixels = 0
 
   for (let y = y0; y <= y1; y += stepY) {
@@ -439,12 +440,17 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
       redValues.push(r)
       greenValues.push(g)
       blueValues.push(b)
-      const colorKey = r + ',' + g + ',' + b
-      colorCounts[colorKey] = (colorCounts[colorKey] || 0) + 1
+      const bucketKey = (r >> 3) + ',' + (g >> 3) + ',' + (b >> 3)
+      if (!colorBuckets[bucketKey]) colorBuckets[bucketKey] = { count: 0, red: 0, green: 0, blue: 0 }
+      colorBuckets[bucketKey].count += 1
+      colorBuckets[bucketKey].red += r
+      colorBuckets[bucketKey].green += g
+      colorBuckets[bucketKey].blue += b
       if (Math.min(r, g, b) >= 248 && Math.max(r, g, b) - Math.min(r, g, b) <= 9) whitePixels += 1
 
       const centerX = (x - left) / Math.max(1, right - left)
       const centerY = (y - top) / Math.max(1, bottom - top)
+      sampledPixels.push({ x: centerX, y: centerY, rgb: [r, g, b] })
       if (centerX >= 0.28 && centerX <= 0.72 && centerY >= 0.25 && centerY <= 0.75) {
         centerSamples.push([r, g, b])
       }
@@ -452,10 +458,13 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
   }
 
   if (!redValues.length) return { rgb: [255, 255, 255], inkRatio: 0, lightInkRatio: 0, whiteRatio: 1, sampleCount: 0 }
-  const dominantKey = Object.keys(colorCounts).reduce((best, key) => !best || colorCounts[key] > colorCounts[best] ? key : best, '')
-  const dominantCount = dominantKey ? colorCounts[dominantKey] : 0
+  const dominantKey = Object.keys(colorBuckets).reduce((best, key) =>
+    !best || colorBuckets[key].count > colorBuckets[best].count ? key : best, '')
+  const dominantBucket = dominantKey ? colorBuckets[dominantKey] : null
+  const dominantCount = dominantBucket ? dominantBucket.count : 0
   const dominantRgb = dominantCount >= Math.max(3, redValues.length * 0.08)
-    ? dominantKey.split(',').map(Number)
+    ? [dominantBucket.red, dominantBucket.green, dominantBucket.blue]
+      .map((sum) => Math.round(sum / dominantBucket.count))
     : [Math.round(median(redValues)), Math.round(median(greenValues)), Math.round(median(blueValues))]
   const backgroundLight = luminance(dominantRgb)
   let darkInk = 0
@@ -465,12 +474,26 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
     if (difference <= -22) darkInk += 1
     if (difference >= 18) lightInk += 1
   })
+  const signatureSide = 8
+  const signatureSums = new Float32Array(signatureSide * signatureSide)
+  const signatureCounts = new Uint16Array(signatureSide * signatureSide)
+  sampledPixels.forEach((sample) => {
+    const column = Math.max(0, Math.min(signatureSide - 1, Math.floor(sample.x * signatureSide)))
+    const row = Math.max(0, Math.min(signatureSide - 1, Math.floor(sample.y * signatureSide)))
+    const index = row * signatureSide + column
+    const contrast = Math.abs(luminance(sample.rgb) - backgroundLight)
+    signatureSums[index] += Math.max(0, Math.min(1, (contrast - 9) / 42))
+    signatureCounts[index] += 1
+  })
+  const labelSignature = Array.from(signatureSums, (sum, index) =>
+    signatureCounts[index] ? Math.round(255 * sum / signatureCounts[index]) : 0)
   return {
     rgb: dominantRgb,
     inkRatio: centerSamples.length ? darkInk / centerSamples.length : 0,
     lightInkRatio: centerSamples.length ? lightInk / centerSamples.length : 0,
     whiteRatio: whitePixels / redValues.length,
-    sampleCount: redValues.length
+    sampleCount: redValues.length,
+    labelSignature
   }
 }
 
@@ -611,16 +634,59 @@ function constrainMatrixColorCount(sampleRows, matrix, rawPalette, expectedColor
   }
 }
 
-function quotaAssignment(sampleRows, matrix, preparedPalette, quotas) {
+function signatureSignal(signature) {
+  if (!Array.isArray(signature) || !signature.length) return 0
+  return signature.reduce((sum, value) => sum + Number(value || 0), 0) / (signature.length * 255)
+}
+
+function signatureDistance(signature, template) {
+  if (!Array.isArray(signature) || !Array.isArray(template) || signature.length !== template.length || !signature.length) return null
+  let difference = 0
+  for (let index = 0; index < signature.length; index += 1) {
+    difference += Math.abs(Number(signature[index]) - Number(template[index]))
+  }
+  return difference / (signature.length * 255)
+}
+
+function buildLabelTemplates(cells, codes) {
+  const templates = Object.create(null)
+  codes.forEach((code) => {
+    const eligible = cells.filter((cell) => cell.candidates[0] && cell.candidates[0].code === code &&
+      signatureSignal(cell.labelSignature) >= 0.012 && signatureSignal(cell.labelSignature) <= 0.62)
+      .sort((left, right) => Number(left.colorDistances[code]) - Number(right.colorDistances[code]))
+    if (eligible.length < 2) return
+    const selected = eligible.slice(0, Math.min(64, Math.max(2, Math.ceil(eligible.length * 0.24))))
+    const length = selected[0].labelSignature.length
+    const template = new Array(length)
+    for (let index = 0; index < length; index += 1) {
+      template[index] = Math.round(median(selected.map((cell) => Number(cell.labelSignature[index]) || 0)))
+    }
+    if (signatureSignal(template) >= 0.01) templates[code] = template
+  })
+  return templates
+}
+
+function quotaAssignment(sampleRows, matrix, preparedPalette, quotas, labelTemplates) {
   const codes = Object.keys(quotas)
+  const templateCount = labelTemplates ? Object.keys(labelTemplates).length : 0
   const cells = []
   matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
     if (!code) return
     const candidates = findNearestColors(sampleRows[rowIndex][columnIndex].rgb, preparedPalette, preparedPalette.length)
+    const labelSignature = sampleRows[rowIndex][columnIndex].labelSignature
+    const colorDistances = Object.create(null)
     const distances = candidates.reduce((result, candidate) => {
+      colorDistances[candidate.code] = candidate.distance
+      const labelDistance = templateCount >= 2 && labelTemplates[candidate.code]
+        ? signatureDistance(labelSignature, labelTemplates[candidate.code])
+        : null
+      candidate.colorDistance = candidate.distance
+      candidate.labelDistance = labelDistance
+      if (labelDistance !== null) candidate.distance += labelDistance * 34
       result[candidate.code] = candidate.distance
       return result
     }, Object.create(null))
+    candidates.sort((left, right) => left.distance - right.distance)
     const firstDistance = candidates[0] ? candidates[0].distance : Infinity
     const secondDistance = candidates[1] ? candidates[1].distance : firstDistance
     cells.push({
@@ -629,6 +695,8 @@ function quotaAssignment(sampleRows, matrix, preparedPalette, quotas) {
       rgb: sampleRows[rowIndex][columnIndex].rgb,
       candidates,
       distances,
+      colorDistances,
+      labelSignature,
       confidenceMargin: secondDistance - firstDistance,
       assignedCode: ''
     })
@@ -741,7 +809,7 @@ function buildReviewCells(assignment) {
   return { reviewCells: uncertain.slice(0, 240), uncertainCellCount: uncertain.length }
 }
 
-function assignMatrixByExpectedCodeCounts(sampleRows, matrix, rawPalette, expectedCodeCounts, pixelInput) {
+function assignMatrixByExpectedCodeCounts(sampleRows, matrix, rawPalette, expectedCodeCounts, pixelInput, useLabelTiles) {
   if (!expectedCodeCounts || typeof expectedCodeCounts !== 'object') return { matrix, adjusted: false }
   const paletteCodes = new Set(rawPalette.map((item) => item.code))
   const quotas = Object.keys(expectedCodeCounts).reduce((result, code) => {
@@ -757,6 +825,7 @@ function assignMatrixByExpectedCodeCounts(sampleRows, matrix, rawPalette, expect
   const recognitionPalette = pixelInput ? preparePalette(selectedPalette) : prepareRecognitionPalette(selectedPalette)
   let assignment = quotaAssignment(sampleRows, matrix, recognitionPalette, quotas)
   if (!assignment) return { matrix, adjusted: false }
+  const colorAnchorCells = assignment.cells
   let calibration = { applied: false, palette: recognitionPalette, centers: [] }
   for (let pass = 0; pass < 2; pass += 1) {
     const nextCalibration = buildChartCalibratedPalette(assignment, calibration.palette, selectedPalette)
@@ -766,11 +835,24 @@ function assignMatrixByExpectedCodeCounts(sampleRows, matrix, rawPalette, expect
     calibration = nextCalibration
     assignment = nextAssignment
   }
+  let labelTemplates = Object.create(null)
+  if (!pixelInput && useLabelTiles) {
+    const nextTemplates = buildLabelTemplates(colorAnchorCells, codes)
+    if (Object.keys(nextTemplates).length >= 2) {
+      const refined = quotaAssignment(sampleRows, matrix, calibration.palette, quotas, nextTemplates)
+      if (refined) {
+        labelTemplates = nextTemplates
+        assignment = refined
+      }
+    }
+  }
   const review = buildReviewCells(assignment)
   return {
     matrix: assignment.matrix,
     adjusted: true,
     chartColorCalibrationApplied: calibration.applied,
+    labelTileRefinementApplied: Object.keys(labelTemplates).length >= 2,
+    labelTemplateCount: Object.keys(labelTemplates).length,
     chartColorCenters: calibration.centers.map((item) => ({
       code: item.code,
       rgb: item.observedRgb,
@@ -977,7 +1059,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   // AI hasLabels is only a hint. Thin grid lines are often mistaken for tiny
   // printed codes, which turns every white background square into an H2 bead.
   // Require local centre-ink evidence before enabling labelled-chart rules.
-  const labeledGrid = !pixelInput && settings.hasCellLabels !== false && detectedLabelRatio >= 0.08
+  const minimumLabelRatio = settings.hasCellLabels === true ? 0.025 : 0.08
+  const labeledGrid = !pixelInput && settings.hasCellLabels !== false && detectedLabelRatio >= minimumLabelRatio
   const blankThreshold = Number(settings.blankThreshold) || 249
   const borderBackground = !labeledGrid && !pixelInput ? estimateBorderBackground(sampleRows) : null
   const matrix = []
@@ -1010,7 +1093,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     : { matrix, restored: 0 }
   const stabilizedMatrix = labeledGrid ? stabilizeLabeledMatrix(sampleRows, topology.matrix, observedVariants) : topology.matrix
   const balanced = rebalanceMatrixToExpectedCount(sampleRows, stabilizedMatrix, settings.expectedBeadCount, matcher)
-  const exactCounts = assignMatrixByExpectedCodeCounts(sampleRows, balanced.matrix, rawPalette, settings.expectedCodeCounts, pixelInput)
+  const exactCounts = assignMatrixByExpectedCodeCounts(
+    sampleRows, balanced.matrix, rawPalette, settings.expectedCodeCounts, pixelInput, labeledGrid)
   const constrained = exactCounts.adjusted
     ? { matrix: exactCounts.matrix, adjusted: false }
     : constrainMatrixColorCount(sampleRows, balanced.matrix, rawPalette, settings.expectedColorCount, pixelInput)
@@ -1037,6 +1121,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     expectedColorCountApplied: constrained.adjusted,
     expectedCodeCountsApplied: exactCounts.adjusted,
     chartColorCalibrationApplied: Boolean(exactCounts.chartColorCalibrationApplied),
+    labelTileRefinementApplied: Boolean(exactCounts.labelTileRefinementApplied),
+    labelTemplateCount: Number(exactCounts.labelTemplateCount) || 0,
     chartColorCenters: exactCounts.chartColorCenters || [],
     reviewCells: exactCounts.reviewCells || [],
     uncertainCellCount: Number(exactCounts.uncertainCellCount) || 0,

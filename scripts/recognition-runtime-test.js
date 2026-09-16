@@ -116,6 +116,26 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.ok(exactCounts.chartColorCenters.every((item) => ['F5', 'C19'].includes(item.code)))
     assert.ok(Array.isArray(exactCounts.reviewCells))
     assert.ok(Number.isInteger(exactCounts.uncertainCellCount))
+    const signatureFor = (code) => Array.from({ length: 64 }, (_, index) => {
+      if (code === 'H6') return index % 8 <= 2 ? 230 : 0
+      return index % 8 >= 5 ? 230 : 0
+    })
+    const labeledCodes = Array.from({ length: 12 }, (_, index) => index % 2 ? 'H7' : 'H6')
+    const ambiguousLabels = [labeledCodes.map((code, index) => ({
+      rgb: index < 4 ? palette.find((item) => item.code === code).rgb : [25, 23, 25],
+      inkRatio: 0.12, lightInkRatio: 0, whiteRatio: 0, sampleCount: 144,
+      labelSignature: signatureFor(code)
+    }))]
+    const labelRefined = classifySampleRows(ambiguousLabels, palette, {
+      hasCellLabels: true,
+      expectedBeadCount: 12,
+      expectedColorCount: 2,
+      expectedCodeCounts: { H6: 6, H7: 6 }
+    })
+    assert.deepStrictEqual(labelRefined.matrix[0], labeledCodes,
+      'enlarged per-cell label signatures must separate colour pairs that are ambiguous by RGB alone')
+    assert.strictEqual(labelRefined.labelTileRefinementApplied, true)
+    assert.strictEqual(labelRefined.labelTemplateCount, 2)
     assert.deepStrictEqual(trustedLegendCodeCounts({
       declaredColorCount: 2, declaredBeadCount: 12,
       legendEntries: [{ code: 'F5', count: 7 }, { code: 'C19', count: 5 }]
