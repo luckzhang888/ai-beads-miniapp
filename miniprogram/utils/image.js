@@ -176,8 +176,8 @@ function normalizeTransform(transform) {
   const value = transform || {}
   return {
     scale: Math.max(0.5, Math.min(4, Number(value.scale) || 1)),
-    offsetX: Math.max(-1, Math.min(1, Number(value.offsetX) || 0)),
-    offsetY: Math.max(-1, Math.min(1, Number(value.offsetY) || 0)),
+    offsetX: Math.max(-4, Math.min(4, Number(value.offsetX) || 0)),
+    offsetY: Math.max(-4, Math.min(4, Number(value.offsetY) || 0)),
     rotation: [0, 90, 180, 270].includes(Number(value.rotation)) ? Number(value.rotation) : 0,
     mirrored: Boolean(value.mirrored)
   }

@@ -42,7 +42,16 @@
       <button class="{{recognitionCropEnabled ? 'active' : ''}}" bindtap="toggleRecognitionCrop">{{recognitionCropEnabled ? '取消裁剪，使用整图' : '移动裁剪主体'}}</button>
       <button wx:if="{{recognitionCropEnabled}}" bindtap="resetCrop">重置位置</button>
     </view>
-    <view wx:if="{{recognitionCropEnabled}}" class="classify-crop-hint">单指拖动图片，双指缩放；框内内容会生成方形拼豆图纸。</view>
+    <view wx:if="{{recognitionCropEnabled}}" class="classify-crop-editor">
+      <view class="classify-crop-hint">直接在图片上单指拖动、双指缩放；也可使用下方控件精确选择位置。</view>
+      <view class="crop-zoom-row"><text>缩放</text><slider min="0" max="300" step="5" value="{{cropZoom}}" bindinput="changeCropZoom" bindchange="changeCropZoom" activeColor="#7150d8" block-size="20" /><text>+{{cropZoom}}%</text></view>
+      <view class="crop-nudge-row">
+        <button data-x="0" data-y="-1" bindtap="nudgeCrop">↑</button>
+        <button data-x="-1" data-y="0" bindtap="nudgeCrop">←</button>
+        <button data-x="1" data-y="0" bindtap="nudgeCrop">→</button>
+        <button data-x="0" data-y="1" bindtap="nudgeCrop">↓</button>
+      </view>
+    </view>
     <view class="variant-row">
       <view wx:for="{{sourceVariants}}" wx:key="value" class="variant-item {{sourceVariant === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectSourceVariant"><view>{{sourceVariant === item.value ? '●' : '○'}}</view><text>{{item.label}}</text></view>
     </view>

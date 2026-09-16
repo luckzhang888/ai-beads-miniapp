@@ -81,6 +81,7 @@ Page({
     cropX: 0,
     cropY: 0,
     cropScale: 1,
+    cropZoom: 0,
     cropRotation: 0,
     cropMirrored: false,
     recognitionCropEnabled: false,
@@ -150,6 +151,7 @@ Page({
       cropX: 0,
       cropY: 0,
       cropScale: 1,
+      cropZoom: 0,
       cropRotation: 0,
       cropMirrored: false,
       recognitionCropEnabled: false,
@@ -406,8 +408,8 @@ Page({
       return
     }
     if (this.cropGesture.type === 'move' && touches.length === 1) {
-      const cropX = Math.max(-150, Math.min(150, this.cropGesture.cropX + touches[0].clientX - this.cropGesture.x))
-      const cropY = Math.max(-150, Math.min(150, this.cropGesture.cropY + touches[0].clientY - this.cropGesture.y))
+      const cropX = this.cropGesture.cropX + touches[0].clientX - this.cropGesture.x
+      const cropY = this.cropGesture.cropY + touches[0].clientY - this.cropGesture.y
       this.updateCropTransform({ cropX, cropY })
     }
   },
@@ -429,6 +431,7 @@ Page({
       cropX: 0,
       cropY: 0,
       cropScale: 1,
+      cropZoom: 0,
       cropRotation: 0,
       cropMirrored: false,
       cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
@@ -626,6 +629,7 @@ Page({
       cropX: wasEnabled ? this.data.cropX : 0,
       cropY: wasEnabled ? this.data.cropY : 0,
       cropScale: wasEnabled ? Math.max(1, this.data.cropScale) : 1,
+      cropZoom: wasEnabled ? Math.round((Math.max(1, this.data.cropScale) - 1) * 100) : 0,
       cropRotation: wasEnabled ? this.data.cropRotation : 0,
       cropMirrored: wasEnabled ? this.data.cropMirrored : false,
       recognitionProgress: 0,
@@ -722,10 +726,51 @@ Page({
 
   updateCropTransform(changes) {
     const next = Object.assign({}, this.data, changes || {})
+    const limits = this.cropTranslationLimits(next)
+    next.cropX = Math.max(-limits.x, Math.min(limits.x, Number(next.cropX) || 0))
+    next.cropY = Math.max(-limits.y, Math.min(limits.y, Number(next.cropY) || 0))
+    next.cropZoom = Math.round((Math.max(1, Number(next.cropScale) || 1) - 1) * 100)
     const cropStyle = 'transform: translate(' + next.cropX + 'px, ' + next.cropY + 'px) scale(' +
       Number(next.cropScale).toFixed(2) + ') rotate(' + next.cropRotation + 'deg) scaleX(' +
       (next.cropMirrored ? -1 : 1) + ');'
-    this.setData(Object.assign({}, changes, { cropStyle, previewResult: null }))
+    this.setData(Object.assign({}, changes, {
+      cropX: next.cropX,
+      cropY: next.cropY,
+      cropScale: next.cropScale,
+      cropZoom: next.cropZoom,
+      cropStyle,
+      previewResult: null
+    }))
+  },
+
+  cropTranslationLimits(state) {
+    if (state.cropMode !== 'cover' || !state.imageInfo) return { x: 150, y: 150 }
+    let width = Math.max(1, Number(state.imageInfo.width) || 1)
+    let height = Math.max(1, Number(state.imageInfo.height) || 1)
+    if (Number(state.cropRotation) === 90 || Number(state.cropRotation) === 270) {
+      const swapped = width
+      width = height
+      height = swapped
+    }
+    const ratio = width / height
+    const scale = Math.max(1, Number(state.cropScale) || 1)
+    const half = 158
+    return {
+      x: Math.max(0, half * (Math.max(1, ratio) * scale - 1)),
+      y: Math.max(0, half * (Math.max(1, 1 / ratio) * scale - 1))
+    }
+  },
+
+  changeCropZoom(event) {
+    const cropScale = 1 + Math.max(0, Math.min(300, Number(event.detail.value) || 0)) / 100
+    this.updateCropTransform({ cropScale })
+  },
+
+  nudgeCrop(event) {
+    const step = 18
+    const x = Number(event.currentTarget.dataset.x) || 0
+    const y = Number(event.currentTarget.dataset.y) || 0
+    this.updateCropTransform({ cropX: this.data.cropX + x * step, cropY: this.data.cropY + y * step })
   },
 
   rotateCrop() {
@@ -737,7 +782,7 @@ Page({
   },
 
   resetCrop() {
-    this.updateCropTransform({ cropX: 0, cropY: 0, cropScale: 1, cropRotation: 0, cropMirrored: false })
+    this.updateCropTransform({ cropX: 0, cropY: 0, cropScale: 1, cropZoom: 0, cropRotation: 0, cropMirrored: false })
   },
 
   processingOptions() {
@@ -752,8 +797,8 @@ Page({
       whiteTolerance: 22,
       fallbackQualityMode: this.data.selectedMethod === 'pixel' ? this.data.qualityMode : 'easy',
       transform: {
-        offsetX: this.data.cropX / 150,
-        offsetY: this.data.cropY / 150,
+        offsetX: this.data.cropX / 158,
+        offsetY: this.data.cropY / 158,
         scale: this.data.cropScale,
         rotation: this.data.cropRotation,
         mirrored: this.data.cropMirrored
@@ -811,13 +856,25 @@ Page({
       src: path,
       success: (info) => {
         const recommendedSize = recommendPatternSize(info.width, info.height)
-        const dims = calculatePatternDimensions(info.width, info.height, recommendedSize, this.data.cropMode)
+        const longImage = Math.max(info.width, info.height) / Math.max(1, Math.min(info.width, info.height)) >= 1.45
+        const recognitionImport = ['recognize', 'diagram', 'link'].indexOf(this.data.selectedMethod) >= 0
+        const autoCrop = this.data.stage === 'classify' && recognitionImport && longImage
+        const cropMode = autoCrop ? 'cover' : this.data.cropMode
+        const dims = calculatePatternDimensions(info.width, info.height, recommendedSize, cropMode)
         this.setData({
           imageInfo: info,
           recommendedSize,
           selectedSize: recommendedSize,
           outputWidth: dims.width,
           outputHeight: dims.height,
+          recognitionCropEnabled: autoCrop,
+          cropMode,
+          imageMode: autoCrop ? 'aspectFill' : this.data.imageMode,
+          cropX: 0,
+          cropY: 0,
+          cropScale: 1,
+          cropZoom: 0,
+          cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
           previewResult: null
         }, () => { if (typeof ready === 'function') ready(info) })
       },
@@ -853,6 +910,7 @@ Page({
       cropX: 0,
       cropY: 0,
       cropScale: 1,
+      cropZoom: 0,
       cropRotation: 0,
       cropMirrored: false,
       cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);'
@@ -953,6 +1011,7 @@ Page({
             cropX: 0,
             cropY: 0,
             cropScale: 1,
+            cropZoom: 0,
             cropRotation: 0,
             cropMirrored: false,
             cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',

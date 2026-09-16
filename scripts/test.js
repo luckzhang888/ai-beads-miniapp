@@ -73,7 +73,7 @@ assert.strictEqual(shouldTreatAsBlank(250, 249, 251, 255, { removeBackground: tr
 assert.strictEqual(shouldTreatAsBlank(250, 180, 180, 255, { removeBackground: true, whiteThreshold: 245 }), false)
 assert.strictEqual(shouldTreatAsBlank(20, 20, 20, 0, {}), true)
 assert.deepStrictEqual(normalizeTransform({ scale: 10, offsetX: -4, rotation: 90, mirrored: true }), {
-  scale: 4, offsetX: -1, offsetY: 0, rotation: 90, mirrored: true
+  scale: 4, offsetX: -4, offsetY: 0, rotation: 90, mirrored: true
 })
 const recognitionPalette = prepareRecognitionPalette(palette)
 assert.strictEqual(findNearestColor([210, 176, 180], recognitionPalette).code, 'E21')
@@ -475,7 +475,7 @@ assert.ok(Array.isArray(inventoryPage.data.transactions))
 const convertPage = loadPage('../miniprogram/pages/convert/convert')
 convertPage.setData({ cropX: 75, cropY: -75, cropScale: 2, cropRotation: 90, cropMirrored: true })
 assert.deepStrictEqual(convertPage.processingOptions().transform, {
-  offsetX: 0.5, offsetY: -0.5, scale: 2, rotation: 90, mirrored: true
+  offsetX: 75 / 158, offsetY: -75 / 158, scale: 2, rotation: 90, mirrored: true
 })
 convertPage.setData({ stage: 'classify', imageInfo: { width: 1080, height: 2340 } })
 convertPage.toggleRecognitionCrop()
@@ -483,9 +483,21 @@ assert.strictEqual(convertPage.data.recognitionCropEnabled, true)
 assert.strictEqual(convertPage.data.cropMode, 'cover')
 assert.deepStrictEqual([convertPage.data.outputWidth, convertPage.data.outputHeight],
   [convertPage.data.selectedSize, convertPage.data.selectedSize])
+convertPage.updateCropTransform({ cropX: 200, cropY: 999 })
+assert.strictEqual(convertPage.data.cropX, 0, 'an unzoomed portrait crop must not slide beyond its horizontal edge')
+assert.ok(convertPage.data.cropY > 150, 'a long portrait crop must reach farther than the old fixed drag limit')
+convertPage.changeCropZoom({ detail: { value: 100 } })
+assert.strictEqual(convertPage.data.cropScale, 2)
+convertPage.nudgeCrop({ currentTarget: { dataset: { x: 1, y: 0 } } })
+assert.ok(convertPage.data.cropX > 0)
 convertPage.toggleRecognitionCrop()
 assert.strictEqual(convertPage.data.recognitionCropEnabled, false)
 assert.strictEqual(convertPage.data.cropMode, 'ratio')
+global.wx.getImageInfo = ({ success }) => success({ path: 'long.jpg', width: 1080, height: 2340 })
+convertPage.setData({ stage: 'classify', selectedMethod: 'recognize', cropMode: 'ratio', recognitionCropEnabled: false })
+convertPage.updateRecommendedSize('long.jpg')
+assert.strictEqual(convertPage.data.recognitionCropEnabled, true, 'long photos must open directly in manual crop mode')
+assert.strictEqual(convertPage.data.cropMode, 'cover')
 
 delete global.wx
 require('./recognition-runtime-test').run({ guideFixture: largeGuideFixture, edgeFixture: edgeCropped, convertPage }).then(() => {
