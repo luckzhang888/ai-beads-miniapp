@@ -15,6 +15,21 @@ function fail(id, code, message) {
   return { ok: false, requestId: id, error: { code, message } }
 }
 
+function verifyUploadIntegrity(buffer, rawBytes, rawDigest) {
+  const expectedBytes = Number(rawBytes)
+  const expectedDigest = String(rawDigest || '').toLowerCase()
+  const hasBytes = Number.isInteger(expectedBytes) && expectedBytes > 0
+  const hasDigest = /^[a-f0-9]{32}$/.test(expectedDigest)
+  const actualDigest = crypto.createHash('md5').update(buffer).digest('hex')
+  return {
+    verified: hasBytes && hasDigest && expectedBytes === buffer.length && expectedDigest === actualDigest,
+    supplied: hasBytes || hasDigest,
+    bytes: buffer.length,
+    matchesBytes: !hasBytes || expectedBytes === buffer.length,
+    matchesDigest: !hasDigest || expectedDigest === actualDigest
+  }
+}
+
 function enter(identity) {
   const now = Date.now()
   const previous = clients.get(identity) || []
@@ -84,13 +99,18 @@ exports.main = async (event = {}, context = {}) => {
         tooLarge ? '图片超过 10 MB，请选择较小但清晰的原图。' : '云存储图片读取失败，请重新选择图片。')
     }
     if (!Buffer.isBuffer(buffer) || !buffer.length) return fail(id, 'IMAGE_REQUIRED', '云存储图片内容为空。')
+    const integrity = verifyUploadIntegrity(buffer, event.sourceBytes, event.sourceDigest)
+    if (integrity.supplied && !integrity.verified) {
+      return fail(id, 'UPLOAD_INTEGRITY_FAILED', '上传后的图片与手机原图不一致，请重新选择原图后重试。')
+    }
     const mimeType = detectImageType(buffer)
     if (!mimeType) return fail(id, 'INVALID_IMAGE', '仅支持 JPEG、PNG、WebP 和 GIF 图片。')
 
     const result = await provider.analyze({ buffer, mimeType }, options)
     console.info(JSON.stringify({ requestId: id, ms: Date.now() - started, model: provider.model,
       status: 200, imageType: result.imageType, rows: result.rows, columns: result.columns, confidence: result.confidence }))
-    return { ok: true, requestId: id, provider: 'deepseek', model: provider.model, result }
+    return { ok: true, requestId: id, provider: 'deepseek', model: provider.model,
+      uploadIntegrity: { verified: integrity.verified, bytes: integrity.bytes }, result }
   } catch (error) {
     const code = error && error.code || 'AI_RECOGNITION_FAILED'
     console.error(JSON.stringify({ requestId: id, ms: Date.now() - started, model: provider.model, errorType: code }))
@@ -106,4 +126,4 @@ exports.main = async (event = {}, context = {}) => {
   }
 }
 
-exports._test = { detectImageType, normalizeOptions, validCloudImageUrl, downloadImage, fail }
+exports._test = { detectImageType, normalizeOptions, validCloudImageUrl, downloadImage, verifyUploadIntegrity, fail }

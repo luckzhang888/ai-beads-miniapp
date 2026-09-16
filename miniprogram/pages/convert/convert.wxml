@@ -58,7 +58,16 @@
     <view><text>图例</text><b>{{recognitionResult.usedColorCount}} 色 · {{recognitionResult.beadCount}} 颗</b></view>
     <view><text>方式</text><b>{{recognitionResult.recognitionModeText}} · {{recognitionResult.confidencePercent}}%</b></view>
   </view>
+  <view wx:if="{{recognitionResult.calibrationNote}}" class="recognition-calibration-note">✓ {{recognitionResult.calibrationNote}}</view>
   <view wx:if="{{recognitionResult.warning}}" class="recognition-warning">{{recognitionResult.warning}}</view>
+  <view wx:if="{{recognitionResult.uncertainCellCount > 0}}" class="recognition-review">
+    <view class="recognition-review-head"><b>待核对 {{recognitionResult.uncertainCellCount}} 格</b><text>以下颜色距离过近，不会虚假标记为 100%</text></view>
+    <view class="recognition-review-list">
+      <view wx:for="{{recognitionResult.reviewPreview}}" wx:key="label">
+        <text>{{item.label}}</text><b>{{item.code}}{{item.alternativeCode ? ' / 候选 ' + item.alternativeCode : ''}}</b><text class="confidence">{{item.confidence}}%</text>
+      </view>
+    </view>
+  </view>
   <view wx:if="{{recognitionResult.needsCalibration}}" class="recognition-calibration">
     <view class="calibration-copy">
       <b>请校准图纸短边网格</b>

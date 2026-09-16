@@ -55,6 +55,18 @@ test('analysis validation rejects invented or malformed grids', () => {
   assert.throws(() => validateAiAnalysis(Object.assign(validAnalysis(), { declaredBeadCount: 0 })), { code: 'AI_INVALID_RESULT' })
 })
 
+test('cloud upload integrity proves the downloaded object is byte-for-byte identical', () => {
+  const buffer = Buffer.from('original-image-bytes')
+  const digest = require('node:crypto').createHash('md5').update(buffer).digest('hex')
+  assert.deepEqual(_test.verifyUploadIntegrity(buffer, buffer.length, digest), {
+    verified: true, supplied: true, bytes: buffer.length, matchesBytes: true, matchesDigest: true
+  })
+  const changed = _test.verifyUploadIntegrity(Buffer.from('changed-image-bytes'), buffer.length, digest)
+  assert.equal(changed.verified, false)
+  assert.equal(changed.supplied, true)
+  assert.equal(changed.matchesDigest, false)
+})
+
 test('cloud image URL validation only accepts matching Tencent storage objects', () => {
   const fileID = 'cloud://test-env.bucket/ai-inputs/a.png'
   assert.equal(_test.validCloudImageUrl(fileID, 'https://test-env.tcb.qcloud.la/ai-inputs/a.png?sign=1'),

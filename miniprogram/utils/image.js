@@ -507,6 +507,7 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.sourceHeight = info.height
   result.recognitionScale = scale
   result.aiAnalysis = analysis
+  result.uploadIntegrityVerified = Boolean(analysis.uploadIntegrity && analysis.uploadIntegrity.verified)
   result.localGridRefined = Boolean(useLocalGrid)
   result.localGridKind = useLocalGrid ? localGridKind : ''
   result.aiDimensionsCorrected = Boolean(aiDimensionsCorrected)
@@ -514,8 +515,15 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     result.aiOriginalDimensions = { rows: analysis.rows, columns: analysis.columns }
   }
   const warnings = (analysis.warnings || []).slice()
+  const calibrationNotes = []
+  if (result.uploadIntegrityVerified) calibrationNotes.push('上传前后文件大小和 MD5 完全一致，云端使用的是手机所选原图')
+  if (result.chartColorCalibrationApplied) calibrationNotes.push('已从本图学习实际色块，校正截图、屏幕和导出造成的整体偏色')
   if (result.expectedCodeCountsApplied) {
-    warnings.unshift('已按图例逐色号数量进行全局校准，仅使用图例中的 MARD 221 标准色')
+    calibrationNotes.push('已按图例逐色号数量进行全局校准，仅使用图例中的 MARD 221 标准色')
+  }
+  result.calibrationNote = calibrationNotes.join('；')
+  if (result.uncertainCellCount > 0) {
+    warnings.unshift(`仍有 ${result.uncertainCellCount} 格颜色接近，已列为待人工核对，不能标记为 100%`)
   }
   if (Array.isArray(analysis.detectedCodes) && analysis.detectedCodes.length >= 2 && allowedCodes.length < 2) {
     warnings.unshift('AI 图例色号未经过逐格核实，已改用本地色块匹配，避免错误压缩颜色数量')

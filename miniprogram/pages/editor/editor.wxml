@@ -31,6 +31,19 @@
 
     <view class="tip">当前工具：{{toolName}}。选择下面的色号，然后点击图纸格子。</view>
 
+    <view wx:if="{{reviewCurrent}}" class="review-queue">
+      <view class="review-copy">
+        <b>颜色待核对 · 样本 {{reviewCells.length}} / 共 {{reviewTotal}} 格</b>
+        <text>{{reviewCurrent.label}}：当前 {{reviewCurrent.code}}{{reviewCurrent.alternativeCode ? '，候选 ' + reviewCurrent.alternativeCode : ''}} · 置信度 {{reviewCurrent.confidence}}%</text>
+        <text wx:if="{{reviewTruncated}}">优先列出置信度最低的 240 格；样本完成后仍需整体查看原图。</text>
+      </view>
+      <view class="review-actions">
+        <button size="mini" data-offset="-1" bindtap="moveReview">上一格</button>
+        <button size="mini" class="review-confirm" bindtap="confirmReviewCell">此格已确认</button>
+        <button size="mini" data-offset="1" bindtap="moveReview">下一格</button>
+      </view>
+    </view>
+
     <bead-grid
       id="editorGrid"
       matrix="{{matrix}}"

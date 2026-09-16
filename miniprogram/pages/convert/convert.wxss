@@ -242,6 +242,16 @@
 .recognition-actions button { width: 100%; margin: 0; border-radius: 20rpx; color: #6548ca; background: white; }
 .recognition-actions button.primary { color: white; background: linear-gradient(135deg,#7b57e8,#6341d6); }
 .recognition-warning { margin-top: 16rpx; padding: 17rpx 20rpx; border: 1rpx solid #f0d39a; border-radius: 17rpx; color: #8a6014; background: #fff8e8; font-size: 21rpx; }
+.recognition-calibration-note { margin-top: 16rpx; padding: 17rpx 20rpx; border-radius: 17rpx; color: #236b43; background: #e9f9ef; font-size: 21rpx; line-height: 1.5; }
+.recognition-review { margin-top: 16rpx; padding: 20rpx; border: 1rpx solid #efc978; border-radius: 18rpx; background: #fffaf0; }
+.recognition-review-head { display: flex; flex-direction: column; gap: 6rpx; }
+.recognition-review-head b { color: #8a5a0a; font-size: 24rpx; }
+.recognition-review-head text { color: #7b6b50; font-size: 20rpx; }
+.recognition-review-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9rpx; margin-top: 14rpx; }
+.recognition-review-list view { display: grid; grid-template-columns: 1fr auto; gap: 3rpx 8rpx; padding: 10rpx 12rpx; border-radius: 11rpx; background: white; }
+.recognition-review-list text { color: #746878; font-size: 18rpx; }
+.recognition-review-list b { color: #33283b; font-size: 19rpx; }
+.recognition-review-list .confidence { grid-column: 2; color: #a06b0c; font-size: 17rpx; text-align: right; }
 .recognition-local-note { margin-top: 16rpx; padding: 17rpx 20rpx; border-radius: 17rpx; color: #5a438b; background: #eae3ff; font-size: 22rpx; line-height: 1.5; }
 .recognition-error { margin-top: 20rpx; padding: 25rpx; display: flex; flex-direction: column; gap: 13rpx; border: 1rpx solid #edc6c6; border-radius: 22rpx; background: #fff; }
 .recognition-error b { color: #a43838; font-size: 27rpx; }
@@ -318,8 +328,10 @@
   .recognition-summary view { padding: 15px; border-radius: 15px; }
   .recognition-summary text { font-size: 13px; }
   .recognition-summary b { font-size: 17px; }
-  .recognition-warning, .recognition-calibration, .recognition-progress-card, .recognition-actions { width: min(100%,900px); box-sizing: border-box; margin-left: auto; margin-right: auto; }
+  .recognition-warning, .recognition-calibration-note, .recognition-review, .recognition-calibration, .recognition-progress-card, .recognition-actions { width: min(100%,900px); box-sizing: border-box; margin-left: auto; margin-right: auto; }
   .recognition-warning { margin-top: 11px; padding: 12px 14px; border-width: 1px; border-radius: 12px; font-size: 14px; }
+  .recognition-calibration-note { margin-top: 11px; padding: 12px 14px; border-radius: 12px; font-size: 14px; }
+  .recognition-review { margin-top: 11px; padding: 14px; border-width: 1px; border-radius: 13px; }
   .recognition-calibration { margin-top: 11px; padding: 14px; border-radius: 13px; }
   .calibration-copy { gap: 5px; }
   .calibration-copy b { font-size: 16px; }

@@ -611,6 +611,136 @@ function constrainMatrixColorCount(sampleRows, matrix, rawPalette, expectedColor
   }
 }
 
+function quotaAssignment(sampleRows, matrix, preparedPalette, quotas) {
+  const codes = Object.keys(quotas)
+  const cells = []
+  matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
+    if (!code) return
+    const candidates = findNearestColors(sampleRows[rowIndex][columnIndex].rgb, preparedPalette, preparedPalette.length)
+    const distances = candidates.reduce((result, candidate) => {
+      result[candidate.code] = candidate.distance
+      return result
+    }, Object.create(null))
+    const firstDistance = candidates[0] ? candidates[0].distance : Infinity
+    const secondDistance = candidates[1] ? candidates[1].distance : firstDistance
+    cells.push({
+      row: rowIndex,
+      column: columnIndex,
+      rgb: sampleRows[rowIndex][columnIndex].rgb,
+      candidates,
+      distances,
+      confidenceMargin: secondDistance - firstDistance,
+      assignedCode: ''
+    })
+  }))
+  cells.sort((left, right) => right.confidenceMargin - left.confidenceMargin)
+  const remaining = Object.assign(Object.create(null), quotas)
+  cells.forEach((cell) => {
+    const choice = cell.candidates.find((candidate) => remaining[candidate.code] > 0)
+    if (!choice) return
+    cell.assignedCode = choice.code
+    remaining[choice.code] -= 1
+  })
+  if (Object.keys(remaining).some((code) => remaining[code] !== 0)) return null
+
+  // The confidence-first pass preserves every quota but is greedy. Exchange
+  // pairs of differently assigned cells whenever that reduces the total colour
+  // distance while leaving every legend count unchanged.
+  for (let pass = 0; pass < 2; pass += 1) {
+    let swaps = 0
+    for (let first = 0; first < codes.length; first += 1) {
+      for (let second = first + 1; second < codes.length; second += 1) {
+        const leftCode = codes[first]
+        const rightCode = codes[second]
+        const left = cells.filter((cell) => cell.assignedCode === leftCode).map((cell) => ({
+          cell,
+          delta: cell.distances[rightCode] - cell.distances[leftCode]
+        })).sort((a, b) => a.delta - b.delta)
+        const right = cells.filter((cell) => cell.assignedCode === rightCode).map((cell) => ({
+          cell,
+          delta: cell.distances[leftCode] - cell.distances[rightCode]
+        })).sort((a, b) => a.delta - b.delta)
+        const pairCount = Math.min(left.length, right.length)
+        for (let index = 0; index < pairCount; index += 1) {
+          if (left[index].delta + right[index].delta >= -0.01) break
+          left[index].cell.assignedCode = rightCode
+          right[index].cell.assignedCode = leftCode
+          swaps += 1
+        }
+      }
+    }
+    if (!swaps) break
+  }
+
+  const output = matrix.map((row) => row.slice())
+  cells.forEach((cell) => { output[cell.row][cell.column] = cell.assignedCode })
+  return { matrix: output, cells }
+}
+
+function medianRgb(samples) {
+  if (!samples.length) return [255, 255, 255]
+  return [0, 1, 2].map((channel) => Math.round(median(samples.map((rgb) => rgb[channel]))))
+}
+
+function buildChartCalibratedPalette(assignment, preparedPalette, selectedPalette) {
+  const reference = preparedPalette.reduce((result, item) => {
+    result[item.code] = item.rgb
+    return result
+  }, Object.create(null))
+  const grouped = assignment.cells.reduce((result, cell) => {
+    if (!result[cell.assignedCode]) result[cell.assignedCode] = []
+    result[cell.assignedCode].push(cell.rgb)
+    return result
+  }, Object.create(null))
+  const centers = []
+  selectedPalette.forEach((item) => {
+    const samples = grouped[item.code] || []
+    if (samples.length < 3) return
+    const anchor = reference[item.code] || item.rgb
+    const stable = samples.slice().sort((left, right) => rgbDistance(left, anchor) - rgbDistance(right, anchor))
+      .slice(0, Math.max(3, Math.ceil(samples.length * 0.72)))
+    const observed = medianRgb(stable)
+    const observedWeight = samples.length >= 8 ? 0.88 : 0.72
+    centers.push({
+      code: item.code,
+      rgb: observed.map((value, channel) => Math.round(value * observedWeight + anchor[channel] * (1 - observedWeight))),
+      observedRgb: observed,
+      sampleCount: samples.length
+    })
+  })
+  if (centers.length < 2) return { applied: false, palette: preparedPalette, centers: [] }
+  const byCode = centers.reduce((result, item) => {
+    result[item.code] = item
+    return result
+  }, Object.create(null))
+  const calibrated = selectedPalette.map((item) => Object.assign({}, item, {
+    rgb: byCode[item.code] ? byCode[item.code].rgb : (reference[item.code] || item.rgb),
+    lab: undefined
+  }))
+  return { applied: true, palette: preparePalette(calibrated), centers }
+}
+
+function buildReviewCells(assignment) {
+  const uncertain = []
+  assignment.cells.forEach((cell) => {
+    const selectedDistance = Number(cell.distances[cell.assignedCode])
+    const alternative = cell.candidates.find((candidate) => candidate.code !== cell.assignedCode)
+    const alternativeDistance = alternative ? Number(alternative.distance) : selectedDistance
+    const relativeMargin = (alternativeDistance - selectedDistance) / Math.max(1, alternativeDistance)
+    const confidence = Math.max(0, Math.min(1, 0.62 + relativeMargin * 0.55 - selectedDistance / 90))
+    if (confidence >= 0.55) return
+    uncertain.push({
+      row: cell.row,
+      column: cell.column,
+      code: cell.assignedCode,
+      alternativeCode: alternative ? alternative.code : '',
+      confidence: Math.round(confidence * 100)
+    })
+  })
+  uncertain.sort((left, right) => left.confidence - right.confidence)
+  return { reviewCells: uncertain.slice(0, 240), uncertainCellCount: uncertain.length }
+}
+
 function assignMatrixByExpectedCodeCounts(sampleRows, matrix, rawPalette, expectedCodeCounts, pixelInput) {
   if (!expectedCodeCounts || typeof expectedCodeCounts !== 'object') return { matrix, adjusted: false }
   const paletteCodes = new Set(rawPalette.map((item) => item.code))
@@ -625,25 +755,30 @@ function assignMatrixByExpectedCodeCounts(sampleRows, matrix, rawPalette, expect
   if (codes.length < 2 || quotaTotal !== occupiedCount) return { matrix, adjusted: false }
   const selectedPalette = rawPalette.filter((item) => quotas[item.code])
   const recognitionPalette = pixelInput ? preparePalette(selectedPalette) : prepareRecognitionPalette(selectedPalette)
-  const cells = []
-  matrix.forEach((row, rowIndex) => row.forEach((code, columnIndex) => {
-    if (!code) return
-    const candidates = findNearestColors(sampleRows[rowIndex][columnIndex].rgb, recognitionPalette, recognitionPalette.length)
-    const firstDistance = candidates[0] ? candidates[0].distance : Infinity
-    const secondDistance = candidates[1] ? candidates[1].distance : firstDistance
-    cells.push({ row: rowIndex, column: columnIndex, candidates, confidenceMargin: secondDistance - firstDistance })
-  }))
-  cells.sort((left, right) => right.confidenceMargin - left.confidenceMargin)
-  const remaining = Object.assign(Object.create(null), quotas)
-  const output = matrix.map((row) => row.slice())
-  cells.forEach((cell) => {
-    const choice = cell.candidates.find((candidate) => remaining[candidate.code] > 0)
-    if (!choice) return
-    output[cell.row][cell.column] = choice.code
-    remaining[choice.code] -= 1
-  })
-  if (Object.keys(remaining).some((code) => remaining[code] !== 0)) return { matrix, adjusted: false }
-  return { matrix: output, adjusted: true }
+  let assignment = quotaAssignment(sampleRows, matrix, recognitionPalette, quotas)
+  if (!assignment) return { matrix, adjusted: false }
+  let calibration = { applied: false, palette: recognitionPalette, centers: [] }
+  for (let pass = 0; pass < 2; pass += 1) {
+    const nextCalibration = buildChartCalibratedPalette(assignment, calibration.palette, selectedPalette)
+    if (!nextCalibration.applied) break
+    const nextAssignment = quotaAssignment(sampleRows, matrix, nextCalibration.palette, quotas)
+    if (!nextAssignment) break
+    calibration = nextCalibration
+    assignment = nextAssignment
+  }
+  const review = buildReviewCells(assignment)
+  return {
+    matrix: assignment.matrix,
+    adjusted: true,
+    chartColorCalibrationApplied: calibration.applied,
+    chartColorCenters: calibration.centers.map((item) => ({
+      code: item.code,
+      rgb: item.observedRgb,
+      sampleCount: item.sampleCount
+    })),
+    reviewCells: review.reviewCells,
+    uncertainCellCount: review.uncertainCellCount
+  }
 }
 
 function createCachedColorMatcher(palette) {
@@ -812,6 +947,10 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     expectedBeadCountApplied: balanced.adjusted,
     expectedColorCountApplied: constrained.adjusted,
     expectedCodeCountsApplied: exactCounts.adjusted,
+    chartColorCalibrationApplied: Boolean(exactCounts.chartColorCalibrationApplied),
+    chartColorCenters: exactCounts.chartColorCenters || [],
+    reviewCells: exactCounts.reviewCells || [],
+    uncertainCellCount: Number(exactCounts.uncertainCellCount) || 0,
     observedVariants: Object.keys(observedVariants).reduce((result, code) => {
       result[code] = Object.keys(observedVariants[code])
         .map((rgb) => ({ rgb: rgb.split(',').map(Number), count: observedVariants[code][rgb] }))

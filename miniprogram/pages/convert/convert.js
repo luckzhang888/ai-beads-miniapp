@@ -444,6 +444,7 @@ Page({
       if (!analysis) {
         const response = await this.requestAiAnalysis(imagePath)
         analysis = response.result
+        if (analysis && response.uploadIntegrity) analysis.uploadIntegrity = response.uploadIntegrity
         this.aiAnalysisCache = { path: imagePath, value: analysis }
       }
       if (this.data.imagePath !== imagePath) return
@@ -548,9 +549,16 @@ Page({
     result.recognitionModeText = modeLabels[result.recognitionMode] || '图片颜色识别'
     result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
     result.exactRecognition = result.recognitionMode !== 'pixel-fallback' && result.recognitionMode !== 'ai-photo' &&
-      Number(result.confidence || 0) >= 0.72 && (!result.validation || result.validation.ok)
+      Number(result.confidence || 0) >= 0.72 && (!result.validation || result.validation.ok) &&
+      Number(result.uncertainCellCount || 0) === 0
     result.needsCalibration = result.recognitionMode === 'pixel-fallback' || result.recognitionMode === 'ai-photo'
-    result.needsReview = Boolean(result.validation && !result.validation.ok)
+    result.needsReview = Boolean((result.validation && !result.validation.ok) || Number(result.uncertainCellCount || 0) > 0)
+    result.reviewPreview = (result.reviewCells || []).slice(0, 12).map((cell) => ({
+      label: `第 ${Number(cell.row) + 1} 行 · 第 ${Number(cell.column) + 1} 列`,
+      code: cell.code,
+      alternativeCode: cell.alternativeCode,
+      confidence: cell.confidence
+    }))
     this.setData({
       recognitionProgress: 100, recognitionStep: '识别完成', recognitionResult: result,
       recognitionSource: source, recognitionError: '', previewResult: result
@@ -585,7 +593,15 @@ Page({
       qualityMode: this.data.qualityMode,
       status: '待拼',
       tags: [options.tag || this.data.selectedMethodTitle || '图片导入', variant ? variant.label : '主图'],
-      sourceOptions: Object.assign({}, this.processingOptions(), { sourceVariant: this.data.sourceVariant })
+      sourceOptions: Object.assign({}, this.processingOptions(), {
+        sourceVariant: this.data.sourceVariant,
+        recognitionReview: {
+          uncertainCellCount: Number(result.uncertainCellCount) || 0,
+          cells: (result.reviewCells || []).slice(0, 240),
+          chartColorCalibrationApplied: Boolean(result.chartColorCalibrationApplied),
+          uploadIntegrityVerified: Boolean(result.uploadIntegrityVerified)
+        }
+      })
     }), mardPalette)
     recordActivity('pattern-import', {
       patternId: pattern.id,
@@ -599,7 +615,10 @@ Page({
         recognitionMode: result.recognitionMode || 'pixel',
         confidence: Number(result.confidence) || 0,
         beadCount: Number(result.beadCount) || 0,
-        usedColorCount: Number(result.usedColorCount) || 0
+        usedColorCount: Number(result.usedColorCount) || 0,
+        uncertainCellCount: Number(result.uncertainCellCount) || 0,
+        chartColorCalibrationApplied: Boolean(result.chartColorCalibrationApplied),
+        uploadIntegrityVerified: Boolean(result.uploadIntegrityVerified)
       }
     })
     return pattern

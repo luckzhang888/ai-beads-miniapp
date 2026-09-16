@@ -63,6 +63,14 @@
   line-height: 1.5;
 }
 
+.review-queue { margin: 0 0 15rpx; padding: 16rpx; border: 1rpx solid #efcb7e; border-radius: 15rpx; background: #fff9eb; }
+.review-copy { display: flex; flex-direction: column; gap: 5rpx; }
+.review-copy b { color: #895b0c; font-size: 23rpx; }
+.review-copy text { color: #6f6250; font-size: 20rpx; line-height: 1.45; }
+.review-actions { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 8rpx; margin-top: 12rpx; }
+.review-actions button { width: 100%; margin: 0; font-size: 20rpx; }
+.review-actions .review-confirm { color: white; background: #7b57e8; }
+
 .selected-chip,
 .swatch {
   border: 1rpx solid rgba(0, 0, 0, 0.15);
@@ -136,6 +144,11 @@
   .tools button, .save-btn { font-size: 14px; }
   .zoom-text { min-width: 44px; font-size: 16px; }
   .tip { margin: 12px 0 10px; padding: 10px 11px; border-radius: 10px; font-size: 15px; }
+  .review-queue { margin-bottom: 10px; padding: 11px; border-width: 1px; border-radius: 10px; }
+  .review-copy b { font-size: 15px; }
+  .review-copy text { font-size: 13px; }
+  .review-actions { gap: 6px; margin-top: 8px; }
+  .review-actions button { font-size: 13px; }
   .selected-chip { width: 36px; height: 36px; border-radius: 10px; }
   .color-actions { gap: 7px; margin: 12px 0; }
   .color-actions button { font-size: 14px; }

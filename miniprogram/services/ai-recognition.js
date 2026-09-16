@@ -110,10 +110,18 @@ function parseCloudResponse(response) {
   return parseApiResponse({ statusCode: body && body.ok === true ? 200 : 503, data: body })
 }
 
-function getImageSize(imagePath) {
+function getImageFileMeta(imagePath) {
   return new Promise((resolve) => {
-    if (typeof wx.getFileInfo !== 'function') return resolve(null)
-    wx.getFileInfo({ filePath: imagePath, success: (info) => resolve(Number(info.size) || null), fail: () => resolve(null) })
+    if (typeof wx.getFileInfo !== 'function') return resolve({ size: null, digest: '' })
+    wx.getFileInfo({
+      filePath: imagePath,
+      digestAlgorithm: 'md5',
+      success: (info) => resolve({
+        size: Number(info.size) || null,
+        digest: /^[a-f0-9]{32}$/i.test(String(info.digest || '')) ? String(info.digest).toLowerCase() : ''
+      }),
+      fail: () => resolve({ size: null, digest: '' })
+    })
   })
 }
 
@@ -251,7 +259,7 @@ function getCloudTempUrl(fileID) {
   })
 }
 
-function callCloudRecognition(fileID, imageUrl, options) {
+function callCloudRecognition(fileID, imageUrl, options, fileMeta) {
   return new Promise((resolve, reject) => {
     let settled = false
     const finish = (error, value) => {
@@ -271,7 +279,9 @@ function callCloudRecognition(fileID, imageUrl, options) {
           imageUrl,
           mode: options.mode || 'auto',
           expectedSize: options.expectedSize || '',
-          palette: 'MARD'
+          palette: 'MARD',
+          sourceBytes: Number(fileMeta && fileMeta.size) || 0,
+          sourceDigest: String(fileMeta && fileMeta.digest || '')
         },
         success(response) {
           try { finish(null, parseCloudResponse(response)) } catch (error) { finish(error) }
@@ -282,12 +292,12 @@ function callCloudRecognition(fileID, imageUrl, options) {
   })
 }
 
-async function analyzeImageWithCloud(imagePath, options) {
+async function analyzeImageWithCloud(imagePath, options, fileMeta) {
   let fileID
   try {
     fileID = await uploadImageToCloud(imagePath)
     const imageUrl = await getCloudTempUrl(fileID)
-    return await callCloudRecognition(fileID, imageUrl, options)
+    return await callCloudRecognition(fileID, imageUrl, options, fileMeta)
   } finally {
     deleteCloudFile(fileID)
   }
@@ -321,14 +331,14 @@ async function analyzeImageWithServer(imagePath, options) {
 
 async function analyzeImage(imagePath, options = {}) {
   if (!imagePath) throw aiError('IMAGE_REQUIRED', '请先选择一张图片。')
-  const size = await getImageSize(imagePath)
-  if (size && size > MAX_BYTES) throw aiError('IMAGE_TOO_LARGE', '图片超过 10 MB，请选择较小但清晰的原图。')
+  const fileMeta = await getImageFileMeta(imagePath)
+  if (fileMeta.size && fileMeta.size > MAX_BYTES) throw aiError('IMAGE_TOO_LARGE', '图片超过 10 MB，请选择较小但清晰的原图。')
   return cloudConfig.transport === 'cloud'
-    ? analyzeImageWithCloud(imagePath, options)
+    ? analyzeImageWithCloud(imagePath, options, fileMeta)
     : analyzeImageWithServer(imagePath, options)
 }
 
 module.exports = {
   analyzeImage, analyzeImageWithCloud, analyzeImageWithServer,
-  uploadFailure, requestFailure, cloudFailure, runtimeAppId, MAX_BYTES, TIMEOUT_MS
+  uploadFailure, requestFailure, cloudFailure, runtimeAppId, getImageFileMeta, MAX_BYTES, TIMEOUT_MS
 }

@@ -96,6 +96,11 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.deepStrictEqual(exactCounts.stats.map((item) => [item.code, item.required]), [['F5', 7], ['C19', 5]],
       'complete legend quotas must control both the allowed codes and each exact count')
     assert.strictEqual(exactCounts.expectedCodeCountsApplied, true)
+    assert.strictEqual(exactCounts.chartColorCalibrationApplied, true,
+      'complete legend quotas must learn colour centres from this chart instead of trusting fixed screen RGB')
+    assert.ok(exactCounts.chartColorCenters.every((item) => ['F5', 'C19'].includes(item.code)))
+    assert.ok(Array.isArray(exactCounts.reviewCells))
+    assert.ok(Number.isInteger(exactCounts.uncertainCellCount))
     assert.deepStrictEqual(trustedLegendCodeCounts({
       declaredColorCount: 2, declaredBeadCount: 12,
       legendEntries: [{ code: 'F5', count: 7 }, { code: 'C19', count: 5 }]

@@ -43,7 +43,12 @@ Page({
     candidates: [],
     lockedCodes: [],
     selectedLocked: false,
-    areaStart: null
+    areaStart: null,
+    reviewCells: [],
+    reviewTotal: 0,
+    reviewTruncated: false,
+    reviewIndex: 0,
+    reviewCurrent: null
   },
 
   onLoad(options) {
@@ -64,14 +69,70 @@ Page({
 
     this.patternId = pattern.id
     const selected = mardPalette[0]
+    const recognitionReview = pattern.sourceOptions && pattern.sourceOptions.recognitionReview
+    const reviewCells = recognitionReview && Array.isArray(recognitionReview.cells)
+      ? recognitionReview.cells.slice(0, 240)
+      : []
+    const reviewTotal = Math.max(reviewCells.length, Number(recognitionReview && recognitionReview.uncertainCellCount) || 0)
     this.setData({
       pattern,
       matrix: cloneMatrix(pattern.matrix),
+      reviewCells,
+      reviewTotal,
+      reviewTruncated: reviewTotal > reviewCells.length,
+      reviewIndex: 0,
+      reviewCurrent: this.reviewCellView(reviewCells[0]),
       lockedCodes: Array.isArray(pattern.lockedCodes) ? pattern.lockedCodes : [],
       palette: mardPalette.map((item) => Object.assign({}, item, {
         locked: Array.isArray(pattern.lockedCodes) && pattern.lockedCodes.indexOf(item.code) >= 0
       })),
       candidates: candidateViews(selected.rgb, selected.code)
+    })
+  },
+
+  reviewCellView(cell) {
+    if (!cell) return null
+    return {
+      row: Number(cell.row),
+      column: Number(cell.column),
+      label: `第 ${Number(cell.row) + 1} 行 · 第 ${Number(cell.column) + 1} 列`,
+      code: cell.code || '',
+      alternativeCode: cell.alternativeCode || '',
+      confidence: Number(cell.confidence) || 0
+    }
+  },
+
+  moveReview(event) {
+    const cells = this.data.reviewCells || []
+    if (!cells.length) return
+    const offset = Number(event.currentTarget.dataset.offset) || 0
+    const index = (this.data.reviewIndex + offset + cells.length) % cells.length
+    this.setData({ reviewIndex: index, reviewCurrent: this.reviewCellView(cells[index]) })
+  },
+
+  confirmReviewCell() {
+    const cells = (this.data.reviewCells || []).slice()
+    if (!cells.length) return
+    cells.splice(this.data.reviewIndex, 1)
+    const index = cells.length ? Math.min(this.data.reviewIndex, cells.length - 1) : 0
+    const reviewTotal = Math.max(0, Number(this.data.reviewTotal) - 1)
+    const pattern = this.data.pattern
+    const sourceOptions = Object.assign({}, pattern.sourceOptions || {})
+    sourceOptions.recognitionReview = Object.assign({}, sourceOptions.recognitionReview || {}, {
+      uncertainCellCount: reviewTotal,
+      cells
+    })
+    this.setData({
+      pattern: Object.assign({}, pattern, { sourceOptions }),
+      reviewCells: cells,
+      reviewTotal,
+      reviewIndex: index,
+      reviewCurrent: this.reviewCellView(cells[index]),
+      dirty: true
+    })
+    wx.showToast({
+      title: cells.length ? `样本还剩 ${cells.length} 格` : (reviewTotal ? '高风险样本已核对' : '全部核对完成'),
+      icon: 'none'
     })
   },
 
