@@ -59,12 +59,16 @@ test('cloud upload integrity proves the downloaded object is byte-for-byte ident
   const buffer = Buffer.from('original-image-bytes')
   const digest = require('node:crypto').createHash('md5').update(buffer).digest('hex')
   assert.deepEqual(_test.verifyUploadIntegrity(buffer, buffer.length, digest), {
-    verified: true, supplied: true, bytes: buffer.length, matchesBytes: true, matchesDigest: true
+    verified: true, supplied: true, mismatch: false, bytes: buffer.length, matchesBytes: true, matchesDigest: true
   })
   const changed = _test.verifyUploadIntegrity(Buffer.from('changed-image-bytes'), buffer.length, digest)
   assert.equal(changed.verified, false)
   assert.equal(changed.supplied, true)
+  assert.equal(changed.mismatch, true)
   assert.equal(changed.matchesDigest, false)
+  const sizeOnly = _test.verifyUploadIntegrity(buffer, buffer.length, '')
+  assert.equal(sizeOnly.verified, false)
+  assert.equal(sizeOnly.mismatch, false)
 })
 
 test('cloud image URL validation only accepts matching Tencent storage objects', () => {

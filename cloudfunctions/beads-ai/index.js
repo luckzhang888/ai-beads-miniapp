@@ -21,12 +21,15 @@ function verifyUploadIntegrity(buffer, rawBytes, rawDigest) {
   const hasBytes = Number.isInteger(expectedBytes) && expectedBytes > 0
   const hasDigest = /^[a-f0-9]{32}$/.test(expectedDigest)
   const actualDigest = crypto.createHash('md5').update(buffer).digest('hex')
+  const matchesBytes = !hasBytes || expectedBytes === buffer.length
+  const matchesDigest = !hasDigest || expectedDigest === actualDigest
   return {
-    verified: hasBytes && hasDigest && expectedBytes === buffer.length && expectedDigest === actualDigest,
+    verified: hasBytes && hasDigest && matchesBytes && matchesDigest,
     supplied: hasBytes || hasDigest,
+    mismatch: !matchesBytes || !matchesDigest,
     bytes: buffer.length,
-    matchesBytes: !hasBytes || expectedBytes === buffer.length,
-    matchesDigest: !hasDigest || expectedDigest === actualDigest
+    matchesBytes,
+    matchesDigest
   }
 }
 
@@ -100,7 +103,7 @@ exports.main = async (event = {}, context = {}) => {
     }
     if (!Buffer.isBuffer(buffer) || !buffer.length) return fail(id, 'IMAGE_REQUIRED', '云存储图片内容为空。')
     const integrity = verifyUploadIntegrity(buffer, event.sourceBytes, event.sourceDigest)
-    if (integrity.supplied && !integrity.verified) {
+    if (integrity.mismatch) {
       return fail(id, 'UPLOAD_INTEGRITY_FAILED', '上传后的图片与手机原图不一致，请重新选择原图后重试。')
     }
     const mimeType = detectImageType(buffer)
