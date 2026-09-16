@@ -6,7 +6,7 @@ const { createDeepSeekProvider } = require('../src/services/vision/deepseek')
 const { validateAiAnalysis, parseAiJson } = require('../src/services/vision/normalize')
 
 const validAnalysis = {
-  imageType: 'bead_pattern', hasGrid: true, rows: 48, columns: 43,
+  imageType: 'bead_pattern', hasGrid: true, rows: 48, columns: 43, dimensionSource: 'counted',
   rotation: 0, confidence: 0.94, hasLabels: true, background: 'white',
   detectedCodes: ['H2', 'G9', 'M12'], legendCodes: ['H2', 'G9', 'M12'],
   legendEntries: [{ code: 'H2', count: 500 }, { code: 'G9', count: 400 }, { code: 'M12', count: 300 }],
@@ -142,6 +142,7 @@ test('DeepSeek request uses vision image_url, original detail and JSON mode', as
   assert.deepEqual(analyzed.detectedCodes, ['H2', 'G9', 'M12'])
   assert.equal(analyzed.declaredColorCount, 3)
   assert.equal(analyzed.declaredBeadCount, 1200)
+  assert.equal(analyzed.dimensionSource, 'counted')
   assert.deepEqual(analyzed.legendEntries, validAnalysis.legendEntries)
   assert.equal(outbound.url, 'https://api.deepseek.com/chat/completions')
   assert.equal(outbound.body.model, 'deepseek-v4-flash-vision-exp')
@@ -158,7 +159,7 @@ test('AI analysis parser rejects bad size, confidence, coordinates, fields and c
   for (const edit of [
     { rows: 5000 }, { columns: -1 }, { confidence: 1.2 },
     { grid: { ...validAnalysis.grid, right: 1.2 } }, { hasLabels: undefined },
-    { declaredColorCount: 0 }, { declaredBeadCount: 70000 },
+    { declaredColorCount: 0 }, { declaredBeadCount: 70000 }, { dimensionSource: 'guessed' },
     { perspective: { ...validAnalysis.perspective, bottomRight: [0.02, 0.03] } }
   ]) assert.throws(() => validateAiAnalysis({ ...validAnalysis, ...edit }), { code: 'AI_INVALID_RESULT' })
   assert.deepEqual(validateAiAnalysis({ ...validAnalysis,

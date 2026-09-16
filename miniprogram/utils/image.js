@@ -1,5 +1,10 @@
 const { matchImageData } = require('./color-match')
-const { validateGuidedAnalysis, guidedGridDisagreesWithLocal, sampleGuidedGrid } = require('./ai-grid')
+const {
+  validateGuidedAnalysis,
+  guidedGridDisagreesWithLocal,
+  fitDetectedGridToDeclaredDimensions,
+  sampleGuidedGrid
+} = require('./ai-grid')
 const {
   detectGuideGridGeometry,
   detectGenericGridGeometry,
@@ -468,20 +473,26 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   const dimensionsAreClose = reliableLocalGrid &&
     Math.abs(localGrid.rows - analysis.rows) <= Math.max(2, Math.round(localGrid.rows * 0.03)) &&
     Math.abs(localGrid.columns - analysis.columns) <= Math.max(2, Math.round(localGrid.columns * 0.03))
-  // Vision models read tiny printed labels better than the device, but can
-  // fluctuate by one or two border lines on the same image. A strong local
-  // line detector is deterministic, so use its grid whenever the two results
-  // describe the same chart and keep AI only for the allowed MARD code set.
+  // A printed title such as 99x106 is a stronger dimension source than an
+  // edge detector that can miss one faint outside line. In that case the
+  // detector supplies the physical grid area/cell pitch only; the declared
+  // row/column count controls how that area is divided.
   const useLocalGrid = Boolean(reliableLocalGrid && dimensionsAreClose)
-  const aiDimensionsCorrected = useLocalGrid &&
+  const declaredDimensionsTrusted = analysis.dimensionSource === 'title'
+  const samplingGrid = useLocalGrid && declaredDimensionsTrusted
+    ? fitDetectedGridToDeclaredDimensions(localGrid, analysis, width, height)
+    : localGrid
+  const gridAreaRepaired = Boolean(useLocalGrid && declaredDimensionsTrusted &&
+    samplingGrid && samplingGrid.declaredDimensionsApplied)
+  const aiDimensionsCorrected = useLocalGrid && !declaredDimensionsTrusted &&
     (localGrid.rows !== analysis.rows || localGrid.columns !== analysis.columns)
   let sampleRows
   if (useLocalGrid) {
     // AI is good at reading the count and printed labels; detected line pixels
     // are more accurate for sub-cell sampling, especially when screenshots
     // are cropped through the first or last row/column.
-    sampleRows = sampleGridCells(pixels, width, height, localGrid)
-    await reportProcessingProgress(settings, 80, '本地网格精校完成')
+    sampleRows = sampleGridCells(pixels, width, height, samplingGrid)
+    await reportProcessingProgress(settings, 80, gridAreaRepaired ? '网格区域修复完成' : '本地网格精校完成')
     await yieldProcessingThread()
   } else {
     sampleRows = await sampleGuidedGrid(pixels, width, height, analysis, (fraction) =>
@@ -501,7 +512,7 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   }), {
     confidence: analysis.confidence,
     recognitionMode: 'ai-guided-grid',
-    grid: { bounds: analysis.grid, perspective: analysis.perspective, local: useLocalGrid ? localGrid : null }
+    grid: { bounds: analysis.grid, perspective: analysis.perspective, local: useLocalGrid ? samplingGrid : null }
   })
   result.sourceWidth = info.width
   result.sourceHeight = info.height
@@ -510,11 +521,15 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.uploadIntegrityVerified = Boolean(analysis.uploadIntegrity && analysis.uploadIntegrity.verified)
   result.localGridRefined = Boolean(useLocalGrid)
   result.localGridKind = useLocalGrid ? localGridKind : ''
+  result.gridAreaRepaired = gridAreaRepaired
   result.aiDimensionsCorrected = Boolean(aiDimensionsCorrected)
   if (aiDimensionsCorrected) {
     result.aiOriginalDimensions = { rows: analysis.rows, columns: analysis.columns }
   }
   const warnings = (analysis.warnings || []).slice()
+  if (gridAreaRepaired) {
+    warnings.unshift(`已先定位网格面积，再按标题标注的 ${analysis.columns}×${analysis.rows} 强制等分；本地漏检的边缘线未再改写尺寸`)
+  }
   const calibrationNotes = []
   if (result.uploadIntegrityVerified) calibrationNotes.push('上传前后文件大小和 MD5 完全一致，云端使用的是手机所选原图')
   if (result.chartColorCalibrationApplied) calibrationNotes.push('已从本图学习实际色块，校正截图、屏幕和导出造成的整体偏色')

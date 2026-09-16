@@ -1,7 +1,7 @@
 const assert = require('assert')
 const palette = require('../miniprogram/data/colors/mard')
 const { gridImageToPattern, aiGuidedImageToPattern, trustedDetectedCodes, trustedLegendCodeCounts } = require('../miniprogram/utils/image')
-const { guidedGridDisagreesWithLocal } = require('../miniprogram/utils/ai-grid')
+const { guidedGridDisagreesWithLocal, fitDetectedGridToDeclaredDimensions } = require('../miniprogram/utils/ai-grid')
 const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync, hasCellLabel } = require('../miniprogram/utils/grid-recognition')
 
 // Canvas test double: exercise the production async pipeline, including
@@ -68,6 +68,21 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     })))
     assert.deepStrictEqual(classifySampleRows(rareSamples, palette).matrix, codes,
       'a single real bead must not be erased by neighbour smoothing')
+
+    const background = [246, 246, 246]
+    const backgroundSamples = Array.from({ length: 5 }, (_, row) => Array.from({ length: 5 }, (_, column) => {
+      const onRing = row >= 1 && row <= 3 && column >= 1 && column <= 3 && !(row === 2 && column === 2)
+      return {
+        rgb: onRing ? palette.find((item) => item.code === 'G14').rgb : background,
+        inkRatio: 0, lightInkRatio: 0, whiteRatio: onRing ? 0 : 0.7, sampleCount: 64
+      }
+    }))
+    const topologyResult = classifySampleRows(backgroundSamples, palette, { hasCellLabels: false })
+    assert.strictEqual(topologyResult.blankCount, 16,
+      'light background connected to the grid edge must not be counted as beads')
+    assert.ok(topologyResult.matrix[2][2],
+      'an enclosed light cell must remain an intentional white bead instead of becoming a hole')
+    assert.strictEqual(topologyResult.backgroundTopologyApplied, true)
 
     assert.equal(hasCellLabel({ rgb: [249, 165, 121], inkRatio: 0, lightInkRatio: 0.08, whiteRatio: 0 }), true,
       'light labels on mid-tone A12/A19 cells must be detected')
@@ -191,6 +206,22 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
       'matching local and AI dimensions must use the detected line pixels for precise sampling')
     assert.deepStrictEqual([edgeGuided.width, edgeGuided.height], [30, 30])
 
+    const fitted = fitDetectedGridToDeclaredDimensions({
+      ok: true, x: 20, y: 10, cellWidth: 10, cellHeight: 10, columns: 98, rows: 106
+    }, {
+      rows: 106, columns: 99, grid: { left: 20 / 1030, top: 10 / 1080, right: 1010 / 1030, bottom: 1070 / 1080 }
+    }, 1030, 1080)
+    assert.deepStrictEqual([fitted.columns, fitted.rows, fitted.detectedColumns], [99, 106, 98],
+      'a detected grid area must be re-divided by the trusted title dimensions')
+
+    global.wx = createCanvasRuntime(edgeFixture)
+    const titleDimensions = Object.assign({}, edgeAnalysis, { columns: 31, dimensionSource: 'title' })
+    const titleGuided = await aiGuidedImageToPattern('fixture.png', palette, titleDimensions)
+    assert.deepStrictEqual([titleGuided.width, titleGuided.height], [31, 30],
+      'a title-declared dimension must not be overwritten by one missing local border line')
+    assert.strictEqual(titleGuided.gridAreaRepaired, true)
+    assert.strictEqual(titleGuided.aiDimensionsCorrected, false)
+
     global.wx = createCanvasRuntime(edgeFixture)
     const fluctuatingAnalysis = Object.assign({}, edgeAnalysis, { rows: 32, columns: 31 })
     const correctedGuided = await aiGuidedImageToPattern('fixture.png', palette, fluctuatingAnalysis)
@@ -257,7 +288,7 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     convertPage.requestAiAnalysis = async () => ({ result: { imageType: 'photo', hasGrid: false, confidence: 0.88 } })
     convertPage.processAiPhotoImage = async () => Object.assign({}, result)
     await convertPage.runAiRecognition()
-    assert.strictEqual(convertPage.data.recognitionResult.recognitionMode, 'ai-photo')
+    assert.strictEqual(convertPage.data.recognitionResult.recognitionMode, 'ai-no-grid')
     assert.strictEqual(convertPage.data.recognitionResult.needsCalibration, true)
     assert.strictEqual(convertPage.data.recognitionResult.exactRecognition, false)
     convertPage.requestAiAnalysis = async () => { throw new Error('AI offline') }

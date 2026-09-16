@@ -472,15 +472,15 @@ Page({
             warnings: [warning].concat(result.validation && result.validation.warnings || [])
           })
         }
-      } else if (analysis.imageType === 'photo') {
-        await this.setDataAsync({ recognitionProgress: 60, recognitionStep: '照片像素化并匹配 MARD 色号' })
-        result = await this.processAiPhotoImage(imagePath)
-        result.recognitionMode = 'ai-photo'
-        result.confidence = analysis.confidence
-        result.validation = { ok: false, warnings: ['普通照片没有可精确统计的原始网格'] }
-        result.warning = 'AI 判断这是普通照片，已转换为拼豆图。请校准尺寸并核对颜色。'
       } else {
-        throw new Error('AI 没有检测到可定位的网格。请更换清晰原图，或使用本地识别。')
+        await this.setDataAsync({ recognitionProgress: 60, recognitionStep: '无网格图片按指定尺寸重新像素化' })
+        result = await this.processAiPhotoImage(imagePath)
+        result.recognitionMode = 'ai-no-grid'
+        result.confidence = analysis.confidence
+        result.aiAnalysis = analysis
+        result.validation = { ok: false, warnings: ['原图没有可逐格复原的网格，当前结果是重新像素化生成'] }
+        result.warning = 'AI 未检测到原始网格，已切换为“主体图片像素化”。这类图片需要选择输出尺寸，不能宣称为原图逐格复原。'
+        recognitionSource = 'AI 分类 + 本地像素化'
       }
       if (this.data.imagePath !== imagePath) return
       this.presentRecognitionResult(result, recognitionSource)
@@ -540,6 +540,7 @@ Page({
     const modeLabels = {
       'ai-guided-grid': 'AI 定位网格 + MARD 本地匹配',
       'ai-photo': 'AI 分类 + 普通照片转换',
+      'ai-no-grid': 'AI 分流 + 无网格图片像素化',
       'guide-grid': '红色导线网格识别',
       'regular-grid': '规则网格识别',
       'pixel-grid': '像素块网格识别',
@@ -549,9 +550,11 @@ Page({
     result.recognitionModeText = modeLabels[result.recognitionMode] || '图片颜色识别'
     result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
     result.exactRecognition = result.recognitionMode !== 'pixel-fallback' && result.recognitionMode !== 'ai-photo' &&
+      result.recognitionMode !== 'ai-no-grid' &&
       Number(result.confidence || 0) >= 0.72 && (!result.validation || result.validation.ok) &&
       Number(result.uncertainCellCount || 0) === 0
-    result.needsCalibration = result.recognitionMode === 'pixel-fallback' || result.recognitionMode === 'ai-photo'
+    result.needsCalibration = result.recognitionMode === 'pixel-fallback' || result.recognitionMode === 'ai-photo' ||
+      result.recognitionMode === 'ai-no-grid'
     result.needsReview = Boolean((result.validation && !result.validation.ok) || Number(result.uncertainCellCount || 0) > 0)
     result.reviewPreview = (result.reviewCells || []).slice(0, 12).map((cell) => ({
       label: `第 ${Number(cell.row) + 1} 行 · 第 ${Number(cell.column) + 1} 列`,

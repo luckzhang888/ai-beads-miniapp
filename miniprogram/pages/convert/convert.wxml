@@ -78,8 +78,8 @@
     </view>
   </view>
   <view wx:if="{{!recognitionError}}" class="recognition-progress-card">
-    <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 检测网格</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 统计颜色</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 匹配色号</text></view>
-    <view class="recognition-step"><b>{{recognitionStep}}</b><text>{{recognitionProgress}}%</text></view>
+    <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 定位网格面积</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 修复并切格</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 匹配色号</text></view>
+    <view class="recognition-step"><b>{{recognitionStep}}</b><text wx:if="{{recognitionProgress === 100}}">处理完成</text><text wx:else>{{recognitionProgress}}%</text></view>
     <progress percent="{{recognitionProgress}}" activeColor="#39c96b" stroke-width="8" />
   </view>
   <view wx:if="{{recognitionProgress === 100}}" class="recognition-actions">

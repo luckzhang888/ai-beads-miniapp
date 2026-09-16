@@ -77,6 +77,46 @@ function createGridMapper(corners) {
   }
 }
 
+function fitDetectedGridToDeclaredDimensions(detected, analysis, width, height) {
+  if (!detected || !detected.ok || !analysis || !Number.isInteger(analysis.rows) ||
+      !Number.isInteger(analysis.columns)) return detected
+
+  const fitAxis = (start, cellSize, detectedCount, declaredCount, aiStart, aiEnd, extent) => {
+    const targetSpan = cellSize * declaredCount
+    const delta = declaredCount - detectedCount
+    const candidates = [
+      start,
+      start - delta * cellSize,
+      start - delta * cellSize / 2,
+      aiStart * extent
+    ]
+    const maximumStart = Math.max(0, extent - targetSpan)
+    let best = null
+    candidates.forEach((candidate) => {
+      const bounded = Math.max(0, Math.min(maximumStart, candidate))
+      const score = Math.abs(bounded - aiStart * extent) +
+        Math.abs(bounded + targetSpan - aiEnd * extent)
+      if (!best || score < best.score) best = { start: bounded, score }
+    })
+    return best ? best.start : Math.max(0, Math.min(maximumStart, start))
+  }
+
+  const grid = analysis.grid || { left: 0, top: 0, right: 1, bottom: 1 }
+  const x = fitAxis(detected.x, detected.cellWidth, detected.columns, analysis.columns,
+    grid.left, grid.right, width)
+  const y = fitAxis(detected.y, detected.cellHeight, detected.rows, analysis.rows,
+    grid.top, grid.bottom, height)
+  return Object.assign({}, detected, {
+    x,
+    y,
+    rows: analysis.rows,
+    columns: analysis.columns,
+    detectedRows: detected.rows,
+    detectedColumns: detected.columns,
+    declaredDimensionsApplied: detected.rows !== analysis.rows || detected.columns !== analysis.columns
+  })
+}
+
 async function sampleGuidedGrid(imageData, width, height, analysis, onProgress) {
   const corners = validateGuidedAnalysis(analysis)
   const map = createGridMapper(corners)
@@ -112,4 +152,10 @@ async function sampleGuidedGrid(imageData, width, height, analysis, onProgress) 
   return rows
 }
 
-module.exports = { validateGuidedAnalysis, guidedGridDisagreesWithLocal, createGridMapper, sampleGuidedGrid }
+module.exports = {
+  validateGuidedAnalysis,
+  guidedGridDisagreesWithLocal,
+  createGridMapper,
+  fitDetectedGridToDeclaredDimensions,
+  sampleGuidedGrid
+}

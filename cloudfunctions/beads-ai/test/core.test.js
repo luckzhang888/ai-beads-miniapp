@@ -7,7 +7,7 @@ const { _test } = require('../index')
 
 function validAnalysis() {
   return {
-    imageType: 'bead_pattern', hasGrid: true, rows: 30, columns: 30,
+    imageType: 'bead_pattern', hasGrid: true, rows: 30, columns: 30, dimensionSource: 'counted',
     rotation: 0, confidence: 0.92, hasLabels: true,
     detectedCodes: ['h2', 'G9', 'H2', 'P1', 'H24'], legendCodes: ['M12', 'G9'],
     legendEntries: [{ code: 'H2', count: 500 }, { code: 'G9', count: 400 }, { code: 'M12', count: 300 }, { code: 'P1', count: 5 }],
@@ -43,6 +43,7 @@ test('cloud DeepSeek provider sends vision request and normalizes response', asy
   assert.deepEqual(result.legendEntries, [{ code: 'H2', count: 500 }, { code: 'G9', count: 400 }, { code: 'M12', count: 300 }])
   assert.equal(result.declaredColorCount, 3)
   assert.equal(result.declaredBeadCount, 1200)
+  assert.equal(result.dimensionSource, 'counted')
   assert.match(request.url, /\/chat\/completions$/)
   assert.equal(request.options.headers.Authorization, 'Bearer test-key')
   const payload = JSON.parse(request.options.body)
@@ -53,6 +54,11 @@ test('cloud DeepSeek provider sends vision request and normalizes response', asy
 test('analysis validation rejects invented or malformed grids', () => {
   assert.throws(() => validateAiAnalysis(Object.assign(validAnalysis(), { rows: null })), { code: 'AI_INVALID_RESULT' })
   assert.throws(() => validateAiAnalysis(Object.assign(validAnalysis(), { declaredBeadCount: 0 })), { code: 'AI_INVALID_RESULT' })
+  assert.throws(() => validateAiAnalysis(Object.assign(validAnalysis(), { dimensionSource: 'model-guessed' })), { code: 'AI_INVALID_RESULT' })
+  const inferred = validAnalysis()
+  delete inferred.dimensionSource
+  inferred.warnings = ['标题标注尺寸为 99×106，已按标题尺寸返回']
+  assert.equal(validateAiAnalysis(inferred).dimensionSource, 'title')
 })
 
 test('cloud upload integrity proves the downloaded object is byte-for-byte identical', () => {

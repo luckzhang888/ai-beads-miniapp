@@ -878,6 +878,79 @@ function sampleGridCells(imageData, width, height, geometry) {
   return sampleRows
 }
 
+function estimateBorderBackground(sampleRows) {
+  const rows = sampleRows.length
+  const columns = rows && sampleRows[0] ? sampleRows[0].length : 0
+  if (!rows || !columns) return null
+  const border = []
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      if (row !== 0 && row !== rows - 1 && column !== 0 && column !== columns - 1) continue
+      const rgb = sampleRows[row][column].rgb
+      const chroma = Math.max.apply(null, rgb) - Math.min.apply(null, rgb)
+      if (luminance(rgb) >= 205 && chroma <= 28) border.push(rgb)
+    }
+  }
+  const borderCellCount = Math.max(1, rows * 2 + Math.max(0, columns - 2) * 2)
+  if (border.length < Math.max(4, Math.ceil(borderCellCount * 0.16))) return null
+  return medianRgb(border)
+}
+
+function isBackgroundCell(cell, backgroundRgb, blankThreshold) {
+  if (!backgroundRgb) return false
+  const rgb = cell.rgb
+  const channelDistance = Math.max(
+    Math.abs(rgb[0] - backgroundRgb[0]),
+    Math.abs(rgb[1] - backgroundRgb[1]),
+    Math.abs(rgb[2] - backgroundRgb[2])
+  )
+  return (channelDistance <= 18 && rgbDistance(rgb, backgroundRgb) <= 27) ||
+    (cell.whiteRatio >= 0.2 && isWhiteLike(backgroundRgb, Math.min(238, blankThreshold - 6)))
+}
+
+function restoreEnclosedBackgroundCells(sampleRows, matrix, matcher, backgroundRgb) {
+  if (!backgroundRgb || !matrix.length || !matrix[0].length) return { matrix, restored: 0 }
+  const rows = matrix.length
+  const columns = matrix[0].length
+  const outside = Array.from({ length: rows }, () => new Uint8Array(columns))
+  const queue = []
+  const visit = (row, column) => {
+    if (row < 0 || row >= rows || column < 0 || column >= columns || outside[row][column] || matrix[row][column]) return
+    outside[row][column] = 1
+    queue.push([row, column])
+  }
+  for (let column = 0; column < columns; column += 1) {
+    visit(0, column)
+    visit(rows - 1, column)
+  }
+  for (let row = 1; row < rows - 1; row += 1) {
+    visit(row, 0)
+    visit(row, columns - 1)
+  }
+  for (let index = 0; index < queue.length; index += 1) {
+    const [row, column] = queue[index]
+    visit(row - 1, column)
+    visit(row + 1, column)
+    visit(row, column - 1)
+    visit(row, column + 1)
+  }
+  let restored = 0
+  const output = matrix.map((row) => row.slice())
+  for (let row = 1; row < rows - 1; row += 1) {
+    for (let column = 1; column < columns - 1; column += 1) {
+      if (matrix[row][column] || outside[row][column]) continue
+      const cell = sampleRows[row][column]
+      if (!isBackgroundCell(cell, backgroundRgb, 249)) continue
+      const nearest = matcher.find(cell.rgb)
+      if (nearest) {
+        output[row][column] = nearest.code
+        restored += 1
+      }
+    }
+  }
+  return { matrix: output, restored }
+}
+
 function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   const settings = options || {}
   const details = metadata || {}
@@ -898,6 +971,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   const labeledGrid = !pixelInput && (typeof settings.hasCellLabels === 'boolean'
     ? settings.hasCellLabels
     : labeledCells / Math.max(1, columns * rows) >= 0.08)
+  const blankThreshold = Number(settings.blankThreshold) || 249
+  const borderBackground = !labeledGrid && !pixelInput ? estimateBorderBackground(sampleRows) : null
   const matrix = []
   const observedVariants = Object.create(null)
   for (let row = 0; row < rows; row += 1) {
@@ -906,7 +981,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
       const cell = sampleRows[row][column]
       const labeled = labeledGrid && hasCellLabel(cell)
       const noLabel = labeledGrid && !labeled
-      if (noLabel || ((isWhiteLike(cell.rgb, Number(settings.blankThreshold) || 249) || cell.whiteRatio >= 0.36) && !labeled)) {
+      const backgroundCell = !labeled && isBackgroundCell(cell, borderBackground, blankThreshold)
+      if (noLabel || ((isWhiteLike(cell.rgb, blankThreshold) || cell.whiteRatio >= 0.36 || backgroundCell) && !labeled)) {
         output.push('')
       } else {
         const nearest = matcher.find(cell.rgb)
@@ -922,7 +998,10 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     matrix.push(output)
     yield (row + 1) / Math.max(1, rows)
   }
-  const stabilizedMatrix = labeledGrid ? stabilizeLabeledMatrix(sampleRows, matrix, observedVariants) : matrix
+  const topology = !labeledGrid && !pixelInput
+    ? restoreEnclosedBackgroundCells(sampleRows, matrix, matcher, borderBackground)
+    : { matrix, restored: 0 }
+  const stabilizedMatrix = labeledGrid ? stabilizeLabeledMatrix(sampleRows, topology.matrix, observedVariants) : topology.matrix
   const balanced = rebalanceMatrixToExpectedCount(sampleRows, stabilizedMatrix, settings.expectedBeadCount, matcher)
   const exactCounts = assignMatrixByExpectedCodeCounts(sampleRows, balanced.matrix, rawPalette, settings.expectedCodeCounts, pixelInput)
   const constrained = exactCounts.adjusted
@@ -944,6 +1023,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     recognitionMode: details.recognitionMode || 'guide-grid',
     confidence: Math.max(0, Math.min(0.99, Number(details.confidence) || 0.9)),
     labeledGrid,
+    backgroundTopologyApplied: Boolean(borderBackground),
+    enclosedLightCellCount: topology.restored,
     expectedBeadCountApplied: balanced.adjusted,
     expectedColorCountApplied: constrained.adjusted,
     expectedCodeCountsApplied: exactCounts.adjusted,
