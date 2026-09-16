@@ -24,6 +24,25 @@ function parseAiJson(text) {
   try { return JSON.parse(clean) } catch (error) { throw new InvalidAnalysisError('不是合法 JSON') }
 }
 
+function parseCodes(value) {
+  const codes = []
+  const seen = new Set()
+  if (!Array.isArray(value)) return codes
+  value.forEach((rawCode) => {
+    const code = String(rawCode || '').trim().toUpperCase()
+    if (!/^[A-Z][0-9]{1,3}$/.test(code) || seen.has(code) || codes.length >= 96) return
+    seen.add(code)
+    codes.push(code)
+  })
+  return codes
+}
+
+function optionalInteger(value, minimum, maximum, label) {
+  if (value === null || value === undefined) return null
+  if (!Number.isInteger(value) || value < minimum || value > maximum) throw new InvalidAnalysisError(label)
+  return value
+}
+
 function validateAiAnalysis(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new InvalidAnalysisError('缺少对象')
   if (!IMAGE_TYPES.has(value.imageType)) throw new InvalidAnalysisError('imageType')
@@ -37,16 +56,10 @@ function validateAiAnalysis(value) {
   let columns = null
   let grid = null
   let perspective = null
-  const detectedCodes = []
-  const seenCodes = new Set()
-  if (Array.isArray(value.detectedCodes)) {
-    value.detectedCodes.forEach((rawCode) => {
-      const code = String(rawCode || '').trim().toUpperCase()
-      if (!/^[A-Z][0-9]{1,3}$/.test(code) || seenCodes.has(code) || detectedCodes.length >= 96) return
-      seenCodes.add(code)
-      detectedCodes.push(code)
-    })
-  }
+  const detectedCodes = parseCodes(value.detectedCodes)
+  const legendCodes = parseCodes(value.legendCodes)
+  const declaredColorCount = optionalInteger(value.declaredColorCount, 1, 96, 'declaredColorCount')
+  const declaredBeadCount = optionalInteger(value.declaredBeadCount, 1, 65536, 'declaredBeadCount')
   if (value.hasGrid) {
     rows = value.rows
     columns = value.columns
@@ -79,7 +92,8 @@ function validateAiAnalysis(value) {
   return {
     imageType: value.imageType, hasGrid: value.hasGrid, rows, columns,
     rotation: value.rotation, confidence, hasLabels: value.hasLabels,
-    background: value.background, grid, perspective, detectedCodes,
+    background: value.background, grid, perspective, detectedCodes, legendCodes,
+    declaredColorCount, declaredBeadCount,
     warnings: value.warnings.slice(0, 12).map((item) => item.slice(0, 160))
   }
 }

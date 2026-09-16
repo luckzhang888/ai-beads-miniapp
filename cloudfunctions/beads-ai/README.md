@@ -11,7 +11,7 @@
 5. 在云函数环境变量中添加：
    - `DEEPSEEK_API_KEY`：必填。
    - `DEEPSEEK_BASE_URL`：可选，默认 `https://api.deepseek.com`。
-   - `DEEPSEEK_VISION_MODEL`：可选，默认 `deepseek-v4-flash-vision-exp`。
+   - `DEEPSEEK_VISION_MODEL`：可选，默认 `deepseek-flash`（DeepSeek-V4.1-Flash）。
    - `DEEPSEEK_TIMEOUT_MS`：可选，默认 `90000`。
 
 6. 建议给云存储目录 `ai-inputs/` 配置 1 天自动删除的生命周期规则，清理由于用户强制关闭小程序而未能即时删除的临时文件。

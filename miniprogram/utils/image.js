@@ -65,6 +65,21 @@ function validateRecognizedGrid(result, geometry) {
   return { ok: warnings.length === 0, warnings }
 }
 
+function trustedDetectedCodes(analysis) {
+  const codes = analysis && Array.isArray(analysis.detectedCodes)
+    ? analysis.detectedCodes.filter(Boolean)
+    : []
+  if (codes.length < 2) return []
+  const warnings = analysis && Array.isArray(analysis.warnings) ? analysis.warnings : []
+  const unreliable = warnings.some((warning) => {
+    const text = String(warning || '')
+    return /detectedcodes.*(?:图例|非逐格|无法|不能|不可|看不清|辨认|推测)/i.test(text) ||
+      /格内色号.*(?:图例|非逐格|无法|不能|不可|看不清|辨认|推测)/i.test(text) ||
+      /(?:来自|取自).*图例.*(?:而非|不是).*逐格/i.test(text)
+  })
+  return unreliable ? [] : codes
+}
+
 function clamp(value) {
   return Math.max(0, Math.min(255, Math.round(value)))
 }
@@ -408,7 +423,12 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   ctx.drawImage(image, 0, 0, info.width, info.height, 0, 0, width, height)
   await reportProcessingProgress(settings, 60, '校准网格与透视')
   const pixels = ctx.getImageData(0, 0, width, height)
-  const localGrid = detectGenericGridGeometry(pixels, width, height, settings)
+  let localGrid = detectGuideGridGeometry(pixels, width, height, settings)
+  let localGridKind = 'guide-grid'
+  if (!localGrid.ok) {
+    localGrid = detectGenericGridGeometry(pixels, width, height, settings)
+    localGridKind = 'regular-grid'
+  }
   if (guidedGridDisagreesWithLocal(analysis, localGrid, width, height)) {
     const error = new Error('AI 估算的网格行列与图片中的规则网格明显不符。')
     error.code = 'AI_GRID_MISMATCH'
@@ -417,10 +437,17 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   const localCellRatio = localGrid && localGrid.ok
     ? Math.max(localGrid.cellWidth, localGrid.cellHeight) / Math.max(0.001, Math.min(localGrid.cellWidth, localGrid.cellHeight))
     : Infinity
-  const reliableLocalGrid = localGrid && localGrid.ok && Number(localGrid.confidence) >= 0.78 && localCellRatio <= 1.15
+  const guideQualityOk = localGridKind !== 'guide-grid' || (
+    Number(localGrid.guideBalance) >= 0.6 &&
+    Number(localGrid.spacingConsistency) >= 0.7
+  )
+  const reliableLocalGrid = localGrid && localGrid.ok &&
+    Number(localGrid.confidence) >= 0.78 &&
+    localCellRatio <= 1.15 &&
+    guideQualityOk
   const dimensionsAreClose = reliableLocalGrid &&
-    Math.abs(localGrid.rows - analysis.rows) <= Math.max(2, Math.round(localGrid.rows * 0.12)) &&
-    Math.abs(localGrid.columns - analysis.columns) <= Math.max(2, Math.round(localGrid.columns * 0.12))
+    Math.abs(localGrid.rows - analysis.rows) <= Math.max(2, Math.round(localGrid.rows * 0.03)) &&
+    Math.abs(localGrid.columns - analysis.columns) <= Math.max(2, Math.round(localGrid.columns * 0.03))
   // Vision models read tiny printed labels better than the device, but can
   // fluctuate by one or two border lines on the same image. A strong local
   // line detector is deterministic, so use its grid whenever the two results
@@ -441,9 +468,12 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
       reportProcessingProgress(settings, 60 + fraction * 20, '逐格采样 ' + Math.round(fraction * 100) + '%'))
   }
   await reportProcessingProgress(settings, 85, '匹配 MARD 295 色号')
+  const allowedCodes = trustedDetectedCodes(analysis)
   const result = await classifySampleRowsAsync(sampleRows, palette, Object.assign({}, settings, {
     hasCellLabels: analysis.hasLabels,
-    allowedCodes: analysis.detectedCodes,
+    allowedCodes,
+    expectedColorCount: analysis.declaredColorCount,
+    expectedBeadCount: analysis.declaredBeadCount,
     onClassificationProgress: (fraction) => reportProcessingProgress(settings,
       85 + fraction * 13, '匹配色号 ' + Math.round(fraction * 100) + '%')
   }), {
@@ -456,11 +486,21 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.recognitionScale = scale
   result.aiAnalysis = analysis
   result.localGridRefined = Boolean(useLocalGrid)
+  result.localGridKind = useLocalGrid ? localGridKind : ''
   result.aiDimensionsCorrected = Boolean(aiDimensionsCorrected)
   if (aiDimensionsCorrected) {
     result.aiOriginalDimensions = { rows: analysis.rows, columns: analysis.columns }
   }
   const warnings = (analysis.warnings || []).slice()
+  if (Array.isArray(analysis.detectedCodes) && analysis.detectedCodes.length >= 2 && allowedCodes.length < 2) {
+    warnings.unshift('AI 图例色号未经过逐格核实，已改用本地色块匹配，避免错误压缩颜色数量')
+  }
+  if (result.expectedColorCountApplied) {
+    warnings.unshift(`已按标题标注的 ${analysis.declaredColorCount} 色合并压缩产生的近似色，请核对具体 MARD 色号`)
+  }
+  if (result.expectedBeadCountApplied) {
+    warnings.unshift(`已按标题标注的 ${analysis.declaredBeadCount} 颗校准空白格，请核对图案边缘`)
+  }
   if (analysis.hasLabels && (!Array.isArray(analysis.detectedCodes) || analysis.detectedCodes.length < 2)) {
     warnings.unshift('AI 未能可靠读取格内色号，颜色仅按本地色差估算')
   }
@@ -482,6 +522,7 @@ module.exports = {
   imageToPattern,
   gridImageToPattern,
   aiGuidedImageToPattern,
+  trustedDetectedCodes,
   recommendPatternSize,
   calculatePatternDimensions,
   normalizeTransform,

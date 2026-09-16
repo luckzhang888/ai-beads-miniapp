@@ -9,7 +9,8 @@ function validAnalysis() {
   return {
     imageType: 'bead_pattern', hasGrid: true, rows: 30, columns: 30,
     rotation: 0, confidence: 0.92, hasLabels: true,
-    detectedCodes: ['h2', 'G9', 'H2'], background: 'white',
+    detectedCodes: ['h2', 'G9', 'H2'], legendCodes: ['M12', 'G9'],
+    declaredColorCount: 3, declaredBeadCount: 1200, background: 'white',
     grid: { left: 0.05, top: 0.05, right: 0.95, bottom: 0.95 },
     perspective: null, warnings: []
   }
@@ -37,6 +38,9 @@ test('cloud DeepSeek provider sends vision request and normalizes response', asy
   const result = await provider.analyze({ buffer: Buffer.from('image'), mimeType: 'image/png' }, { mode: 'auto' })
   assert.equal(result.rows, 30)
   assert.deepEqual(result.detectedCodes, ['H2', 'G9'])
+  assert.deepEqual(result.legendCodes, ['M12', 'G9'])
+  assert.equal(result.declaredColorCount, 3)
+  assert.equal(result.declaredBeadCount, 1200)
   assert.match(request.url, /\/chat\/completions$/)
   assert.equal(request.options.headers.Authorization, 'Bearer test-key')
   const payload = JSON.parse(request.options.body)
@@ -46,6 +50,7 @@ test('cloud DeepSeek provider sends vision request and normalizes response', asy
 
 test('analysis validation rejects invented or malformed grids', () => {
   assert.throws(() => validateAiAnalysis(Object.assign(validAnalysis(), { rows: null })), { code: 'AI_INVALID_RESULT' })
+  assert.throws(() => validateAiAnalysis(Object.assign(validAnalysis(), { declaredBeadCount: 0 })), { code: 'AI_INVALID_RESULT' })
 })
 
 test('cloud image URL validation only accepts matching Tencent storage objects', () => {

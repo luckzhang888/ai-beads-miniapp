@@ -1,6 +1,6 @@
 const assert = require('assert')
 const palette = require('../miniprogram/data/colors/mard')
-const { gridImageToPattern, aiGuidedImageToPattern } = require('../miniprogram/utils/image')
+const { gridImageToPattern, aiGuidedImageToPattern, trustedDetectedCodes } = require('../miniprogram/utils/image')
 const { guidedGridDisagreesWithLocal } = require('../miniprogram/utils/ai-grid')
 const { recognizeKnownGrid, classifySampleRows, classifySampleRowsAsync, hasCellLabel } = require('../miniprogram/utils/grid-recognition')
 
@@ -78,6 +78,18 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     }]], palette, { hasCellLabels: true, allowedCodes: ['G9', 'A17'] })
     assert.deepStrictEqual(constrained.matrix, [['G9']], 'AI-read labels must constrain ambiguous local colour matching')
 
+    const declaredSamples = Array.from({ length: 4 }, (_, row) => Array.from({ length: 4 }, (_, column) => ({
+      rgb: palette.find((item) => item.code === ['F5', 'C19', 'G9', 'M12'][(row + column) % 4]).rgb,
+      inkRatio: 0.08 + row * 0.01, lightInkRatio: 0, whiteRatio: 0, sampleCount: 64
+    })))
+    const declared = classifySampleRows(declaredSamples, palette, {
+      hasCellLabels: true, expectedBeadCount: 12, expectedColorCount: 2
+    })
+    assert.strictEqual(declared.beadCount, 12, 'an explicit title total must calibrate false occupied cells')
+    assert.strictEqual(declared.usedColorCount, 2, 'an explicit title colour count must merge compression variants')
+    assert.strictEqual(declared.expectedBeadCountApplied, true)
+    assert.strictEqual(declared.expectedColorCountApplied, true)
+
     const noisySamples = Array.from({ length: 106 }, (_, row) => Array.from({ length: 99 }, (_, column) => ({
       rgb: [40 + column, 60 + row, 100 + (row + column) % 90],
       inkRatio: 0.08, lightInkRatio: 0, whiteRatio: 0, sampleCount: 64
@@ -112,6 +124,22 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     for (let index = 1; index < progress.length; index += 1) {
       assert.ok(progress[index].value >= progress[index - 1].value, 'progress cannot move backwards')
     }
+
+    const unreliableLegendWarning = '底部图例色号可读，格内色号因分辨率过小无法辨认；detectedCodes来自底部图例而非逐格读取'
+    assert.deepStrictEqual(trustedDetectedCodes({ detectedCodes: ['B7', 'E8'], warnings: [unreliableLegendWarning] }), [],
+      'AI-admitted legend guesses must not constrain the local palette')
+    global.wx = createCanvasRuntime(guideFixture)
+    const largeGuided = await aiGuidedImageToPattern('fixture.png', palette, {
+      imageType: 'bead_pattern', hasGrid: true, rows: 106, columns: 99,
+      confidence: 0.9, hasLabels: true, detectedCodes: ['B7', 'E8'],
+      warnings: [unreliableLegendWarning], rotation: 0,
+      grid: { left: 0.02, top: 0.06, right: 0.98, bottom: 0.97 },
+      perspective: { topLeft: [0.02, 0.06], topRight: [0.98, 0.06], bottomLeft: [0.02, 0.97], bottomRight: [0.98, 0.97] }
+    })
+    assert.deepStrictEqual([largeGuided.width, largeGuided.height, largeGuided.usedColorCount, largeGuided.beadCount],
+      [99, 106, 15, 6813], 'AI-guided large charts must reuse the precise red-guide detector')
+    assert.strictEqual(largeGuided.localGridKind, 'guide-grid')
+    assert.match(largeGuided.warning, /已改用本地色块匹配/)
 
     const guidedPixels = new Uint8ClampedArray(12 * 12 * 4)
     const guidedCodes = [['F5', 'C19'], ['B9', 'G8']]

@@ -13,7 +13,7 @@ cp .env.example .env
 npm start
 ```
 
-默认只监听 `127.0.0.1:3001`，需由 Nginx 等 HTTPS 反向代理对外提供服务。`DEEPSEEK_BASE_URL` 默认为 `https://api.deepseek.com`，`DEEPSEEK_VISION_MODEL` 默认为 `deepseek-v4-flash-vision-exp`。Key 缺失时健康检查可用，但识别接口会返回 `AI_NOT_CONFIGURED`，不会伪装成 AI 结果。生产配置中的 Key 只保存在服务器 `/home/luck/ai-beads-server/.env`，不提交 Git。
+默认只监听 `127.0.0.1:3001`，需由 Nginx 等 HTTPS 反向代理对外提供服务。`DEEPSEEK_BASE_URL` 默认为 `https://api.deepseek.com`，`DEEPSEEK_VISION_MODEL` 默认为 `deepseek-flash`（DeepSeek-V4.1-Flash）。Key 缺失时健康检查可用，但识别接口会返回 `AI_NOT_CONFIGURED`，不会伪装成 AI 结果。生产配置中的 Key 只保存在服务器 `/home/luck/ai-beads-server/.env`，不提交 Git。
 
 ## 验证
 

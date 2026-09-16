@@ -12,7 +12,7 @@ class ProviderError extends Error {
 function createDeepSeekProvider(config = {}, fetchImpl = fetch) {
   const apiKey = config.apiKey || process.env.DEEPSEEK_API_KEY
   const baseUrl = (config.baseUrl || process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '')
-  const model = config.model || process.env.DEEPSEEK_VISION_MODEL || 'deepseek-v4-flash-vision-exp'
+  const model = config.model || process.env.DEEPSEEK_VISION_MODEL || 'deepseek-flash'
   const timeoutMs = Math.max(1000, Math.min(120000, Number(config.timeoutMs || process.env.DEEPSEEK_TIMEOUT_MS) || 90000))
   return {
     model,

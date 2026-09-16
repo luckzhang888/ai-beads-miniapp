@@ -545,6 +545,72 @@ function buildCounts(matrix) {
   return counts
 }
 
+function occupancyConfidence(cell, row, column, matrix) {
+  const rgb = cell && Array.isArray(cell.rgb) ? cell.rgb : [255, 255, 255]
+  const ink = Math.max(Number(cell && cell.inkRatio) || 0, Number(cell && cell.lightInkRatio) || 0)
+  const darkest = Math.min.apply(null, rgb)
+  const brightest = Math.max.apply(null, rgb)
+  const darkness = Math.max(0, (250 - darkest) / 250)
+  const chroma = Math.max(0, (brightest - darkest) / 255)
+  let occupiedNeighbors = 0
+  for (let y = Math.max(0, row - 1); y <= Math.min(matrix.length - 1, row + 1); y += 1) {
+    for (let x = Math.max(0, column - 1); x <= Math.min(matrix[row].length - 1, column + 1); x += 1) {
+      if ((x !== column || y !== row) && matrix[y][x]) occupiedNeighbors += 1
+    }
+  }
+  return (hasCellLabel(cell) ? 1 : 0) + Math.min(0.5, ink * 2) +
+    Math.min(0.22, darkness * 0.28) + Math.min(0.08, chroma * 0.2) + occupiedNeighbors * 0.07
+}
+
+function rebalanceMatrixToExpectedCount(sampleRows, matrix, expectedBeadCount, matcher) {
+  const total = matrix.length && matrix[0] ? matrix.length * matrix[0].length : 0
+  const target = Number(expectedBeadCount)
+  if (!Number.isInteger(target) || target < 1 || target > total) return { matrix, adjusted: false }
+  const next = matrix.map((row) => row.slice())
+  const occupied = []
+  const blank = []
+  for (let row = 0; row < next.length; row += 1) {
+    for (let column = 0; column < next[row].length; column += 1) {
+      const item = { row, column, score: occupancyConfidence(sampleRows[row][column], row, column, matrix) }
+      if (next[row][column]) occupied.push(item)
+      else blank.push(item)
+    }
+  }
+  if (occupied.length === target) return { matrix: next, adjusted: false }
+  if (occupied.length > target) {
+    occupied.sort((left, right) => left.score - right.score)
+    occupied.slice(0, occupied.length - target).forEach((item) => { next[item.row][item.column] = '' })
+  } else {
+    blank.sort((left, right) => right.score - left.score)
+    blank.slice(0, target - occupied.length).forEach((item) => {
+      const nearest = matcher.find(sampleRows[item.row][item.column].rgb)
+      next[item.row][item.column] = nearest ? nearest.code : ''
+    })
+  }
+  return { matrix: next, adjusted: true }
+}
+
+function constrainMatrixColorCount(sampleRows, matrix, rawPalette, expectedColorCount, pixelInput) {
+  const limit = Number(expectedColorCount)
+  const counts = buildCounts(matrix)
+  const usedCodes = Object.keys(counts)
+  if (!Number.isInteger(limit) || limit < 2 || limit >= usedCodes.length) return { matrix, adjusted: false }
+  const selected = new Set(usedCodes.sort((left, right) => counts[right] - counts[left]).slice(0, limit))
+  const selectedPalette = rawPalette.filter((item) => selected.has(item.code))
+  if (selectedPalette.length < 2) return { matrix, adjusted: false }
+  const matcher = createCachedColorMatcher(pixelInput
+    ? preparePalette(selectedPalette)
+    : prepareRecognitionPalette(selectedPalette))
+  return {
+    matrix: matrix.map((row, rowIndex) => row.map((code, columnIndex) => {
+      if (!code) return ''
+      const nearest = matcher.find(sampleRows[rowIndex][columnIndex].rgb)
+      return nearest ? nearest.code : code
+    })),
+    adjusted: true
+  }
+}
+
 function createCachedColorMatcher(palette) {
   const cache = Object.create(null)
   let misses = 0
@@ -687,11 +753,14 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     yield (row + 1) / Math.max(1, rows)
   }
   const stabilizedMatrix = labeledGrid ? stabilizeLabeledMatrix(sampleRows, matrix, observedVariants) : matrix
-  const counts = buildCounts(stabilizedMatrix)
+  const balanced = rebalanceMatrixToExpectedCount(sampleRows, stabilizedMatrix, settings.expectedBeadCount, matcher)
+  const constrained = constrainMatrixColorCount(sampleRows, balanced.matrix, rawPalette, settings.expectedColorCount, pixelInput)
+  const finalMatrix = constrained.matrix
+  const counts = buildCounts(finalMatrix)
   const beadCount = Object.keys(counts).reduce((sum, code) => sum + counts[code], 0)
   return {
     ok: true,
-    matrix: stabilizedMatrix,
+    matrix: finalMatrix,
     stats: buildStats(counts, palette),
     palette,
     width: columns,
@@ -702,6 +771,8 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     recognitionMode: details.recognitionMode || 'guide-grid',
     confidence: Math.max(0, Math.min(0.99, Number(details.confidence) || 0.9)),
     labeledGrid,
+    expectedBeadCountApplied: balanced.adjusted,
+    expectedColorCountApplied: constrained.adjusted,
     observedVariants: Object.keys(observedVariants).reduce((result, code) => {
       result[code] = Object.keys(observedVariants[code])
         .map((rgb) => ({ rgb: rgb.split(',').map(Number), count: observedVariants[code][rgb] }))
