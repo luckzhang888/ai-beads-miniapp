@@ -85,34 +85,36 @@ function fitDetectedGridToDeclaredDimensions(detected, analysis, width, height) 
   if (!detected || !detected.ok || !analysis || !Number.isInteger(analysis.rows) ||
       !Number.isInteger(analysis.columns)) return detected
 
-  const fitAxis = (start, cellSize, detectedCount, declaredCount, aiStart, aiEnd, extent) => {
-    const targetSpan = cellSize * declaredCount
-    const delta = declaredCount - detectedCount
-    const candidates = [
-      start,
-      start - delta * cellSize,
-      start - delta * cellSize / 2,
-      aiStart * extent
-    ]
-    const maximumStart = Math.max(0, extent - targetSpan)
-    let best = null
-    candidates.forEach((candidate) => {
-      const bounded = Math.max(0, Math.min(maximumStart, candidate))
-      const score = Math.abs(bounded - aiStart * extent) +
-        Math.abs(bounded + targetSpan - aiEnd * extent)
-      if (!best || score < best.score) best = { start: bounded, score }
-    })
-    return best ? best.start : Math.max(0, Math.min(maximumStart, start))
+  const refineGuideAxis = (start, cellSize, guideCount, firstGuide, lastGuide, declaredCount) => {
+    const expectedGuides = Math.ceil((declaredCount - 1) / 5)
+    if (guideCount !== expectedGuides || guideCount < 4 || !Number.isFinite(firstGuide) ||
+        !Number.isFinite(lastGuide) || lastGuide <= firstGuide) return { start, cellSize }
+    const refinedCellSize = (lastGuide - firstGuide) / ((guideCount - 1) * 5)
+    if (refinedCellSize < cellSize * 0.88 || refinedCellSize > cellSize * 1.12) return { start, cellSize }
+    return { start: firstGuide - refinedCellSize, cellSize: refinedCellSize }
   }
 
-  const grid = analysis.grid || { left: 0, top: 0, right: 1, bottom: 1 }
-  const x = fitAxis(detected.x, detected.cellWidth, detected.columns, analysis.columns,
-    grid.left, grid.right, width)
-  const y = fitAxis(detected.y, detected.cellHeight, detected.rows, analysis.rows,
-    grid.top, grid.bottom, height)
+  const refinedX = refineGuideAxis(detected.x, detected.cellWidth, detected.guideColumns,
+    detected.firstGuideX, detected.lastGuideX, analysis.columns)
+  const refinedY = refineGuideAxis(detected.y, detected.cellHeight, detected.guideRows,
+    detected.firstGuideY, detected.lastGuideY, analysis.rows)
+
+  const fitAxis = (start, cellSize, declaredCount, extent) => {
+    const targetSpan = cellSize * declaredCount
+    // `start` comes from real guide-line pixels and identifies the first
+    // data-cell boundary. AI bounds are deliberately coarse, while an extra
+    // or missing detected count normally comes from the far-side printed
+    // axis. Change only the number of cells; never move the measured origin.
+    return Math.max(0, Math.min(Math.max(0, extent - targetSpan), start))
+  }
+
+  const x = fitAxis(refinedX.start, refinedX.cellSize, analysis.columns, width)
+  const y = fitAxis(refinedY.start, refinedY.cellSize, analysis.rows, height)
   return Object.assign({}, detected, {
     x,
     y,
+    cellWidth: refinedX.cellSize,
+    cellHeight: refinedY.cellSize,
     rows: analysis.rows,
     columns: analysis.columns,
     detectedRows: detected.rows,

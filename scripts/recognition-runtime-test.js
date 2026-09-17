@@ -94,10 +94,44 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.strictEqual(cleanedWatermark.overlaySuppressed, true,
       'minority red watermark strokes must be removed before cell colour reading')
     assert.ok(Math.min.apply(null, cleanedWatermark.rgb) >= 248)
+    const antialiasedWatermarkPixels = new Uint8ClampedArray(12 * 12 * 4)
+    for (let y = 0; y < 12; y += 1) {
+      for (let x = 0; x < 12; x += 1) {
+        const overlay = x === 5 || y === 6
+        antialiasedWatermarkPixels.set((overlay ? [245, 205, 200] : [252, 252, 252]).concat([255]),
+          (y * 12 + x) * 4)
+      }
+    }
+    const cleanedAntialiasedWatermark = dominantCellColor(
+      { data: antialiasedWatermarkPixels }, 12, 12, 0, 0, 12, 12)
+    assert.strictEqual(cleanedAntialiasedWatermark.overlaySuppressed, true,
+      'downscaled pale-red guide fringes must be removed before label detection')
+    assert.ok(Math.min.apply(null, cleanedAntialiasedWatermark.rgb) >= 248)
+    assert.strictEqual(cleanedAntialiasedWatermark.neutralInkRatio, 0,
+      'a red guide fringe must not become neutral label evidence')
     const realRedPixels = new Uint8ClampedArray(12 * 12 * 4)
     for (let index = 0; index < 12 * 12; index += 1) realRedPixels.set([220, 45, 55, 255], index * 4)
     const realRed = dominantCellColor({ data: realRedPixels }, 12, 12, 0, 0, 12, 12)
     assert.strictEqual(realRed.overlaySuppressed, false, 'a genuine predominantly red bead must be preserved')
+
+    const overlayOnlySamples = Array.from({ length: 4 }, (_, row) => Array.from({ length: 4 }, (_, column) => {
+      if (row === column) {
+        return {
+          rgb: [252, 252, 252], inkRatio: 0.12, lightInkRatio: 0,
+          neutralInkRatio: 0, whiteRatio: 0.8, overlaySuppressed: true
+        }
+      }
+      return {
+        rgb: [24, 135, 162], inkRatio: 0.08, lightInkRatio: 0,
+        neutralInkRatio: 0.06, whiteRatio: 0, overlaySuppressed: false
+      }
+    }))
+    const overlayOnlyResult = classifySampleRows(overlayOnlySamples, palette, {
+      hasCellLabels: true, expectedBeadCount: 12
+    })
+    assert.strictEqual(overlayOnlyResult.beadCount, 12)
+    assert.ok(overlayOnlyResult.matrix.every((row, index) => !row[index]),
+      'overlay-only white background cells must not survive exact-count calibration')
 
     const codes = Array.from({ length: 5 }, (_, row) => Array(5).fill(row < 3 ? 'A1' : 'C19'))
     codes[1][1] = 'F5'
@@ -290,6 +324,20 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     }, 1030, 1080)
     assert.deepStrictEqual([fitted.columns, fitted.rows, fitted.detectedColumns], [99, 106, 98],
       'a detected grid area must be re-divided by the trusted title dimensions')
+
+    const coarseAiBounds = fitDetectedGridToDeclaredDimensions({
+      ok: true, x: 31.4, y: 171.4, cellWidth: 29.6, cellHeight: 29.6, columns: 78, rows: 93,
+      guideColumns: 16, guideRows: 19, firstGuideX: 61, lastGuideX: 2312,
+      firstGuideY: 201, lastGuideY: 2905
+    }, {
+      rows: 93, columns: 77, grid: { left: 0.01, top: 0.07, right: 0.99, bottom: 0.94 }
+    }, 2374, 3072)
+    assert.ok(Math.abs(coarseAiBounds.cellWidth - 30.0133333333) < 0.0001)
+    assert.ok(Math.abs(coarseAiBounds.cellHeight - 30.0444444444) < 0.0001)
+    assert.ok(Math.abs(coarseAiBounds.x - 30.9866666667) < 0.0001,
+      'the first-cell boundary must be derived from the first guide and full-span pitch')
+    assert.ok(Math.abs(coarseAiBounds.y - 170.9555555556) < 0.0001,
+      'full-span guide regression must prevent cumulative row drift')
 
     global.wx = createCanvasRuntime(edgeFixture)
     const titleDimensions = Object.assign({}, edgeAnalysis, { columns: 31, dimensionSource: 'title' })

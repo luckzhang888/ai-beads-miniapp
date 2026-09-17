@@ -440,7 +440,11 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
         // Printed red copyright text and thick red guide lines are overlays,
         // not bead colours. Only remove them when they occupy a minority of
         // the cell; a genuine red bead remains predominantly red and is kept.
-        overlayRed: r >= 165 && r - g >= 55 && r - b >= 45
+        // Downscaling blends a thin red guide/watermark stroke with the cell
+        // underneath.  Accept the resulting pale pink fringe as overlay too;
+        // `overlayPixelRatio` below still protects a real red/pink bead whose
+        // fill occupies most of the cell.
+        overlayRed: r >= 150 && r - g >= 24 && r - b >= 18
       })
     }
   }
@@ -489,10 +493,13 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
   const backgroundLight = luminance(dominantRgb)
   let darkInk = 0
   let lightInk = 0
+  let neutralInk = 0
   centerSamples.forEach((sample) => {
     const difference = luminance(sample) - backgroundLight
     if (difference <= -22) darkInk += 1
     if (difference >= 18) lightInk += 1
+    const chroma = Math.max.apply(null, sample) - Math.min.apply(null, sample)
+    if ((difference <= -22 || difference >= 18) && chroma <= 22) neutralInk += 1
   })
   const signatureSide = 8
   const signatureSums = new Float32Array(signatureSide * signatureSide)
@@ -511,6 +518,7 @@ function dominantCellColor(imageData, width, height, left, top, right, bottom) {
     rgb: dominantRgb,
     inkRatio: centerSamples.length ? darkInk / centerSamples.length : 0,
     lightInkRatio: centerSamples.length ? lightInk / centerSamples.length : 0,
+    neutralInkRatio: centerSamples.length ? neutralInk / centerSamples.length : 0,
     whiteRatio: whitePixels / redValues.length,
     sampleCount: redValues.length,
     labelSignature,
@@ -603,8 +611,9 @@ function occupancyConfidence(cell, row, column, matrix) {
       if ((x !== column || y !== row) && matrix[y][x]) occupiedNeighbors += 1
     }
   }
-  return (hasCellLabel(cell) ? 1 : 0) + Math.min(0.5, ink * 2) +
-    Math.min(0.22, darkness * 0.28) + Math.min(0.08, chroma * 0.2) + occupiedNeighbors * 0.07
+  const overlayPenalty = isOverlayOnlyBackground(cell) ? 2 : 0
+  return (hasReliableCellLabel(cell) ? 1 : 0) + Math.min(0.5, ink * 2) +
+    Math.min(0.22, darkness * 0.28) + Math.min(0.08, chroma * 0.2) + occupiedNeighbors * 0.07 - overlayPenalty
 }
 
 function rebalanceMatrixToExpectedCount(sampleRows, matrix, expectedBeadCount, matcher) {
@@ -962,6 +971,22 @@ function hasCellLabel(cell) {
     (cell.lightInkRatio >= 0.01 && cell.lightInkRatio <= 0.48)
 }
 
+function hasReliableCellLabel(cell) {
+  if (!hasCellLabel(cell)) return false
+  // A suppressed red guide/watermark can leave a faint chromatic fringe that
+  // looks like ink. Real printed cell codes still contribute dark/bright
+  // neutral pixels, whereas an overlay-only background cell does not.
+  return !isOverlayOnlyBackground(cell)
+}
+
+function isOverlayOnlyBackground(cell) {
+  const outsideOverlay = cell && cell.outsideBackground && cell.overlaySuppressed &&
+    (cell.whiteRatio >= 0.12 || luminance(cell.rgb) >= 205)
+  if (outsideOverlay) return true
+  return Boolean(cell && cell.overlaySuppressed && isWhiteLike(cell.rgb, 238) &&
+    Number.isFinite(cell.neutralInkRatio) && cell.neutralInkRatio < 0.035)
+}
+
 function sampleGridCells(imageData, width, height, geometry) {
   const sampleRows = []
   for (let row = 0; row < geometry.rows; row += 1) {
@@ -1010,6 +1035,43 @@ function isBackgroundCell(cell, backgroundRgb, blankThreshold) {
   )
   return (channelDistance <= 18 && rgbDistance(rgb, backgroundRgb) <= 27) ||
     (cell.whiteRatio >= 0.2 && isWhiteLike(backgroundRgb, Math.min(238, blankThreshold - 6)))
+}
+
+function markOutsideBackgroundCells(sampleRows, backgroundRgb) {
+  const rows = sampleRows.length
+  const columns = rows && sampleRows[0] ? sampleRows[0].length : 0
+  if (!backgroundRgb || !rows || !columns) return 0
+  const outside = Array.from({ length: rows }, () => new Uint8Array(columns))
+  const candidate = sampleRows.map((row) => row.map((cell) =>
+    isBackgroundCell(cell, backgroundRgb, 249) || isWhiteLike(cell.rgb, 249) || cell.whiteRatio >= 0.36 ||
+    (cell.overlaySuppressed && cell.whiteRatio >= 0.12 && luminance(cell.rgb) >= 190)))
+  const queue = []
+  const visit = (row, column) => {
+    if (row < 0 || row >= rows || column < 0 || column >= columns || outside[row][column] || !candidate[row][column]) return
+    outside[row][column] = 1
+    queue.push([row, column])
+  }
+  for (let column = 0; column < columns; column += 1) {
+    visit(0, column)
+    visit(rows - 1, column)
+  }
+  for (let row = 1; row < rows - 1; row += 1) {
+    visit(row, 0)
+    visit(row, columns - 1)
+  }
+  for (let index = 0; index < queue.length; index += 1) {
+    const [row, column] = queue[index]
+    visit(row - 1, column)
+    visit(row + 1, column)
+    visit(row, column - 1)
+    visit(row, column + 1)
+  }
+  let count = 0
+  sampleRows.forEach((row, rowIndex) => row.forEach((cell, columnIndex) => {
+    cell.outsideBackground = Boolean(outside[rowIndex][columnIndex])
+    if (cell.outsideBackground) count += 1
+  }))
+  return count
 }
 
 function restoreEnclosedBackgroundCells(sampleRows, matrix, matcher, backgroundRgb) {
@@ -1076,7 +1138,7 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   const constrainedPalette = allowedPalette.length >= 2 ? allowedPalette : rawPalette
   const recognitionPalette = pixelInput ? preparePalette(constrainedPalette) : prepareRecognitionPalette(constrainedPalette)
   const matcher = createCachedColorMatcher(recognitionPalette)
-  const labeledCells = sampleRows.reduce((sum, row) => sum + row.filter(hasCellLabel).length, 0)
+  const labeledCells = sampleRows.reduce((sum, row) => sum + row.filter(hasReliableCellLabel).length, 0)
   const overlaySuppressedCellCount = sampleRows.reduce((sum, row) =>
     sum + row.filter((cell) => cell && cell.overlaySuppressed).length, 0)
   const detectedLabelRatio = labeledCells / Math.max(1, columns * rows)
@@ -1086,14 +1148,15 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
   const minimumLabelRatio = settings.hasCellLabels === true ? 0.025 : 0.08
   const labeledGrid = !pixelInput && settings.hasCellLabels !== false && detectedLabelRatio >= minimumLabelRatio
   const blankThreshold = Number(settings.blankThreshold) || 249
-  const borderBackground = !labeledGrid && !pixelInput ? estimateBorderBackground(sampleRows) : null
+  const borderBackground = !pixelInput ? estimateBorderBackground(sampleRows) : null
+  const outsideBackgroundCellCount = markOutsideBackgroundCells(sampleRows, borderBackground)
   const matrix = []
   const observedVariants = Object.create(null)
   for (let row = 0; row < rows; row += 1) {
     const output = []
     for (let column = 0; column < columns; column += 1) {
       const cell = sampleRows[row][column]
-      const labeled = labeledGrid && hasCellLabel(cell)
+      const labeled = labeledGrid && hasReliableCellLabel(cell) && !(cell.outsideBackground && cell.overlaySuppressed)
       const noLabel = labeledGrid && !labeled
       const backgroundCell = !labeled && isBackgroundCell(cell, borderBackground, blankThreshold)
       if (noLabel || ((isWhiteLike(cell.rgb, blankThreshold) || cell.whiteRatio >= 0.36 || backgroundCell) && !labeled)) {
@@ -1116,6 +1179,7 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     ? restoreEnclosedBackgroundCells(sampleRows, matrix, matcher, borderBackground)
     : { matrix, restored: 0 }
   const stabilizedMatrix = labeledGrid ? stabilizeLabeledMatrix(sampleRows, topology.matrix, observedVariants) : topology.matrix
+  const preBalanceBeadCount = stabilizedMatrix.reduce((sum, row) => sum + row.filter(Boolean).length, 0)
   const balanced = rebalanceMatrixToExpectedCount(sampleRows, stabilizedMatrix, settings.expectedBeadCount, matcher)
   const exactCounts = assignMatrixByExpectedCodeCounts(
     sampleRows, balanced.matrix, rawPalette, settings.expectedCodeCounts, pixelInput, labeledGrid)
@@ -1140,8 +1204,11 @@ function* classifySampleRowsSteps(sampleRows, rawPalette, options, metadata) {
     labeledGrid,
     detectedLabelRatio,
     backgroundTopologyApplied: Boolean(borderBackground),
+    outsideBackgroundCellCount,
     enclosedLightCellCount: topology.restored,
     expectedBeadCountApplied: balanced.adjusted,
+    preBalanceBeadCount,
+    expectedBeadCountAdjustment: beadCount - preBalanceBeadCount,
     expectedColorCountApplied: constrained.adjusted,
     expectedCodeCountsApplied: exactCounts.adjusted,
     chartColorCalibrationApplied: Boolean(exactCounts.chartColorCalibrationApplied),
