@@ -57,15 +57,23 @@
     </view>
     <button class="primary-btn classify-confirm" bindtap="confirmSourceVariant">{{recognitionCropEnabled ? '确认当前截取区域并识别' : (selectedMethod === 'recognize' || selectedMethod === 'diagram' || selectedMethod === 'link' ? '确认整图并智能识别' : '确认并继续设置')}}</button>
     <button class="secondary-btn" bindtap="chooseImage">重新选择图片</button>
+    <button class="original-file-btn" bindtap="chooseOriginalFile">从聊天文件导入原图</button>
+    <view class="original-file-hint">微信里“作为照片”保存可能已压缩；高密度图纸请让对方以文件发送，再从此导入。</view>
   </view>
 </view>
 
 <view wx:elif="{{stage === 'recognizing'}}" class="recognition-page">
   <view class="recognition-title">{{recognitionSource === '本地' ? '本地识别处理' : 'AI 自动化处理'}}</view>
   <view class="recognition-preview {{!recognitionResult && recognitionCropEnabled ? 'cropped-source' : ''}}">
-    <bead-grid wx:if="{{recognitionResult}}" matrix="{{recognitionResult.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{330}}" show-grid="{{true}}" />
+    <bead-grid wx:if="{{recognitionResult && recognitionPreviewMode === 'pattern'}}" matrix="{{recognitionResult.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{330}}" show-grid="{{true}}" />
+    <image wx:elif="{{recognitionResult}}" src="{{imagePath}}" mode="aspectFit" bindtap="previewRecognitionSource" />
     <image wx:else src="{{imagePath}}" mode="{{recognitionCropEnabled ? 'scaleToFill' : 'aspectFit'}}" style="{{recognitionCropEnabled ? recognitionCropImageStyle : ''}}" />
   </view>
+  <view wx:if="{{recognitionResult}}" class="recognition-preview-tabs">
+    <view class="{{recognitionPreviewMode === 'pattern' ? 'active' : ''}}" data-mode="pattern" bindtap="setRecognitionPreviewMode">识别豆格</view>
+    <view class="{{recognitionPreviewMode === 'source' ? 'active' : ''}}" data-mode="source" bindtap="setRecognitionPreviewMode">手机原图</view>
+  </view>
+  <view wx:if="{{recognitionResult && recognitionPreviewMode === 'source'}}" class="recognition-preview-hint">点击原图可全屏打开，再用双指缩放查看格内文字。</view>
   <view wx:if="{{recognitionSource === '本地' && recognitionResult}}" class="recognition-local-note">本次图纸网格和色号由本地识别生成，请仔细核对尺寸和颜色。</view>
   <view wx:if="{{recognitionError}}" class="recognition-error">
     <b>AI 识别暂时不可用</b>
@@ -80,6 +88,12 @@
     <view><text>网格</text><b>{{recognitionResult.width}} × {{recognitionResult.height}}</b></view>
     <view><text>图例</text><b>{{recognitionResult.usedColorCount}} 色 · {{recognitionResult.beadCount}} 颗</b></view>
     <view><text>方式</text><b>{{recognitionResult.recognitionModeText}}</b><text class="recognition-status">{{recognitionResult.recognitionStatusText}}</text></view>
+  </view>
+  <view wx:if="{{recognitionResult.gridPreservationText}}" class="recognition-resolution-note">
+    <b>网格没有被减少</b>
+    <text>{{recognitionResult.gridPreservationText}}</text>
+    <text>{{recognitionResult.sourceQualityText}}</text>
+    <button wx:if="{{recognitionResult.sourceResolutionInsufficient}}" bindtap="chooseOriginalFile">重新导入未压缩文件</button>
   </view>
   <view wx:if="{{recognitionResult.calibrationNote}}" class="recognition-calibration-note">✓ {{recognitionResult.calibrationNote}}</view>
   <view wx:if="{{recognitionResult.warning}}" class="recognition-warning">{{recognitionResult.warning}}</view>

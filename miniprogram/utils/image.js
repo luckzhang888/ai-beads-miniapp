@@ -675,7 +675,7 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     // AI is good at reading the count and printed labels; detected line pixels
     // are more accurate for sub-cell sampling, especially when screenshots
     // are cropped through the first or last row/column.
-    if (scale < 0.999 && settings.disableSourceTileSampling !== true) {
+    if (settings.disableSourceTileSampling !== true) {
       sourceTileSampling = await sampleOriginalGridInTiles(
         image,
         info,
@@ -722,10 +722,18 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.gridAreaRepaired = gridAreaRepaired
   result.aiDimensionsCorrected = Boolean(aiDimensionsCorrected)
   result.originalResolutionTileSampling = Boolean(sourceTileSampling)
+  const estimatedSourceCellSize = Math.min(
+    (Number(analysis.grid && analysis.grid.right) - Number(analysis.grid && analysis.grid.left)) * info.width /
+      Math.max(1, Number(analysis.columns) || 1),
+    (Number(analysis.grid && analysis.grid.bottom) - Number(analysis.grid && analysis.grid.top)) * info.height /
+      Math.max(1, Number(analysis.rows) || 1)
+  )
   result.sourceSampleCellSize = sourceTileSampling
     ? Math.min(sourceTileSampling.sourceCellWidth, sourceTileSampling.sourceCellHeight)
-    : Math.min(Number(samplingGrid && samplingGrid.cellWidth) || 0, Number(samplingGrid && samplingGrid.cellHeight) || 0)
+    : (Math.min(Number(samplingGrid && samplingGrid.cellWidth) || 0,
+      Number(samplingGrid && samplingGrid.cellHeight) || 0) / Math.max(0.000001, scale) || estimatedSourceCellSize)
   result.sourceTileCount = sourceTileSampling ? sourceTileSampling.tileCount : 0
+  result.sourceResolutionInsufficient = Boolean(analysis.hasLabels && result.sourceSampleCellSize < 40)
   result.geometryConfidence = Number(analysis.confidence) || 0
   result.colorVerification = result.expectedCodeCountsApplied
     ? 'legend-counts'
@@ -745,7 +753,10 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     warnings.unshift(`已先定位网格面积，再按标题标注的 ${analysis.columns}×${analysis.rows} 强制等分；本地漏检的边缘线未再改写尺寸`)
   }
   const calibrationNotes = []
-  if (result.uploadIntegrityVerified) calibrationNotes.push('上传前后文件大小和 MD5 完全一致，云端使用的是手机所选原图')
+  if (result.uploadIntegrityVerified) {
+    calibrationNotes.push('手机所选文件上传前后大小和 MD5 一致；这只证明传输没有再压缩，不代表相册中的文件是发布者原始分辨率')
+  }
+  calibrationNotes.push(`手机实际文件 ${info.width}×${info.height}，网格内每格约 ${result.sourceSampleCellSize.toFixed(1)} 像素`)
   if (result.originalResolutionTileSampling) {
     calibrationNotes.push(`缩略图仅用于定位，已从原始分辨率按 ${result.sourceTileCount} 块逐格提取颜色与文字`)
   }
@@ -764,6 +775,9 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.calibrationNote = calibrationNotes.join('；')
   if (result.uncertainCellCount > 0) {
     warnings.unshift(`仍有 ${result.uncertainCellCount} 格颜色接近，已列为待人工核对，不能标记为 100%`)
+  }
+  if (result.sourceResolutionInsufficient) {
+    warnings.unshift(`手机实际选中的 ${info.width}×${info.height} 文件每格仅约 ${result.sourceSampleCellSize.toFixed(1)} 像素，格内色号已不足以稳定辨认；请用“从聊天文件导入原图”，不要使用微信照片预览保存版`)
   }
   if (Array.isArray(analysis.detectedCodes) && analysis.detectedCodes.length >= 2 && allowedCodes.length < 2) {
     warnings.unshift('AI 图例色号未经过逐格核实，已改用本地色块匹配，避免错误压缩颜色数量')

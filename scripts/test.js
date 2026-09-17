@@ -479,6 +479,10 @@ assert.match(convertMarkup, /recognition-preview \{\{!recognitionResult && recog
   'recognition progress must preview the confirmed crop instead of the uncropped source')
 assert.match(convertMarkup, /mode="\{\{recognitionCropEnabled \? 'scaleToFill' : 'aspectFit'\}\}" style="\{\{recognitionCropEnabled \? recognitionCropImageStyle/,
   'recognition progress must use the exact same transform as the crop confirmation screen')
+assert.match(convertMarkup, /bindtap="chooseOriginalFile"/,
+  'dense charts must offer uncompressed chat-file import instead of relying on album previews')
+assert.match(convertMarkup, /recognitionPreviewMode === 'source'/,
+  'recognition results must let the user compare the screen preview with the selected source file')
 assert.match(convertStyles, /\.classify-crop-frame\s*\{[^}]*inset:\s*0;/,
   'the visible crop frame must match the full exported square without a hidden inset')
 assert.strictEqual(convertPage.processAiPhotoImage.toString().includes('removeBackground: false'), true,
@@ -523,6 +527,19 @@ assert.deepStrictEqual([convertPage.data.cropX, convertPage.data.cropY, convertP
   'restoring the original must clear the previous crop transform')
 assert.strictEqual(convertPage.data.stage, 'classify')
 assert.strictEqual(convertPage.data.recognitionCropEnabled, true)
+
+let originalFileRequest
+let acceptedOriginalPath = ''
+global.wx.chooseMessageFile = (options) => {
+  originalFileRequest = options
+  options.success({ tempFiles: [{ path: 'uncompressed-original.png' }] })
+}
+const previousAcceptImagePath = convertPage.acceptImagePath
+convertPage.acceptImagePath = (path) => { acceptedOriginalPath = path }
+convertPage.chooseOriginalFile()
+convertPage.acceptImagePath = previousAcceptImagePath
+assert.deepStrictEqual(originalFileRequest.extension, ['jpg', 'jpeg', 'png', 'webp'])
+assert.strictEqual(acceptedOriginalPath, 'uncompressed-original.png')
 
 delete global.wx
 require('./recognition-runtime-test').run({ guideFixture: largeGuideFixture, edgeFixture: edgeCropped, convertPage }).then(() => {

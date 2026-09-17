@@ -276,6 +276,8 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.deepStrictEqual([largeGuided.width, largeGuided.height, largeGuided.usedColorCount, largeGuided.beadCount],
       [99, 106, 15, 6813], 'AI-guided large charts must reuse the precise red-guide detector')
     assert.strictEqual(largeGuided.localGridKind, 'guide-grid')
+    assert.strictEqual(largeGuided.originalResolutionTileSampling, true,
+      'existing charts must always use bounded source tiles, even when the selected file already fits the overview canvas')
     assert.match(largeGuided.warning, /已改用本地色块匹配/)
 
     const guidedPixels = new Uint8ClampedArray(12 * 12 * 4)

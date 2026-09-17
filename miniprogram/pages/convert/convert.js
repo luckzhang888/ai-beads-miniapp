@@ -68,6 +68,7 @@ Page({
     recognitionProgress: 0,
     recognitionStep: '等待图片',
     recognitionResult: null,
+    recognitionPreviewMode: 'pattern',
     recognitionError: '',
     recognitionSource: '',
     recognitionSaving: false,
@@ -147,6 +148,7 @@ Page({
       pdfFile: null,
       previewResult: null,
       recognitionResult: null,
+      recognitionPreviewMode: 'pattern',
       recognitionError: '',
       recognitionSource: '',
       recognitionProgress: 0,
@@ -653,6 +655,12 @@ Page({
     result.needsCalibration = result.recognitionMode === 'pixel-fallback' || result.recognitionMode === 'ai-photo' ||
       result.recognitionMode === 'ai-no-grid'
     result.needsReview = Boolean((result.validation && !result.validation.ok) || Number(result.uncertainCellCount || 0) > 0)
+    if (result.recognitionMode === 'ai-guided-grid') {
+      result.gridPreservationText = `${result.width}×${result.height} 是原图中的豆格数，识别没有减少网格；屏幕预览只是缩放显示。`
+      if (Number(result.sourceWidth) > 0 && Number(result.sourceHeight) > 0) {
+        result.sourceQualityText = `手机实际文件 ${result.sourceWidth}×${result.sourceHeight}，每格约 ${Number(result.sourceSampleCellSize || 0).toFixed(1)} 像素。`
+      }
+    }
     result.reviewPreview = (result.reviewCells || []).slice(0, 12).map((cell) => ({
       label: `第 ${Number(cell.row) + 1} 行 · 第 ${Number(cell.column) + 1} 列`,
       code: cell.code,
@@ -661,8 +669,19 @@ Page({
     }))
     this.setData({
       recognitionProgress: 100, recognitionStep: '识别完成', recognitionResult: result,
-      recognitionSource: source, recognitionError: '', previewResult: result
+      recognitionSource: source, recognitionError: '', previewResult: result,
+      recognitionPreviewMode: 'pattern'
     })
+  },
+
+  setRecognitionPreviewMode(event) {
+    const mode = event.currentTarget.dataset.mode === 'source' ? 'source' : 'pattern'
+    this.setData({ recognitionPreviewMode: mode })
+  },
+
+  previewRecognitionSource() {
+    if (!this.data.imagePath || typeof wx.previewImage !== 'function') return
+    wx.previewImage({ current: this.data.imagePath, urls: [this.data.imagePath] })
   },
 
   reprocessRecognitionSize(event) {
@@ -1025,6 +1044,7 @@ Page({
       sourceVariant: 'main',
       recognitionProgress: 0,
       recognitionResult: null,
+      recognitionPreviewMode: 'pattern',
       recognitionError: '',
       recognitionSource: '',
       previewResult: null,
@@ -1067,6 +1087,27 @@ Page({
       sourceType: ['album', 'camera'],
       success(res) {
         done(res.tempFilePaths && res.tempFilePaths[0])
+      },
+      fail: (error) => this.handleImagePickerFailure(error)
+    })
+  },
+
+  chooseOriginalFile() {
+    if (typeof wx.chooseMessageFile !== 'function') {
+      wx.showModal({
+        title: '当前微信不支持',
+        content: '请升级微信后，将原图以“文件”方式发送到聊天，再从这里导入。',
+        showCancel: false
+      })
+      return
+    }
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: ['jpg', 'jpeg', 'png', 'webp'],
+      success: (result) => {
+        const file = result.tempFiles && result.tempFiles[0]
+        this.acceptImagePath(file && file.path || '')
       },
       fail: (error) => this.handleImagePickerFailure(error)
     })
