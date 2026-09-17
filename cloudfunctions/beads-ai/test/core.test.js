@@ -36,7 +36,14 @@ test('cloud DeepSeek provider sends vision request and normalizes response', asy
       async json() { return { choices: [{ message: { content: JSON.stringify(validAnalysis()) } }] } }
     }
   })
-  const result = await provider.analyze({ buffer: Buffer.from('image'), mimeType: 'image/png' }, { mode: 'auto' })
+  const result = await provider.analyze({
+    buffer: Buffer.from('image'),
+    mimeType: 'image/png',
+    regions: [
+      { name: 'title', buffer: Buffer.from('title'), mimeType: 'image/jpeg' },
+      { name: 'legend', buffer: Buffer.from('legend'), mimeType: 'image/jpeg' }
+    ]
+  }, { mode: 'auto' })
   assert.equal(result.rows, 30)
   assert.deepEqual(result.detectedCodes, ['H2', 'G9'])
   assert.deepEqual(result.legendCodes, ['M12', 'G9'])
@@ -48,7 +55,11 @@ test('cloud DeepSeek provider sends vision request and normalizes response', asy
   assert.equal(request.options.headers.Authorization, 'Bearer test-key')
   const payload = JSON.parse(request.options.body)
   assert.equal(payload.model, 'vision-test')
-  assert.match(payload.messages[1].content[1].image_url.url, /^data:image\/png;base64,/)
+  const imageBlocks = payload.messages[1].content.filter((item) => item.type === 'image_url')
+  assert.equal(imageBlocks.length, 3)
+  assert.match(imageBlocks[0].image_url.url, /^data:image\/png;base64,/)
+  assert.match(imageBlocks[1].image_url.url, /^data:image\/jpeg;base64,/)
+  assert.match(imageBlocks[2].image_url.url, /^data:image\/jpeg;base64,/)
 })
 
 test('analysis validation rejects invented or malformed grids', () => {

@@ -20,6 +20,21 @@ function createDeepSeekProvider(config = {}, fetchImpl = defaultFetch) {
     async analyze(image, options = {}) {
       if (!apiKey) throw new ProviderError('AI_NOT_CONFIGURED', 503)
       try {
+        const content = [
+          { type: 'text', text: buildPrompt(options) },
+          { type: 'text', text: '图1：完整原图，用于判断图像类型、网格边界、行列和透视。' },
+          { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.buffer.toString('base64')}`, detail: 'original' } }
+        ]
+        ;(image.regions || []).forEach((region) => {
+          const label = region.name === 'title'
+            ? '图2：原图顶部标题区域的放大裁片，只用于读取标题声明的行列、色数和总颗数。'
+            : '图3：原图底部图例区域的放大裁片，请逐项读取 MARD 色号及紧邻的数量。'
+          content.push({ type: 'text', text: label })
+          content.push({
+            type: 'image_url',
+            image_url: { url: `data:${region.mimeType};base64,${region.buffer.toString('base64')}`, detail: 'original' }
+          })
+        })
         const response = await fetchImpl(baseUrl + '/chat/completions', {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
@@ -31,10 +46,7 @@ function createDeepSeekProvider(config = {}, fetchImpl = defaultFetch) {
             max_tokens: 1800,
             messages: [
               { role: 'system', content: SYSTEM_PROMPT },
-              { role: 'user', content: [
-                { type: 'text', text: buildPrompt(options) },
-                { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.buffer.toString('base64')}`, detail: 'original' } }
-              ] }
+              { role: 'user', content }
             ]
           }),
           timeout: timeoutMs

@@ -77,7 +77,17 @@ function trustedDetectedCodes(analysis) {
   // matcher to that partial list is destructive (for example, 15 colours can
   // collapse to 8). Only a complete legend whose counts add up to the printed
   // total is strong enough to constrain the MARD 221 palette.
-  return legendCounts ? Object.keys(legendCounts) : []
+  if (legendCounts) return Object.keys(legendCounts)
+  const legendCodes = analysis && Array.isArray(analysis.legendCodes)
+    ? Array.from(new Set(analysis.legendCodes.map((code) => String(code || '').toUpperCase()).filter(Boolean)))
+    : []
+  const declaredColors = Number(analysis && analysis.declaredColorCount)
+  // A complete code-only legend is still valuable even when one or more tiny
+  // quantities cannot be read. It safely narrows 221 candidates to the exact
+  // printed set without inventing per-colour quotas.
+  return Number.isInteger(declaredColors) && declaredColors >= 2 && legendCodes.length === declaredColors
+    ? legendCodes
+    : []
 }
 
 function trustedLegendCodeCounts(analysis) {
@@ -217,6 +227,101 @@ function drawTransformed(ctx, image, sourceWidth, sourceHeight, width, height, c
     drawSize.height
   )
   ctx.restore()
+}
+
+function writeBase64File(filePath, base64) {
+  return new Promise((resolve, reject) => {
+    try {
+      wx.getFileSystemManager().writeFile({
+        filePath,
+        data: base64,
+        encoding: 'base64',
+        success: () => resolve(filePath),
+        fail: reject
+      })
+    } catch (error) { reject(error) }
+  })
+}
+
+function canvasToTemporaryFile(canvas, width, height, prefix) {
+  if (canvas && typeof canvas.toDataURL === 'function' && wx.env && wx.env.USER_DATA_PATH) {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.98)
+    const comma = String(dataUrl || '').indexOf(',')
+    if (comma > 0) {
+      const path = wx.env.USER_DATA_PATH + '/' + (prefix || 'beads-crop') + '-' + Date.now() + '-' +
+        Math.random().toString(36).slice(2, 8) + '.jpg'
+      return writeBase64File(path, dataUrl.slice(comma + 1))
+    }
+  }
+  return new Promise((resolve, reject) => {
+    if (typeof wx.canvasToTempFilePath !== 'function') {
+      reject(new Error('当前微信版本不能导出裁剪选区，请升级微信后重试'))
+      return
+    }
+    wx.canvasToTempFilePath({
+      canvas,
+      x: 0,
+      y: 0,
+      width,
+      height,
+      destWidth: width,
+      destHeight: height,
+      fileType: 'jpg',
+      quality: 1,
+      success: (result) => resolve(result.tempFilePath),
+      fail: reject
+    })
+  })
+}
+
+async function cropImageToFile(imagePath, options) {
+  const settings = options || {}
+  const info = await getImageInfo(imagePath)
+  const shortest = Math.max(1, Math.min(info.width, info.height))
+  const side = Math.max(1200, Math.min(3072, Number(settings.outputSide) || shortest))
+  const canvas = createProcessorCanvas(side, side)
+  canvas.width = side
+  canvas.height = side
+  const ctx = canvas.getContext('2d')
+  const image = await loadCanvasImage(canvas, info.path)
+  ctx.clearRect(0, 0, side, side)
+  ctx.imageSmoothingEnabled = true
+  if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
+  drawTransformed(ctx, image, info.width, info.height, side, side, 'cover', settings.transform)
+  return canvasToTemporaryFile(canvas, side, side, 'beads-crop')
+}
+
+async function cropInspectionRegion(imagePath, name, topRatio, heightRatio) {
+  const info = await getImageInfo(imagePath)
+  if (info.width < 640 || info.height < 480) return null
+  const sourceTop = Math.max(0, Math.min(info.height - 1, Math.round(info.height * topRatio)))
+  const sourceHeight = Math.max(1, Math.min(info.height - sourceTop, Math.round(info.height * heightRatio)))
+  const width = Math.max(1200, Math.min(2800, info.width))
+  const height = Math.max(120, Math.round(width * sourceHeight / info.width))
+  const canvas = createProcessorCanvas(width, height)
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  const image = await loadCanvasImage(canvas, info.path)
+  ctx.clearRect(0, 0, width, height)
+  ctx.imageSmoothingEnabled = true
+  if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(image, 0, sourceTop, info.width, sourceHeight, 0, 0, width, height)
+  const path = await canvasToTemporaryFile(canvas, width, height, 'beads-' + name)
+  return { name, path }
+}
+
+async function createInspectionRegionFiles(imagePath) {
+  const regions = []
+  try {
+    const title = await cropInspectionRegion(imagePath, 'title', 0, 0.10)
+    if (title) regions.push(title)
+  } catch (error) {}
+  try {
+    const legend = await cropInspectionRegion(imagePath, 'legend', 0.90, 0.10)
+    if (legend) regions.push(legend)
+  } catch (error) {}
+  return regions
 }
 
 function qualitySettings(mode) {
@@ -428,7 +533,12 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   await reportProcessingProgress(settings, 45, '根据 AI 定位图纸区域')
   const info = await getImageInfo(imagePath)
   const longestSide = Math.max(info.width, info.height)
-  const scale = Math.min(1, 2400 / longestSide)
+  // Dense exported charts contain two- or three-character codes inside every
+  // cell. 2400px left only ~20px per cell on common 99x106/77x93 originals.
+  // 3072 remains below the widely supported 4096 canvas limit while retaining
+  // materially more label and fill-colour information.
+  const recognitionMaxSide = Math.max(2400, Math.min(3600, Number(settings.recognitionMaxSide) || 3072))
+  const scale = Math.min(1, recognitionMaxSide / longestSide)
   const width = Math.max(1, Math.round(info.width * scale))
   const height = Math.max(1, Math.round(info.height * scale))
   const canvas = createProcessorCanvas(width, height)
@@ -494,6 +604,8 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   await reportProcessingProgress(settings, 85, '逐格归一化放大并匹配 MARD 221')
   const allowedCodes = trustedDetectedCodes(analysis)
   const expectedCodeCounts = trustedLegendCodeCounts(analysis)
+  const completeLegendCodes = !expectedCodeCounts && Number(analysis.declaredColorCount) >= 2 &&
+    allowedCodes.length === Number(analysis.declaredColorCount)
   const result = await classifySampleRowsAsync(sampleRows, palette, Object.assign({}, settings, {
     hasCellLabels: analysis.hasLabels,
     allowedCodes,
@@ -516,6 +628,17 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.localGridKind = useLocalGrid ? localGridKind : ''
   result.gridAreaRepaired = gridAreaRepaired
   result.aiDimensionsCorrected = Boolean(aiDimensionsCorrected)
+  result.geometryConfidence = Number(analysis.confidence) || 0
+  result.colorVerification = result.expectedCodeCountsApplied
+    ? 'legend-counts'
+    : (completeLegendCodes ? 'legend-codes' : 'estimated')
+  if (result.colorVerification === 'legend-counts') {
+    result.confidence = Math.min(Number(result.confidence) || 0, result.uncertainCellCount > 0 ? 0.84 : 0.97)
+  } else if (result.colorVerification === 'legend-codes') {
+    result.confidence = Math.min(Number(result.confidence) || 0, 0.76)
+  } else {
+    result.confidence = Math.min(Number(result.confidence) || 0, analysis.hasLabels ? 0.52 : 0.62)
+  }
   if (aiDimensionsCorrected) {
     result.aiOriginalDimensions = { rows: analysis.rows, columns: analysis.columns }
   }
@@ -534,6 +657,8 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   }
   if (result.expectedCodeCountsApplied) {
     calibrationNotes.push('已按图例逐色号数量进行全局校准，仅使用图例中的 MARD 221 标准色')
+  } else if (completeLegendCodes) {
+    calibrationNotes.push(`已从放大图例确认完整 ${allowedCodes.length} 个 MARD 色号，逐格仅在这些色号中匹配`)
   }
   result.calibrationNote = calibrationNotes.join('；')
   if (result.uncertainCellCount > 0) {
@@ -547,6 +672,16 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   }
   if (result.expectedBeadCountApplied) {
     warnings.unshift(`已按标题标注的 ${analysis.declaredBeadCount} 颗校准空白格，请核对图案边缘`)
+  }
+  if (completeLegendCodes && !result.expectedCodeCountsApplied) {
+    warnings.unshift('已确认完整色号集合，但图例数量未全部读清，逐格位置仍按颜色和格内文字估算')
+  }
+  if (!completeLegendCodes && !result.expectedCodeCountsApplied) {
+    warnings.unshift('未取得可校验的完整图例，本次只确认了网格结构，具体 MARD 色号不能视为准确')
+  }
+  if (Number.isInteger(Number(analysis.declaredColorCount)) &&
+    result.usedColorCount !== Number(analysis.declaredColorCount)) {
+    warnings.unshift(`标题声明 ${analysis.declaredColorCount} 色，但当前只匹配到 ${result.usedColorCount} 色`)
   }
   if (analysis.hasLabels && (!Array.isArray(analysis.detectedCodes) || analysis.detectedCodes.length < 2)) {
     warnings.unshift('AI 未能可靠读取格内色号，颜色仅按本地色差估算')
@@ -569,6 +704,8 @@ module.exports = {
   imageToPattern,
   gridImageToPattern,
   aiGuidedImageToPattern,
+  cropImageToFile,
+  createInspectionRegionFiles,
   trustedDetectedCodes,
   trustedLegendCodeCounts,
   recommendPatternSize,

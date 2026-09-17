@@ -1,5 +1,6 @@
 const apiConfig = require('../config/api')
 const cloudConfig = require('../config/cloud')
+const { createInspectionRegionFiles } = require('../utils/image')
 const MAX_BYTES = 10 * 1024 * 1024
 const TIMEOUT_MS = 120000
 
@@ -259,7 +260,7 @@ function getCloudTempUrl(fileID) {
   })
 }
 
-function callCloudRecognition(fileID, imageUrl, options, fileMeta) {
+function callCloudRecognition(fileID, imageUrl, options, fileMeta, regions) {
   return new Promise((resolve, reject) => {
     let settled = false
     const finish = (error, value) => {
@@ -281,7 +282,8 @@ function callCloudRecognition(fileID, imageUrl, options, fileMeta) {
           expectedSize: options.expectedSize || '',
           palette: 'MARD',
           sourceBytes: Number(fileMeta && fileMeta.size) || 0,
-          sourceDigest: String(fileMeta && fileMeta.digest || '')
+          sourceDigest: String(fileMeta && fileMeta.digest || ''),
+          regions: Array.isArray(regions) ? regions : []
         },
         success(response) {
           try { finish(null, parseCloudResponse(response)) } catch (error) { finish(error) }
@@ -293,13 +295,33 @@ function callCloudRecognition(fileID, imageUrl, options, fileMeta) {
 }
 
 async function analyzeImageWithCloud(imagePath, options, fileMeta) {
-  let fileID
+  const uploadedFileIDs = []
+  let localRegions = []
   try {
-    fileID = await uploadImageToCloud(imagePath)
+    try { localRegions = await createInspectionRegionFiles(imagePath) } catch (error) { localRegions = [] }
+    const fileID = await uploadImageToCloud(imagePath)
+    uploadedFileIDs.push(fileID)
     const imageUrl = await getCloudTempUrl(fileID)
-    return await callCloudRecognition(fileID, imageUrl, options, fileMeta)
+    const regions = []
+    for (let index = 0; index < localRegions.length; index += 1) {
+      const region = localRegions[index]
+      // The magnified title/legend images improve tiny-text recognition, but
+      // they are optional. A transient upload failure must not prevent the
+      // original image from being analysed.
+      try {
+        const regionFileID = await uploadImageToCloud(region.path)
+        uploadedFileIDs.push(regionFileID)
+        regions.push({ name: region.name, fileID: regionFileID, imageUrl: await getCloudTempUrl(regionFileID) })
+      } catch (error) {}
+    }
+    return await callCloudRecognition(fileID, imageUrl, options, fileMeta, regions)
   } finally {
-    deleteCloudFile(fileID)
+    uploadedFileIDs.forEach(deleteCloudFile)
+    if (typeof wx !== 'undefined' && wx.getFileSystemManager) {
+      localRegions.forEach((region) => {
+        try { wx.getFileSystemManager().unlink({ filePath: region.path, fail() {} }) } catch (error) {}
+      })
+    }
   }
 }
 

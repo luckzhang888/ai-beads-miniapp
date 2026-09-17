@@ -203,6 +203,11 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
       'AI-admitted legend guesses must not constrain the local palette')
     assert.deepStrictEqual(trustedDetectedCodes({ detectedCodes: ['B7', 'E8', 'G9'], warnings: [] }), [],
       'a partial model-read code list must never collapse a larger chart palette')
+    assert.deepStrictEqual(trustedDetectedCodes({
+      declaredColorCount: 3,
+      legendCodes: ['B7', 'E8', 'G9'],
+      legendEntries: []
+    }), ['B7', 'E8', 'G9'], 'a complete magnified legend may safely constrain the palette even without counts')
     global.wx = createCanvasRuntime(guideFixture)
     const largeGuided = await aiGuidedImageToPattern('fixture.png', palette, {
       imageType: 'bead_pattern', hasGrid: true, rows: 106, columns: 99,
@@ -299,7 +304,7 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.deepStrictEqual(rotated.matrix, guidedCodes, 'AI-guided 90-degree rotation must preserve colour order')
 
     global.wx = {}
-    convertPage.setData({ imagePath: 'fixture.png', recognitionProgress: 0 })
+    convertPage.setData({ imagePath: 'fixture.png', recognitionProgress: 0, recognitionCropEnabled: false })
     convertPage.requestAiAnalysis = async () => ({ result: guidedAnalysis })
     convertPage.processAiGuidedImage = async (path, analysis, onProgress) => {
       assert.strictEqual(path, 'fixture.png')
@@ -320,7 +325,7 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
       error.code = 'AI_GRID_MISMATCH'
       throw error
     }
-    convertPage.processCurrentImage = async (onProgress) => {
+    convertPage.processPreparedLocalImage = async (path, options, onProgress) => {
       await onProgress(50, '本地校验中')
       assert.ok(convertPage.data.recognitionProgress >= 60, 'AI-to-local fallback must not reset progress')
       return Object.assign({}, result, { validation: { ok: true, warnings: [] } })
@@ -342,7 +347,7 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.strictEqual(convertPage.data.stage, 'classify')
     assert.strictEqual(convertPage.data.recognitionCropEnabled, true)
     assert.strictEqual(convertPage.data.cropMode, 'cover')
-    convertPage.setData({ imagePath: 'fixture.png', recognitionProgress: 0 })
+    convertPage.setData({ imagePath: 'fixture.png', recognitionProgress: 0, recognitionCropEnabled: false })
     convertPage.requestAiAnalysis = async () => { throw new Error('AI offline') }
     convertPage.aiAnalysisCache = null
     convertPage.setData({ recognitionProgress: 0 })

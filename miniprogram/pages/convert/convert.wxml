@@ -27,7 +27,7 @@
 <view wx:elif="{{stage === 'classify'}}" class="classify-page">
   <view class="classify-card">
     <view class="classify-title">{{selectedMethodTitle || '图纸导入'}}</view>
-    <view class="classify-note">图纸请保留整图；普通长图可移动、缩放后截取主体</view>
+    <view class="classify-note">图纸请保留整图；长图不会直接识别默认中心，请先移动、缩放并确认要截取的区域</view>
     <view
       class="classify-preview {{recognitionCropEnabled ? 'cropping' : ''}}"
       bindtouchstart="cropTouchStart"
@@ -36,7 +36,7 @@
       bindtouchcancel="cropTouchEnd"
     >
       <image src="{{imagePath}}" mode="{{recognitionCropEnabled ? 'aspectFill' : 'aspectFit'}}" style="{{recognitionCropEnabled ? cropStyle : ''}}" />
-      <view wx:if="{{recognitionCropEnabled}}" class="classify-crop-frame"><text>最终截取区域</text></view>
+      <view wx:if="{{recognitionCropEnabled}}" class="classify-crop-frame"><text>{{longImageManualCrop ? '请手动移动图片，框内才是最终截取区域' : '最终截取区域'}}</text></view>
     </view>
     <view class="classify-crop-controls">
       <button class="{{recognitionCropEnabled ? 'active' : ''}}" bindtap="toggleRecognitionCrop">{{recognitionCropEnabled ? '取消裁剪，使用整图' : '移动裁剪主体'}}</button>
@@ -55,7 +55,7 @@
     <view class="variant-row">
       <view wx:for="{{sourceVariants}}" wx:key="value" class="variant-item {{sourceVariant === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectSourceVariant"><view>{{sourceVariant === item.value ? '●' : '○'}}</view><text>{{item.label}}</text></view>
     </view>
-    <button class="primary-btn classify-confirm" bindtap="confirmSourceVariant">{{selectedMethod === 'recognize' || selectedMethod === 'diagram' || selectedMethod === 'link' ? '确认并智能识别' : '确认并继续设置'}}</button>
+    <button class="primary-btn classify-confirm" bindtap="confirmSourceVariant">{{recognitionCropEnabled ? '确认当前截取区域并识别' : (selectedMethod === 'recognize' || selectedMethod === 'diagram' || selectedMethod === 'link' ? '确认整图并智能识别' : '确认并继续设置')}}</button>
     <button class="secondary-btn" bindtap="chooseImage">重新选择图片</button>
   </view>
 </view>
@@ -79,7 +79,7 @@
   <view wx:if="{{recognitionResult}}" class="recognition-summary">
     <view><text>网格</text><b>{{recognitionResult.width}} × {{recognitionResult.height}}</b></view>
     <view><text>图例</text><b>{{recognitionResult.usedColorCount}} 色 · {{recognitionResult.beadCount}} 颗</b></view>
-    <view><text>方式</text><b>{{recognitionResult.recognitionModeText}} · {{recognitionResult.confidencePercent}}%</b></view>
+    <view><text>方式</text><b>{{recognitionResult.recognitionModeText}}</b><text class="recognition-status">{{recognitionResult.recognitionStatusText}}</text></view>
   </view>
   <view wx:if="{{recognitionResult.calibrationNote}}" class="recognition-calibration-note">✓ {{recognitionResult.calibrationNote}}</view>
   <view wx:if="{{recognitionResult.warning}}" class="recognition-warning">{{recognitionResult.warning}}</view>
@@ -105,6 +105,10 @@
     <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 定位网格面积</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 修复并切格</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 匹配色号</text></view>
     <view class="recognition-step"><b>{{recognitionStep}}</b><text wx:if="{{recognitionProgress === 100}}">处理完成</text><text wx:else>{{recognitionProgress}}%</text></view>
     <progress percent="{{recognitionProgress}}" activeColor="#39c96b" stroke-width="8" />
+  </view>
+  <view wx:if="{{recognitionProgress === 100 && recognitionResult.cropApplied}}" class="recognition-recrop-actions">
+    <button bindtap="editRecognitionCrop">调整当前截取</button>
+    <button bindtap="restartCropFromOriginal">恢复原图重新截取</button>
   </view>
   <view wx:if="{{recognitionProgress === 100}}" class="recognition-actions">
     <button data-target="detail" bindtap="saveRecognitionResult">{{recognitionResult.needsCalibration || recognitionResult.needsReview ? '核对结果后保存' : '保存到图纸册'}}</button>

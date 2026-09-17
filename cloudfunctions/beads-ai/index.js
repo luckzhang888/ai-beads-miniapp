@@ -79,6 +79,23 @@ async function downloadImage(imageUrl, fetchImpl = fetch) {
   return response.buffer()
 }
 
+async function downloadAnalysisRegions(event) {
+  const inputs = Array.isArray(event.regions) ? event.regions.slice(0, 2) : []
+  const regions = []
+  for (let index = 0; index < inputs.length; index += 1) {
+    const item = inputs[index] || {}
+    const name = item.name === 'title' || item.name === 'legend' ? item.name : ''
+    const fileID = String(item.fileID || '')
+    const imageUrl = validCloudImageUrl(fileID, String(item.imageUrl || ''))
+    if (!name || !imageUrl || regions.some((region) => region.name === name)) continue
+    const buffer = await downloadImage(imageUrl)
+    const mimeType = detectImageType(buffer)
+    if (!mimeType) continue
+    regions.push({ name, buffer, mimeType })
+  }
+  return regions
+}
+
 exports.main = async (event = {}, context = {}) => {
   const id = requestId()
   const started = Date.now()
@@ -109,9 +126,14 @@ exports.main = async (event = {}, context = {}) => {
     const mimeType = detectImageType(buffer)
     if (!mimeType) return fail(id, 'INVALID_IMAGE', '仅支持 JPEG、PNG、WebP 和 GIF 图片。')
 
-    const result = await provider.analyze({ buffer, mimeType }, options)
+    let regions = []
+    try { regions = await downloadAnalysisRegions(event) } catch (error) {
+      console.warn(JSON.stringify({ requestId: id, regionDownload: 'failed', reason: error && error.message || 'unknown' }))
+    }
+    const result = await provider.analyze({ buffer, mimeType, regions }, options)
     console.info(JSON.stringify({ requestId: id, ms: Date.now() - started, model: provider.model,
-      status: 200, imageType: result.imageType, rows: result.rows, columns: result.columns, confidence: result.confidence }))
+      status: 200, imageType: result.imageType, rows: result.rows, columns: result.columns,
+      confidence: result.confidence, enlargedRegions: regions.length, legendEntries: result.legendEntries.length }))
     return { ok: true, requestId: id, provider: 'deepseek', model: provider.model,
       uploadIntegrity: { verified: integrity.verified, bytes: integrity.bytes }, result }
   } catch (error) {

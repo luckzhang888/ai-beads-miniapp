@@ -4,6 +4,7 @@ const {
   imageToPattern,
   gridImageToPattern,
   aiGuidedImageToPattern,
+  cropImageToFile,
   recommendPatternSize,
   calculatePatternDimensions
 } = require('../../utils/image')
@@ -85,6 +86,7 @@ Page({
     cropRotation: 0,
     cropMirrored: false,
     recognitionCropEnabled: false,
+    longImageManualCrop: false,
     cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
     optimizeOptions: [
       { value: 'soft', label: '柔和' },
@@ -155,6 +157,7 @@ Page({
       cropRotation: 0,
       cropMirrored: false,
       recognitionCropEnabled: false,
+      longImageManualCrop: false,
       cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);'
     })
   },
@@ -426,6 +429,7 @@ Page({
     this.aiAnalysisCache = null
     this.setData({
       recognitionCropEnabled,
+      longImageManualCrop: recognitionCropEnabled,
       cropMode,
       imageMode: recognitionCropEnabled ? 'aspectFill' : 'aspectFit',
       cropX: 0,
@@ -453,6 +457,26 @@ Page({
     this.setData({ stage: 'config' })
   },
 
+  neutralProcessingOptions() {
+    return Object.assign({}, this.processingOptions(), {
+      cropMode: 'ratio',
+      transform: { offsetX: 0, offsetY: 0, scale: 1, rotation: 0, mirrored: false }
+    })
+  },
+
+  async prepareRecognitionInput(imagePath) {
+    if (!this.data.recognitionCropEnabled) {
+      return { path: imagePath, options: this.processingOptions(), temporary: false }
+    }
+    const path = await cropImageToFile(imagePath, { transform: this.processingOptions().transform })
+    return { path, options: this.neutralProcessingOptions(), temporary: path !== imagePath }
+  },
+
+  removeTemporaryRecognitionInput(input) {
+    if (!input || !input.temporary || !input.path || typeof wx === 'undefined' || !wx.getFileSystemManager) return
+    try { wx.getFileSystemManager().unlink({ filePath: input.path, fail() {} }) } catch (error) {}
+  },
+
   async runAiRecognition() {
     if (!this.data.imagePath || (this.data.recognitionProgress > 0 && this.data.recognitionProgress < 100)) return
     const imagePath = this.data.imagePath
@@ -466,14 +490,21 @@ Page({
       recognitionError: '',
       recognitionSource: ''
     })
+    let preparedInput
     try {
-      await this.setDataAsync({ recognitionProgress: 25, recognitionStep: 'DeepSeek AI 分析图纸' })
-      let analysis = this.aiAnalysisCache && this.aiAnalysisCache.path === imagePath ? this.aiAnalysisCache.value : null
+      if (this.data.recognitionCropEnabled) {
+        await this.setDataAsync({ recognitionProgress: 16, recognitionStep: '按你确认的方框生成截取图片' })
+      }
+      preparedInput = await this.prepareRecognitionInput(imagePath)
+      const recognitionPath = preparedInput.path
+      const cacheKey = this.processingSignature()
+      await this.setDataAsync({ recognitionProgress: 25, recognitionStep: 'DeepSeek AI 分析已确认的图片区域' })
+      let analysis = this.aiAnalysisCache && this.aiAnalysisCache.signature === cacheKey ? this.aiAnalysisCache.value : null
       if (!analysis) {
-        const response = await this.requestAiAnalysis(imagePath)
+        const response = await this.requestAiAnalysis(recognitionPath)
         analysis = response.result
         if (analysis && response.uploadIntegrity) analysis.uploadIntegrity = response.uploadIntegrity
-        this.aiAnalysisCache = { path: imagePath, value: analysis }
+        this.aiAnalysisCache = { signature: cacheKey, value: analysis }
       }
       if (this.data.imagePath !== imagePath) return
       if (!analysis || typeof analysis.hasGrid !== 'boolean') throw new Error('AI 返回的图纸结构无效，请重试或使用本地识别。')
@@ -481,17 +512,18 @@ Page({
       let recognitionSource = 'AI'
       if (analysis.hasGrid) {
         try {
-          result = await this.processAiGuidedImage(imagePath, analysis, (progress, step) => this.setDataAsync({
+          result = await this.processAiGuidedImage(recognitionPath, analysis, (progress, step) => this.setDataAsync({
             recognitionProgress: Math.min(98, Number(progress) || 0),
             recognitionStep: step || '正在识别图纸'
-          }))
+          }), preparedInput.options)
         } catch (error) {
           if (!error || error.code !== 'AI_GRID_MISMATCH') throw error
           await this.setDataAsync({ recognitionProgress: 60, recognitionStep: 'AI 行列不可靠，改用本地网格识别' })
-          result = await this.processCurrentImage((progress, step) => this.setDataAsync({
-            recognitionProgress: Math.min(98, 60 + (Number(progress) || 0) * 0.38),
-            recognitionStep: step || '正在本地识别图纸'
-          }))
+          result = await this.processPreparedLocalImage(recognitionPath, preparedInput.options,
+            (progress, step) => this.setDataAsync({
+              recognitionProgress: Math.min(98, 60 + (Number(progress) || 0) * 0.38),
+              recognitionStep: step || '正在本地识别图纸'
+            }))
           recognitionSource = '本地'
           const warning = 'AI 行列估算与本地网格检测不一致，已改用本地识别。请核对网格尺寸、色号和豆数。'
           result.warning = result.warning ? warning + result.warning : warning
@@ -502,7 +534,7 @@ Page({
         }
       } else {
         await this.setDataAsync({ recognitionProgress: 60, recognitionStep: '无网格图片按指定尺寸重新像素化' })
-        result = await this.processAiPhotoImage(imagePath)
+        result = await this.processAiPhotoImage(recognitionPath, preparedInput.options)
         result.recognitionMode = 'ai-no-grid'
         result.confidence = analysis.confidence
         result.aiAnalysis = analysis
@@ -513,6 +545,7 @@ Page({
           : 'AI 未检测到原始网格，已切换为“主体图片像素化”。长图可返回重新选择并开启“移动裁剪主体”，再选择输出尺寸。'
         recognitionSource = 'AI 分类 + 本地像素化'
       }
+      result.cropApplied = Boolean(this.data.recognitionCropEnabled)
       if (this.data.imagePath !== imagePath) return
       this.presentRecognitionResult(result, recognitionSource)
     } catch (error) {
@@ -522,6 +555,8 @@ Page({
         stage: 'recognizing', recognitionProgress: 0, recognitionStep: 'AI 识别暂时不可用',
         recognitionError: error && error.message ? error.message : 'AI 识别暂时不可用，请重试或使用本地识别。'
       })
+    } finally {
+      this.removeTemporaryRecognitionInput(preparedInput)
     }
   },
 
@@ -532,13 +567,18 @@ Page({
     return analyzeImage(imagePath, { mode })
   },
 
-  processAiGuidedImage(imagePath, analysis, onProgress) {
+  processAiGuidedImage(imagePath, analysis, onProgress, processingOptions) {
     return aiGuidedImageToPattern(imagePath, mardPalette, analysis,
-      Object.assign({}, this.processingOptions(), { onProgress }))
+      Object.assign({}, processingOptions || this.processingOptions(), { onProgress }))
   },
 
-  processAiPhotoImage(imagePath) {
-    return imageToPattern(imagePath, this.data.selectedSize, mardPalette, this.processingOptions())
+  processAiPhotoImage(imagePath, processingOptions) {
+    return imageToPattern(imagePath, this.data.selectedSize, mardPalette, processingOptions || this.processingOptions())
+  },
+
+  processPreparedLocalImage(imagePath, processingOptions, onProgress) {
+    return gridImageToPattern(imagePath, this.data.selectedSize, mardPalette,
+      Object.assign({}, processingOptions || this.processingOptions(), { onProgress }))
   },
 
   retryAiRecognition() {
@@ -583,6 +623,17 @@ Page({
       result.recognitionModeText = 'AI 定位 + 分块放大文字复核 + MARD 匹配'
     }
     result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
+    result.geometryConfidencePercent = Math.round(Number(result.geometryConfidence || result.confidence || 0) * 100)
+    if (result.recognitionMode === 'pixel-fallback' || result.recognitionMode === 'ai-photo' ||
+      result.recognitionMode === 'ai-no-grid') {
+      result.recognitionStatusText = '重新像素化（不是原图复原）'
+    } else if (result.colorVerification === 'legend-counts' && Number(result.uncertainCellCount || 0) === 0) {
+      result.recognitionStatusText = '图例色号与数量已校验'
+    } else if (result.colorVerification === 'legend-codes') {
+      result.recognitionStatusText = '完整色号集已确认，逐格待核对'
+    } else {
+      result.recognitionStatusText = '网格定位 ' + result.geometryConfidencePercent + '%，色号未验证'
+    }
     result.exactRecognition = result.recognitionMode !== 'pixel-fallback' && result.recognitionMode !== 'ai-photo' &&
       result.recognitionMode !== 'ai-no-grid' &&
       Number(result.confidence || 0) >= 0.72 && (!result.validation || result.validation.ok) &&
@@ -647,6 +698,31 @@ Page({
       })
       this.refreshOutputSize({ cropMode: 'cover' })
     })
+  },
+
+  restartCropFromOriginal() {
+    this.cachedSignature = ''
+    this.cachedResult = null
+    this.aiAnalysisCache = null
+    this.setData({
+      stage: 'classify',
+      recognitionCropEnabled: true,
+      longImageManualCrop: true,
+      cropMode: 'cover',
+      imageMode: 'aspectFill',
+      cropX: 0,
+      cropY: 0,
+      cropScale: 1,
+      cropZoom: 0,
+      cropRotation: 0,
+      cropMirrored: false,
+      cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
+      recognitionProgress: 0,
+      recognitionStep: '请移动原图并确认截取区域',
+      recognitionResult: null,
+      recognitionError: '',
+      previewResult: null
+    }, () => this.refreshOutputSize({ cropMode: 'cover' }))
   },
 
   saveProcessedPattern(result, settings) {
@@ -823,17 +899,24 @@ Page({
     }
     const recognizeGrid = ['recognize', 'diagram', 'link', 'pixel'].indexOf(this.data.selectedMethod) >= 0
     const processor = recognizeGrid ? gridImageToPattern : imageToPattern
-    const options = this.processingOptions()
-    if (typeof onProgress === 'function') options.onProgress = onProgress
-    const result = await processor(
-      this.data.imagePath,
-      this.data.selectedSize,
-      mardPalette,
-      options
-    )
-    this.cachedSignature = signature
-    this.cachedResult = result
-    return result
+    let preparedInput
+    try {
+      preparedInput = await this.prepareRecognitionInput(this.data.imagePath)
+      const options = preparedInput.options
+      if (typeof onProgress === 'function') options.onProgress = onProgress
+      const result = await processor(
+        preparedInput.path,
+        this.data.selectedSize,
+        mardPalette,
+        options
+      )
+      result.cropApplied = Boolean(this.data.recognitionCropEnabled)
+      this.cachedSignature = signature
+      this.cachedResult = result
+      return result
+    } finally {
+      this.removeTemporaryRecognitionInput(preparedInput)
+    }
   },
 
   async previewPattern() {
@@ -868,6 +951,7 @@ Page({
           outputWidth: dims.width,
           outputHeight: dims.height,
           recognitionCropEnabled: autoCrop,
+          longImageManualCrop: autoCrop,
           cropMode,
           imageMode: autoCrop ? 'aspectFill' : this.data.imageMode,
           cropX: 0,
@@ -907,6 +991,7 @@ Page({
       cropMode: 'ratio',
       imageMode: 'aspectFit',
       recognitionCropEnabled: false,
+      longImageManualCrop: false,
       cropX: 0,
       cropY: 0,
       cropScale: 1,

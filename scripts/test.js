@@ -486,6 +486,15 @@ assert.deepStrictEqual([convertPage.data.outputWidth, convertPage.data.outputHei
 convertPage.updateCropTransform({ cropX: 200, cropY: 999 })
 assert.strictEqual(convertPage.data.cropX, 0, 'an unzoomed portrait crop must not slide beyond its horizontal edge')
 assert.ok(convertPage.data.cropY > 150, 'a long portrait crop must reach farther than the old fixed drag limit')
+const dragStartY = convertPage.data.cropY
+convertPage.cropTouchStart({ touches: [{ clientX: 120, clientY: 160 }] })
+convertPage.cropTouchMove({ touches: [{ clientX: 120, clientY: 120 }] })
+convertPage.cropTouchEnd()
+assert.ok(convertPage.data.cropY < dragStartY, 'one-finger movement must reposition the image inside the crop frame')
+convertPage.cropTouchStart({ touches: [{ clientX: 100, clientY: 100 }, { clientX: 200, clientY: 100 }] })
+convertPage.cropTouchMove({ touches: [{ clientX: 75, clientY: 100 }, { clientX: 225, clientY: 100 }] })
+convertPage.cropTouchEnd()
+assert.ok(convertPage.data.cropScale > 1, 'two-finger pinch must resize the image inside the crop frame')
 convertPage.changeCropZoom({ detail: { value: 100 } })
 assert.strictEqual(convertPage.data.cropScale, 2)
 convertPage.nudgeCrop({ currentTarget: { dataset: { x: 1, y: 0 } } })
@@ -498,6 +507,12 @@ convertPage.setData({ stage: 'classify', selectedMethod: 'recognize', cropMode: 
 convertPage.updateRecommendedSize('long.jpg')
 assert.strictEqual(convertPage.data.recognitionCropEnabled, true, 'long photos must open directly in manual crop mode')
 assert.strictEqual(convertPage.data.cropMode, 'cover')
+convertPage.setData({ cropX: 48, cropY: -96, cropScale: 1.8, recognitionProgress: 100 })
+convertPage.restartCropFromOriginal()
+assert.deepStrictEqual([convertPage.data.cropX, convertPage.data.cropY, convertPage.data.cropScale], [0, 0, 1],
+  'restoring the original must clear the previous crop transform')
+assert.strictEqual(convertPage.data.stage, 'classify')
+assert.strictEqual(convertPage.data.recognitionCropEnabled, true)
 
 delete global.wx
 require('./recognition-runtime-test').run({ guideFixture: largeGuideFixture, edgeFixture: edgeCropped, convertPage }).then(() => {
