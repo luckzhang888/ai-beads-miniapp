@@ -56,6 +56,86 @@ function yieldProcessingThread() {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+async function sampleOriginalGridInTiles(image, sourceInfo, overviewScale, geometry, onProgress) {
+  const rows = Math.max(1, Math.round(Number(geometry && geometry.rows) || 0))
+  const columns = Math.max(1, Math.round(Number(geometry && geometry.columns) || 0))
+  const scale = Math.max(0.000001, Number(overviewScale) || 1)
+  const sourceCellWidth = Number(geometry.cellWidth) / scale
+  const sourceCellHeight = Number(geometry.cellHeight) / scale
+  if (!Number.isFinite(sourceCellWidth) || !Number.isFinite(sourceCellHeight) ||
+    sourceCellWidth <= 0 || sourceCellHeight <= 0) {
+    throw new Error('原图网格采样参数无效')
+  }
+
+  // Read small source-resolution rectangles instead of scaling a 5K chart
+  // down to one canvas. This keeps the printed code and the fill colour of
+  // every cell separate while staying well below WeChat's canvas limits.
+  const tileSide = 1536
+  const columnsPerTile = Math.max(1, Math.min(columns, Math.floor(tileSide / sourceCellWidth)))
+  const rowsPerTile = Math.max(1, Math.min(rows, Math.floor(tileSide / sourceCellHeight)))
+  const tileCanvas = createProcessorCanvas(1, 1)
+  const sampleRows = Array.from({ length: rows }, () => Array(columns))
+  const totalTiles = Math.ceil(columns / columnsPerTile) * Math.ceil(rows / rowsPerTile)
+  let completedTiles = 0
+
+  for (let rowStart = 0; rowStart < rows; rowStart += rowsPerTile) {
+    const tileRows = Math.min(rowsPerTile, rows - rowStart)
+    for (let columnStart = 0; columnStart < columns; columnStart += columnsPerTile) {
+      const tileColumns = Math.min(columnsPerTile, columns - columnStart)
+      const sourceX = (Number(geometry.x) + columnStart * Number(geometry.cellWidth)) / scale
+      const sourceY = (Number(geometry.y) + rowStart * Number(geometry.cellHeight)) / scale
+      const sourceWidth = tileColumns * sourceCellWidth
+      const sourceHeight = tileRows * sourceCellHeight
+      const renderScale = Math.min(1, tileSide / sourceWidth, tileSide / sourceHeight)
+      const width = Math.max(tileColumns, Math.round(sourceWidth * renderScale))
+      const height = Math.max(tileRows, Math.round(sourceHeight * renderScale))
+      tileCanvas.width = width
+      tileCanvas.height = height
+      const ctx = tileCanvas.getContext('2d')
+      ctx.clearRect(0, 0, width, height)
+      ctx.imageSmoothingEnabled = true
+      if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(
+        image,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        width,
+        height
+      )
+      const tilePixels = ctx.getImageData(0, 0, width, height)
+      const tileSamples = sampleGridCells(tilePixels, width, height, {
+        x: 0,
+        y: 0,
+        cellWidth: width / tileColumns,
+        cellHeight: height / tileRows,
+        columns: tileColumns,
+        rows: tileRows
+      })
+      tileSamples.forEach((row, rowOffset) => {
+        row.forEach((cell, columnOffset) => {
+          sampleRows[rowStart + rowOffset][columnStart + columnOffset] = cell
+        })
+      })
+      completedTiles += 1
+      if (typeof onProgress === 'function') await onProgress(completedTiles / totalTiles)
+      await yieldProcessingThread()
+    }
+  }
+
+  return {
+    sampleRows,
+    sourceCellWidth,
+    sourceCellHeight,
+    tileCount: totalTiles,
+    sourceWidth: Number(sourceInfo && sourceInfo.width) || 0,
+    sourceHeight: Number(sourceInfo && sourceInfo.height) || 0
+  }
+}
+
 function validateRecognizedGrid(result, geometry) {
   const warnings = []
   const cellRatio = Math.max(geometry.cellWidth, geometry.cellHeight) /
@@ -590,11 +670,24 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   const aiDimensionsCorrected = useLocalGrid && !declaredDimensionsTrusted &&
     (localGrid.rows !== analysis.rows || localGrid.columns !== analysis.columns)
   let sampleRows
+  let sourceTileSampling = null
   if (useLocalGrid) {
     // AI is good at reading the count and printed labels; detected line pixels
     // are more accurate for sub-cell sampling, especially when screenshots
     // are cropped through the first or last row/column.
-    sampleRows = sampleGridCells(pixels, width, height, samplingGrid)
+    if (scale < 0.999 && settings.disableSourceTileSampling !== true) {
+      sourceTileSampling = await sampleOriginalGridInTiles(
+        image,
+        info,
+        scale,
+        samplingGrid,
+        (fraction) => reportProcessingProgress(settings, 60 + fraction * 20,
+          '原图分块逐格提取 ' + Math.round(fraction * 100) + '%')
+      )
+      sampleRows = sourceTileSampling.sampleRows
+    } else {
+      sampleRows = sampleGridCells(pixels, width, height, samplingGrid)
+    }
     await reportProcessingProgress(settings, 80, gridAreaRepaired ? '网格区域修复完成' : '本地网格精校完成')
     await yieldProcessingThread()
   } else {
@@ -628,6 +721,11 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.localGridKind = useLocalGrid ? localGridKind : ''
   result.gridAreaRepaired = gridAreaRepaired
   result.aiDimensionsCorrected = Boolean(aiDimensionsCorrected)
+  result.originalResolutionTileSampling = Boolean(sourceTileSampling)
+  result.sourceSampleCellSize = sourceTileSampling
+    ? Math.min(sourceTileSampling.sourceCellWidth, sourceTileSampling.sourceCellHeight)
+    : Math.min(Number(samplingGrid && samplingGrid.cellWidth) || 0, Number(samplingGrid && samplingGrid.cellHeight) || 0)
+  result.sourceTileCount = sourceTileSampling ? sourceTileSampling.tileCount : 0
   result.geometryConfidence = Number(analysis.confidence) || 0
   result.colorVerification = result.expectedCodeCountsApplied
     ? 'legend-counts'
@@ -648,6 +746,9 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   }
   const calibrationNotes = []
   if (result.uploadIntegrityVerified) calibrationNotes.push('上传前后文件大小和 MD5 完全一致，云端使用的是手机所选原图')
+  if (result.originalResolutionTileSampling) {
+    calibrationNotes.push(`缩略图仅用于定位，已从原始分辨率按 ${result.sourceTileCount} 块逐格提取颜色与文字`)
+  }
   if (result.chartColorCalibrationApplied) calibrationNotes.push('已从本图学习实际色块，校正截图、屏幕和导出造成的整体偏色')
   if (result.labelTileRefinementApplied) {
     calibrationNotes.push(`已逐格归一化放大，并用 ${result.labelTemplateCount} 组格内文字模板复核相近色号`)
@@ -708,6 +809,7 @@ module.exports = {
   createInspectionRegionFiles,
   trustedDetectedCodes,
   trustedLegendCodeCounts,
+  sampleOriginalGridInTiles,
   recommendPatternSize,
   calculatePatternDimensions,
   normalizeTransform,

@@ -1,6 +1,12 @@
 const assert = require('assert')
 const palette = require('../miniprogram/data/colors/mard')
-const { gridImageToPattern, aiGuidedImageToPattern, trustedDetectedCodes, trustedLegendCodeCounts } = require('../miniprogram/utils/image')
+const {
+  gridImageToPattern,
+  aiGuidedImageToPattern,
+  trustedDetectedCodes,
+  trustedLegendCodeCounts,
+  sampleOriginalGridInTiles
+} = require('../miniprogram/utils/image')
 const { guidedGridDisagreesWithLocal, fitDetectedGridToDeclaredDimensions } = require('../miniprogram/utils/ai-grid')
 const {
   recognizeKnownGrid,
@@ -293,6 +299,18 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.deepStrictEqual(guided.matrix, guidedCodes, 'AI geometry must produce a local MARD matrix')
     assert.strictEqual(guided.recognitionMode, 'ai-guided-grid')
     assert.strictEqual(guidedProgress[guidedProgress.length - 1], 100)
+
+    const tileRuntime = createCanvasRuntime({ width: 12, height: 12, imageData: { data: guidedPixels } })
+    global.wx = tileRuntime
+    const originalTiles = await sampleOriginalGridInTiles({}, { width: 12, height: 12 }, 0.5, {
+      x: 0, y: 0, cellWidth: 3, cellHeight: 3, columns: 2, rows: 2
+    })
+    const originalTileResult = classifySampleRows(originalTiles.sampleRows, palette)
+    assert.deepStrictEqual(originalTileResult.matrix, guidedCodes,
+      'source-resolution tile sampling must map overview grid coordinates back to original pixels')
+    assert.deepStrictEqual([originalTiles.sourceCellWidth, originalTiles.sourceCellHeight], [6, 6])
+    assert.strictEqual(tileRuntime.calls.canvases, 1,
+      'source-resolution reading must reuse one bounded tile canvas')
 
     const whitePixels = new Uint8ClampedArray(2 * 2 * 4)
     for (let index = 0; index < 4; index += 1) whitePixels.set([255, 255, 255, 255], index * 4)
