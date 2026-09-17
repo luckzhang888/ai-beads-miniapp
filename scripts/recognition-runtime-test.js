@@ -22,9 +22,26 @@ function createCanvasRuntime(fixture) {
       let width = options.width
       let height = options.height
       let draw = null
+      let transform = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }
+      const transformStack = []
       const context = {
         clearRect() { draw = null },
-        drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh) { draw = { sx, sy, sw, sh, dx, dy, dw, dh } },
+        save() { transformStack.push(Object.assign({}, transform)) },
+        restore() { transform = transformStack.pop() || { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 } },
+        translate(x, y) { transform.x += x; transform.y += y },
+        rotate(radians) { transform.rotation += radians },
+        scale(x, y) { transform.scaleX *= x; transform.scaleY *= y },
+        fillRect() {},
+        drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh) {
+          assert.ok(Math.abs(transform.rotation) < 0.0001, 'this test runtime only exercises non-rotated crop rendering')
+          draw = {
+            sx, sy, sw, sh,
+            dx: transform.x + dx * transform.scaleX,
+            dy: transform.y + dy * transform.scaleY,
+            dw: dw * transform.scaleX,
+            dh: dh * transform.scaleY
+          }
+        },
         getImageData(left, top, outputWidth, outputHeight) {
           assert.ok(draw, 'source image must be drawn before pixel sampling')
           assert.ok(outputWidth <= 4096, 'processor canvas must stay within the dimension limit')
@@ -242,6 +259,17 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.deepStrictEqual(guided.matrix, guidedCodes, 'AI geometry must produce a local MARD matrix')
     assert.strictEqual(guided.recognitionMode, 'ai-guided-grid')
     assert.strictEqual(guidedProgress[guidedProgress.length - 1], 100)
+
+    const whitePixels = new Uint8ClampedArray(2 * 2 * 4)
+    for (let index = 0; index < 4; index += 1) whitePixels.set([255, 255, 255, 255], index * 4)
+    global.wx = createCanvasRuntime({ width: 2, height: 2, imageData: { data: whitePixels } })
+    convertPage.setData({ selectedSize: 48 })
+    const photoPattern = await convertPage.processAiPhotoImage('fixture.png', {
+      cropMode: 'ratio', optimizePreset: 'natural', qualityMode: 'full', removeBackground: true,
+      transform: { offsetX: 0, offsetY: 0, scale: 1, rotation: 0, mirrored: false }
+    })
+    assert.deepStrictEqual([photoPattern.width, photoPattern.height, photoPattern.beadCount], [48, 48, 2304],
+      'a no-grid photo must keep all cells even when the global background-removal default is enabled')
 
     global.wx = createCanvasRuntime(edgeFixture)
     const edgeAnalysis = {

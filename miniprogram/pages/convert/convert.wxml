@@ -35,7 +35,7 @@
       bindtouchend="cropTouchEnd"
       bindtouchcancel="cropTouchEnd"
     >
-      <image src="{{imagePath}}" mode="{{recognitionCropEnabled ? 'aspectFill' : 'aspectFit'}}" style="{{recognitionCropEnabled ? cropStyle : ''}}" />
+      <image src="{{imagePath}}" mode="{{recognitionCropEnabled ? 'scaleToFill' : 'aspectFit'}}" style="{{recognitionCropEnabled ? recognitionCropImageStyle : ''}}" />
       <view wx:if="{{recognitionCropEnabled}}" class="classify-crop-frame"><text>{{longImageManualCrop ? '请手动移动图片，框内才是最终截取区域' : '最终截取区域'}}</text></view>
     </view>
     <view class="classify-crop-controls">
@@ -62,9 +62,9 @@
 
 <view wx:elif="{{stage === 'recognizing'}}" class="recognition-page">
   <view class="recognition-title">{{recognitionSource === '本地' ? '本地识别处理' : 'AI 自动化处理'}}</view>
-  <view class="recognition-preview">
+  <view class="recognition-preview {{!recognitionResult && recognitionCropEnabled ? 'cropped-source' : ''}}">
     <bead-grid wx:if="{{recognitionResult}}" matrix="{{recognitionResult.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{330}}" show-grid="{{true}}" />
-    <image wx:else src="{{imagePath}}" mode="aspectFit" />
+    <image wx:else src="{{imagePath}}" mode="{{recognitionCropEnabled ? 'scaleToFill' : 'aspectFit'}}" style="{{recognitionCropEnabled ? recognitionCropImageStyle : ''}}" />
   </view>
   <view wx:if="{{recognitionSource === '本地' && recognitionResult}}" class="recognition-local-note">本次图纸网格和色号由本地识别生成，请仔细核对尺寸和颜色。</view>
   <view wx:if="{{recognitionError}}" class="recognition-error">

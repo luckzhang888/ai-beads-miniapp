@@ -473,6 +473,16 @@ assert.strictEqual(inventoryPage.data.colorCount, 221)
 assert.ok(Array.isArray(inventoryPage.data.transactions))
 
 const convertPage = loadPage('../miniprogram/pages/convert/convert')
+const convertMarkup = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/convert/convert.wxml'), 'utf8')
+const convertStyles = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/convert/convert.wxss'), 'utf8')
+assert.match(convertMarkup, /recognition-preview \{\{!recognitionResult && recognitionCropEnabled \? 'cropped-source'/,
+  'recognition progress must preview the confirmed crop instead of the uncropped source')
+assert.match(convertMarkup, /mode="\{\{recognitionCropEnabled \? 'scaleToFill' : 'aspectFit'\}\}" style="\{\{recognitionCropEnabled \? recognitionCropImageStyle/,
+  'recognition progress must use the exact same transform as the crop confirmation screen')
+assert.match(convertStyles, /\.classify-crop-frame\s*\{[^}]*inset:\s*0;/,
+  'the visible crop frame must match the full exported square without a hidden inset')
+assert.strictEqual(convertPage.processAiPhotoImage.toString().includes('removeBackground: false'), true,
+  'photo conversion must keep every output cell, including white and pale cells')
 convertPage.setData({ cropX: 75, cropY: -75, cropScale: 2, cropRotation: 90, cropMirrored: true })
 assert.deepStrictEqual(convertPage.processingOptions().transform, {
   offsetX: 75 / 158, offsetY: -75 / 158, scale: 2, rotation: 90, mirrored: true

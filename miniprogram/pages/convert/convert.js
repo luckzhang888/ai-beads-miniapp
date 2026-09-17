@@ -87,7 +87,9 @@ Page({
     cropMirrored: false,
     recognitionCropEnabled: false,
     longImageManualCrop: false,
+    cropViewportSize: 316,
     cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
+    recognitionCropImageStyle: 'width:100%;height:100%;transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
     optimizeOptions: [
       { value: 'soft', label: '柔和' },
       { value: 'natural', label: '自然' },
@@ -158,6 +160,7 @@ Page({
       cropMirrored: false,
       recognitionCropEnabled: false,
       longImageManualCrop: false,
+      cropViewportSize: 316,
       cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);'
     })
   },
@@ -440,8 +443,10 @@ Page({
       cropMirrored: false,
       cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
       previewResult: null
+    }, () => {
+      if (recognitionCropEnabled) this.measureRecognitionCropViewport()
+      this.refreshOutputSize({ recognitionCropEnabled, cropMode })
     })
-    this.refreshOutputSize({ recognitionCropEnabled, cropMode })
   },
 
   selectSourceVariant(event) {
@@ -573,7 +578,14 @@ Page({
   },
 
   processAiPhotoImage(imagePath, processingOptions) {
-    return imageToPattern(imagePath, this.data.selectedSize, mardPalette, processingOptions || this.processingOptions())
+    // A no-grid photo is being converted into a new bead canvas, not read as
+    // an existing chart. Every output cell is intentional, including pale or
+    // white pixels; otherwise a 48x48 result can incorrectly report fewer
+    // than 2304 beads.
+    const options = Object.assign({}, processingOptions || this.processingOptions(), {
+      removeBackground: false
+    })
+    return imageToPattern(imagePath, this.data.selectedSize, mardPalette, options)
   },
 
   processPreparedLocalImage(imagePath, processingOptions, onProgress) {
@@ -697,6 +709,7 @@ Page({
         cropMirrored: this.data.cropMirrored
       })
       this.refreshOutputSize({ cropMode: 'cover' })
+      this.measureRecognitionCropViewport()
     })
   },
 
@@ -722,7 +735,10 @@ Page({
       recognitionResult: null,
       recognitionError: '',
       previewResult: null
-    }, () => this.refreshOutputSize({ cropMode: 'cover' }))
+    }, () => {
+      this.refreshOutputSize({ cropMode: 'cover' })
+      this.measureRecognitionCropViewport()
+    })
   },
 
   saveProcessedPattern(result, settings) {
@@ -806,17 +822,37 @@ Page({
     next.cropX = Math.max(-limits.x, Math.min(limits.x, Number(next.cropX) || 0))
     next.cropY = Math.max(-limits.y, Math.min(limits.y, Number(next.cropY) || 0))
     next.cropZoom = Math.round((Math.max(1, Number(next.cropScale) || 1) - 1) * 100)
-    const cropStyle = 'transform: translate(' + next.cropX + 'px, ' + next.cropY + 'px) scale(' +
+    const transformStyle = 'transform: translate(' + next.cropX + 'px, ' + next.cropY + 'px) scale(' +
       Number(next.cropScale).toFixed(2) + ') rotate(' + next.cropRotation + 'deg) scaleX(' +
       (next.cropMirrored ? -1 : 1) + ');'
+    const sourceWidth = Math.max(1, Number(next.imageInfo && next.imageInfo.width) || 1)
+    const sourceHeight = Math.max(1, Number(next.imageInfo && next.imageInfo.height) || 1)
+    const sourceRatio = sourceWidth / sourceHeight
+    const mediaWidth = sourceRatio >= 1 ? sourceRatio * 100 : 100
+    const mediaHeight = sourceRatio >= 1 ? 100 : 100 / sourceRatio
+    const recognitionCropImageStyle = 'width:' + mediaWidth.toFixed(4) + '%;height:' +
+      mediaHeight.toFixed(4) + '%;' + transformStyle
     this.setData(Object.assign({}, changes, {
       cropX: next.cropX,
       cropY: next.cropY,
       cropScale: next.cropScale,
       cropZoom: next.cropZoom,
-      cropStyle,
+      cropStyle: transformStyle,
+      recognitionCropImageStyle,
       previewResult: null
     }))
+  },
+
+  measureRecognitionCropViewport() {
+    if (typeof wx === 'undefined' || typeof wx.createSelectorQuery !== 'function') {
+      this.updateCropTransform({})
+      return
+    }
+    wx.createSelectorQuery().in(this).select('.classify-preview').boundingClientRect((rect) => {
+      const size = Number(rect && rect.width)
+      if (!size) return
+      this.setData({ cropViewportSize: size }, () => this.updateCropTransform({}))
+    }).exec()
   },
 
   cropTranslationLimits(state) {
@@ -830,7 +866,7 @@ Page({
     }
     const ratio = width / height
     const scale = Math.max(1, Number(state.cropScale) || 1)
-    const half = 158
+    const half = Math.max(1, Number(state.cropViewportSize) || 316) / 2
     return {
       x: Math.max(0, half * (Math.max(1, ratio) * scale - 1)),
       y: Math.max(0, half * (Math.max(1, 1 / ratio) * scale - 1))
@@ -862,6 +898,7 @@ Page({
   },
 
   processingOptions() {
+    const cropHalf = Math.max(1, Number(this.data.cropViewportSize) || 316) / 2
     return {
       inputMode: this.data.selectedMethod,
       cropMode: this.data.cropMode,
@@ -873,8 +910,8 @@ Page({
       whiteTolerance: 22,
       fallbackQualityMode: this.data.selectedMethod === 'pixel' ? this.data.qualityMode : 'easy',
       transform: {
-        offsetX: this.data.cropX / 158,
-        offsetY: this.data.cropY / 158,
+        offsetX: this.data.cropX / cropHalf,
+        offsetY: this.data.cropY / cropHalf,
         scale: this.data.cropScale,
         rotation: this.data.cropRotation,
         mirrored: this.data.cropMirrored
@@ -960,7 +997,10 @@ Page({
           cropZoom: 0,
           cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
           previewResult: null
-        }, () => { if (typeof ready === 'function') ready(info) })
+        }, () => {
+          if (autoCrop) this.measureRecognitionCropViewport()
+          if (typeof ready === 'function') ready(info)
+        })
       },
       fail: () => wx.showModal({ title: '图片读取失败', content: '请确认图片仍在本机并允许小程序访问相册，然后重新选择。', showCancel: false })
     })
