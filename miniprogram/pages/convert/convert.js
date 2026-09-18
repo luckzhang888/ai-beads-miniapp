@@ -67,8 +67,13 @@ Page({
     ],
     recognitionProgress: 0,
     recognitionStep: '等待图片',
+    recognitionPhase: 'idle',
     recognitionResult: null,
     recognitionPreviewMode: 'pattern',
+    gridCalibration: null,
+    gridCalibrationOriginal: null,
+    gridOverlayStyle: '',
+    gridLegendSummary: '',
     recognitionError: '',
     recognitionSource: '',
     recognitionSaving: false,
@@ -141,6 +146,9 @@ Page({
 
   resetMethods() {
     this.aiAnalysisCache = null
+    this.pendingGridAnalysis = null
+    this.pendingGridSignature = ''
+    this.confirmedGridSignature = ''
     this.setData({
       stage: 'methods',
       imagePath: '',
@@ -153,6 +161,11 @@ Page({
       recognitionSource: '',
       recognitionProgress: 0,
       recognitionStep: '等待图片',
+      recognitionPhase: 'idle',
+      gridCalibration: null,
+      gridCalibrationOriginal: null,
+      gridOverlayStyle: '',
+      gridLegendSummary: '',
       sourceVariant: 'main',
       cropX: 0,
       cropY: 0,
@@ -432,6 +445,9 @@ Page({
     this.cachedSignature = ''
     this.cachedResult = null
     this.aiAnalysisCache = null
+    this.pendingGridAnalysis = null
+    this.pendingGridSignature = ''
+    this.confirmedGridSignature = ''
     this.setData({
       recognitionCropEnabled,
       longImageManualCrop: recognitionCropEnabled,
@@ -484,6 +500,180 @@ Page({
     try { wx.getFileSystemManager().unlink({ filePath: input.path, fail() {} }) } catch (error) {}
   },
 
+  clampGridValue(value, minimum, maximum) {
+    return Math.max(minimum, Math.min(maximum, Number(value) || 0))
+  },
+
+  createGridCalibration(analysis) {
+    const grid = analysis && analysis.grid || {}
+    const left = this.clampGridValue(grid.left, 0, 0.98)
+    const top = this.clampGridValue(grid.top, 0, 0.98)
+    const right = this.clampGridValue(grid.right == null ? 1 : grid.right, left + 0.02, 1)
+    const bottom = this.clampGridValue(grid.bottom == null ? 1 : grid.bottom, top + 0.02, 1)
+    return {
+      rows: Math.max(1, Math.min(256, Math.round(Number(analysis && analysis.rows) || 1))),
+      columns: Math.max(1, Math.min(256, Math.round(Number(analysis && analysis.columns) || 1))),
+      left,
+      top,
+      right,
+      bottom
+    }
+  },
+
+  gridLegendText(analysis) {
+    const entries = Array.isArray(analysis && analysis.legendEntries) ? analysis.legendEntries : []
+    const codes = Array.isArray(analysis && analysis.legendCodes) && analysis.legendCodes.length
+      ? analysis.legendCodes
+      : (Array.isArray(analysis && analysis.detectedCodes) ? analysis.detectedCodes : [])
+    const colorCount = Number(analysis && analysis.declaredColorCount) || entries.length || codes.length
+    const beadCount = Number(analysis && analysis.declaredBeadCount) || 0
+    if (colorCount && beadCount) return colorCount + ' 色 · ' + beadCount + ' 颗（下一步复核）'
+    if (colorCount) return colorCount + ' 色（下一步复核数量）'
+    return '网格确认后再放大读取图例'
+  },
+
+  async showGridConfirmation(analysis, signature) {
+    const gridCalibration = this.createGridCalibration(analysis)
+    this.pendingGridAnalysis = analysis
+    this.pendingGridSignature = signature
+    await this.setDataAsync({
+      recognitionPhase: 'grid-confirm',
+      recognitionProgress: 32,
+      recognitionStep: '第 1 步：请确认网格覆盖是否对齐',
+      recognitionSource: 'AI 网格匹配',
+      gridCalibration,
+      gridCalibrationOriginal: Object.assign({}, gridCalibration),
+      gridLegendSummary: this.gridLegendText(analysis),
+      recognitionError: ''
+    })
+    this.updateGridOverlayStyle()
+  },
+
+  updateGridOverlayStyle() {
+    const grid = this.data.gridCalibration
+    if (!grid) return
+    const lineColor = 'rgba(105,72,218,.72)'
+    const background = 'background-image:linear-gradient(to right,' + lineColor + ' 1px,transparent 1px),' +
+      'linear-gradient(to bottom,' + lineColor + ' 1px,transparent 1px);' +
+      'background-size:' + (100 / grid.columns).toFixed(5) + '% 100%,100% ' +
+      (100 / grid.rows).toFixed(5) + '%;'
+    const percentStyle = 'left:' + (grid.left * 100).toFixed(4) + '%;top:' + (grid.top * 100).toFixed(4) +
+      '%;width:' + ((grid.right - grid.left) * 100).toFixed(4) + '%;height:' +
+      ((grid.bottom - grid.top) * 100).toFixed(4) + '%;' + background
+    this.setData({ gridOverlayStyle: percentStyle })
+    if (typeof wx === 'undefined' || typeof wx.createSelectorQuery !== 'function') return
+    const query = wx.createSelectorQuery()
+    if (query.in) query.in(this)
+    query.select('#grid-calibration-surface').boundingClientRect((rect) => {
+      if (!rect || !this.data.gridCalibration || this.data.recognitionPhase !== 'grid-confirm') return
+      const current = this.data.gridCalibration
+      const info = this.data.imageInfo || {}
+      const sourceWidth = this.data.recognitionCropEnabled ? Number(rect.width) : Number(info.width)
+      const sourceHeight = this.data.recognitionCropEnabled ? Number(rect.height) : Number(info.height)
+      if (!(sourceWidth > 0 && sourceHeight > 0 && rect.width > 0 && rect.height > 0)) return
+      const scale = Math.min(rect.width / sourceWidth, rect.height / sourceHeight)
+      const displayWidth = sourceWidth * scale
+      const displayHeight = sourceHeight * scale
+      const offsetX = (rect.width - displayWidth) / 2
+      const offsetY = (rect.height - displayHeight) / 2
+      this.setData({
+        gridOverlayStyle: 'left:' + (offsetX + current.left * displayWidth).toFixed(2) + 'px;top:' +
+          (offsetY + current.top * displayHeight).toFixed(2) + 'px;width:' +
+          ((current.right - current.left) * displayWidth).toFixed(2) + 'px;height:' +
+          ((current.bottom - current.top) * displayHeight).toFixed(2) + 'px;' + background
+      })
+    }).exec()
+  },
+
+  setGridCalibration(changes) {
+    const previous = this.data.gridCalibration
+    if (!previous) return
+    const next = Object.assign({}, previous, changes || {})
+    next.rows = Math.max(1, Math.min(256, Math.round(Number(next.rows) || 1)))
+    next.columns = Math.max(1, Math.min(256, Math.round(Number(next.columns) || 1)))
+    next.left = this.clampGridValue(next.left, 0, 0.98)
+    next.top = this.clampGridValue(next.top, 0, 0.98)
+    next.right = this.clampGridValue(next.right, next.left + 0.02, 1)
+    next.bottom = this.clampGridValue(next.bottom, next.top + 0.02, 1)
+    this.setData({ gridCalibration: next }, () => this.updateGridOverlayStyle())
+  },
+
+  adjustGridDimension(event) {
+    const axis = event.currentTarget.dataset.axis === 'rows' ? 'rows' : 'columns'
+    const delta = Number(event.currentTarget.dataset.delta) || 0
+    const changes = {}
+    changes[axis] = Number(this.data.gridCalibration && this.data.gridCalibration[axis]) + delta
+    this.setGridCalibration(changes)
+  },
+
+  nudgeGrid(event) {
+    const step = 0.0025
+    const dx = (Number(event.currentTarget.dataset.x) || 0) * step
+    const dy = (Number(event.currentTarget.dataset.y) || 0) * step
+    const grid = this.data.gridCalibration
+    if (!grid) return
+    const width = grid.right - grid.left
+    const height = grid.bottom - grid.top
+    const left = this.clampGridValue(grid.left + dx, 0, 1 - width)
+    const top = this.clampGridValue(grid.top + dy, 0, 1 - height)
+    this.setGridCalibration({ left, right: left + width, top, bottom: top + height })
+  },
+
+  resizeGrid(event) {
+    const expand = (Number(event.currentTarget.dataset.delta) || 0) * 0.0025
+    const grid = this.data.gridCalibration
+    if (!grid) return
+    this.setGridCalibration({
+      left: grid.left - expand,
+      top: grid.top - expand,
+      right: grid.right + expand,
+      bottom: grid.bottom + expand
+    })
+  },
+
+  resetGridCalibration() {
+    if (!this.data.gridCalibrationOriginal) return
+    this.setGridCalibration(Object.assign({}, this.data.gridCalibrationOriginal))
+  },
+
+  buildConfirmedGridAnalysis() {
+    const grid = this.data.gridCalibration
+    const base = this.pendingGridAnalysis || {}
+    if (!grid) return null
+    return Object.assign({}, base, {
+      rows: grid.rows,
+      columns: grid.columns,
+      dimensionSource: 'manual',
+      manualGridConfirmed: true,
+      grid: { left: grid.left, top: grid.top, right: grid.right, bottom: grid.bottom },
+      perspective: {
+        topLeft: [grid.left, grid.top],
+        topRight: [grid.right, grid.top],
+        bottomLeft: [grid.left, grid.bottom],
+        bottomRight: [grid.right, grid.bottom]
+      }
+    })
+  },
+
+  async confirmGridAndRecognize() {
+    const analysis = this.buildConfirmedGridAnalysis()
+    const signature = this.pendingGridSignature || this.processingSignature()
+    if (!analysis || !signature) return
+    this.pendingGridAnalysis = analysis
+    this.confirmedGridSignature = signature
+    this.aiAnalysisCache = { signature, value: analysis }
+    await this.setDataAsync({
+      recognitionPhase: 'recognizing',
+      recognitionProgress: 0,
+      recognitionStep: '网格已确认，准备统计图例与逐格识别'
+    })
+    return this.runAiRecognition()
+  },
+
+  returnToImageSelection() {
+    this.editRecognitionCrop()
+  },
+
   async runAiRecognition() {
     if (!this.data.imagePath || (this.data.recognitionProgress > 0 && this.data.recognitionProgress < 100)) return
     const imagePath = this.data.imagePath
@@ -493,6 +683,7 @@ Page({
       stage: 'recognizing',
       recognitionProgress: 10,
       recognitionStep: '上传图片',
+      recognitionPhase: 'recognizing',
       recognitionResult: null,
       recognitionError: '',
       recognitionSource: ''
@@ -515,6 +706,10 @@ Page({
       }
       if (this.data.imagePath !== imagePath) return
       if (!analysis || typeof analysis.hasGrid !== 'boolean') throw new Error('AI 返回的图纸结构无效，请重试或使用本地识别。')
+      if (analysis.hasGrid && this.confirmedGridSignature !== cacheKey) {
+        await this.showGridConfirmation(analysis, cacheKey)
+        return
+      }
       let result
       let recognitionSource = 'AI'
       if (analysis.hasGrid) {
@@ -597,6 +792,10 @@ Page({
 
   retryAiRecognition() {
     this.aiAnalysisCache = null
+    this.pendingGridAnalysis = null
+    this.pendingGridSignature = ''
+    this.confirmedGridSignature = ''
+    this.setData({ recognitionProgress: 0, recognitionPhase: 'idle', gridCalibration: null })
     this.runAiRecognition()
   },
 
@@ -670,7 +869,7 @@ Page({
     this.setData({
       recognitionProgress: 100, recognitionStep: '识别完成', recognitionResult: result,
       recognitionSource: source, recognitionError: '', previewResult: result,
-      recognitionPreviewMode: 'pattern'
+      recognitionPreviewMode: 'pattern', recognitionPhase: 'complete'
     })
   },
 
@@ -702,6 +901,9 @@ Page({
     this.cachedSignature = ''
     this.cachedResult = null
     this.aiAnalysisCache = null
+    this.pendingGridAnalysis = null
+    this.pendingGridSignature = ''
+    this.confirmedGridSignature = ''
     const wasEnabled = Boolean(this.data.recognitionCropEnabled)
     this.setData({
       stage: 'classify',
@@ -716,6 +918,8 @@ Page({
       cropMirrored: wasEnabled ? this.data.cropMirrored : false,
       recognitionProgress: 0,
       recognitionStep: '等待确认选区',
+      recognitionPhase: 'idle',
+      gridCalibration: null,
       recognitionResult: null,
       recognitionError: '',
       previewResult: null
@@ -736,6 +940,9 @@ Page({
     this.cachedSignature = ''
     this.cachedResult = null
     this.aiAnalysisCache = null
+    this.pendingGridAnalysis = null
+    this.pendingGridSignature = ''
+    this.confirmedGridSignature = ''
     this.setData({
       stage: 'classify',
       recognitionCropEnabled: true,
@@ -751,6 +958,8 @@ Page({
       cropStyle: 'transform: translate(0px, 0px) scale(1) rotate(0deg) scaleX(1);',
       recognitionProgress: 0,
       recognitionStep: '请移动原图并确认截取区域',
+      recognitionPhase: 'idle',
+      gridCalibration: null,
       recognitionResult: null,
       recognitionError: '',
       previewResult: null
@@ -1038,15 +1247,23 @@ Page({
   acceptImagePath(path) {
     if (!path) return
     this.aiAnalysisCache = null
+    this.pendingGridAnalysis = null
+    this.pendingGridSignature = ''
+    this.confirmedGridSignature = ''
     this.setData({
       imagePath: path,
       stage: 'classify',
       sourceVariant: 'main',
       recognitionProgress: 0,
+      recognitionPhase: 'idle',
       recognitionResult: null,
       recognitionPreviewMode: 'pattern',
       recognitionError: '',
       recognitionSource: '',
+      gridCalibration: null,
+      gridCalibrationOriginal: null,
+      gridOverlayStyle: '',
+      gridLegendSummary: '',
       previewResult: null,
       cropMode: 'ratio',
       imageMode: 'aspectFit',

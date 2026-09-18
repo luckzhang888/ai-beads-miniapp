@@ -661,7 +661,7 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   // detector supplies the physical grid area/cell pitch only; the declared
   // row/column count controls how that area is divided.
   const useLocalGrid = Boolean(reliableLocalGrid && dimensionsAreClose)
-  const declaredDimensionsTrusted = analysis.dimensionSource === 'title'
+  const declaredDimensionsTrusted = analysis.dimensionSource === 'title' || analysis.dimensionSource === 'manual'
   const samplingGrid = useLocalGrid && declaredDimensionsTrusted
     ? fitDetectedGridToDeclaredDimensions(localGrid, analysis, width, height)
     : localGrid

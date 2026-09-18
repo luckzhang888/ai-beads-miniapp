@@ -248,6 +248,11 @@
 .recognition-preview image { width: 100%; height: 660rpx; }
 .recognition-preview.cropped-source { min-height: 0; aspect-ratio: 1 / 1; }
 .recognition-preview.cropped-source image { flex: none; height: 100%; transform-origin: center; }
+.recognition-preview.cropped-source .grid-calibration-surface { height: 100%; }
+.grid-calibration-surface { position: relative; width: 100%; height: 660rpx; overflow: hidden; }
+.grid-calibration-surface image { position: absolute; inset: 0; width: 100%; height: 100%; }
+.grid-match-overlay { position: absolute; z-index: 2; box-sizing: border-box; border: 4rpx solid #25b967; pointer-events: none; box-shadow: 0 0 0 2rpx rgba(255,255,255,.75), inset 0 0 0 1rpx rgba(255,255,255,.45); }
+.grid-match-badge { position: absolute; z-index: 3; top: 13rpx; left: 50%; transform: translateX(-50%); padding: 8rpx 14rpx; border-radius: 999rpx; color: white; background: rgba(39,31,48,.8); font-size: 18rpx; white-space: nowrap; }
 .recognition-preview-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10rpx; margin-top: 14rpx; padding: 8rpx; border-radius: 18rpx; background: #e8e3f3; }
 .recognition-preview-tabs view { padding: 13rpx; border-radius: 13rpx; color: #72667f; text-align: center; font-size: 22rpx; }
 .recognition-preview-tabs view.active { color: #6242c5; background: white; font-weight: 700; box-shadow: 0 4rpx 12rpx rgba(62,46,83,.08); }
@@ -285,6 +290,31 @@
 .recognition-review-list b { color: #33283b; font-size: 19rpx; }
 .recognition-review-list .confidence { grid-column: 2; color: #a06b0c; font-size: 17rpx; text-align: right; }
 .recognition-local-note { margin-top: 16rpx; padding: 17rpx 20rpx; border-radius: 17rpx; color: #5a438b; background: #eae3ff; font-size: 22rpx; line-height: 1.5; }
+.grid-confirm-card { margin-top: 18rpx; padding: 22rpx; border: 2rpx solid #d8cdf5; border-radius: 22rpx; background: white; }
+.grid-confirm-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14rpx; }
+.grid-confirm-head > view { display: flex; flex: 1; flex-direction: column; gap: 7rpx; }
+.grid-confirm-head b { font-size: 26rpx; }
+.grid-confirm-head text { color: #776d80; font-size: 20rpx; line-height: 1.5; }
+.grid-confirm-head button { flex: none; width: auto; margin: 0; padding: 0 15rpx; color: #6546ca; border-radius: 14rpx; background: #f2edfc; font-size: 19rpx; line-height: 56rpx; }
+.grid-confirm-head button::after { border: 0; }
+.grid-confirm-summary { display: grid; grid-template-columns: 1fr 1.35fr; gap: 12rpx; margin-top: 18rpx; }
+.grid-confirm-summary > view { min-width: 0; padding: 16rpx; display: flex; flex-direction: column; gap: 5rpx; border-radius: 15rpx; background: #f7f5fb; }
+.grid-confirm-summary text { color: #9b92a3; font-size: 18rpx; }
+.grid-confirm-summary b { font-size: 22rpx; line-height: 1.4; }
+.grid-dimension-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; margin-top: 14rpx; }
+.grid-number-control { display: grid; grid-template-columns: auto 52rpx 1fr 52rpx; align-items: center; gap: 7rpx; padding: 10rpx 12rpx; border: 1rpx solid #e0d9ed; border-radius: 15rpx; }
+.grid-number-control text { color: #746a7d; font-size: 19rpx; }
+.grid-number-control b { text-align: center; font-size: 23rpx; }
+.grid-number-control button { width: 52rpx; height: 52rpx; margin: 0; padding: 0; color: #6546ca; border-radius: 12rpx; background: #f0ebfb; font-size: 26rpx; line-height: 52rpx; }
+.grid-number-control button::after { border: 0; }
+.grid-boundary-title { margin-top: 17rpx; color: #62586c; font-size: 20rpx; font-weight: 700; }
+.grid-boundary-controls { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8rpx; margin-top: 9rpx; }
+.grid-boundary-controls button { width: 100%; height: 57rpx; margin: 0; padding: 0; color: #6043c2; border-radius: 12rpx; background: #f4f0fc; font-size: 20rpx; line-height: 57rpx; }
+.grid-boundary-controls button::after { border-color: #ddd4ef; }
+.grid-confirm-actions { display: grid; grid-template-columns: 1fr 1.7fr; gap: 12rpx; margin-top: 19rpx; }
+.grid-confirm-actions button { width: 100%; margin: 0; color: #6147bc; border-radius: 17rpx; background: #f1edfa; font-size: 22rpx; }
+.grid-confirm-actions button.primary { color: white; background: linear-gradient(135deg,#7b57e8,#6341d6); }
+.grid-confirm-actions button::after { border: 0; }
 .recognition-error { margin-top: 20rpx; padding: 25rpx; display: flex; flex-direction: column; gap: 13rpx; border: 1rpx solid #edc6c6; border-radius: 22rpx; background: #fff; }
 .recognition-error b { color: #a43838; font-size: 27rpx; }
 .recognition-error text { color: #685d68; font-size: 22rpx; line-height: 1.5; }
@@ -360,6 +390,7 @@
   .recognition-title { padding: 7px 0 17px; font-size: 25px; }
   .recognition-preview { width: min(100%,900px); min-height: 0; height: 420px; margin: 0 auto; border-width: 9px; border-radius: 20px; }
   .recognition-preview image { height: 420px; min-height: 0; }
+  .grid-calibration-surface { height: 420px; }
   .recognition-summary { width: min(100%,900px); gap: 12px; margin: 14px auto 0; }
   .recognition-preview-tabs, .recognition-resolution-note { width: min(100%,900px); box-sizing: border-box; margin-left: auto; margin-right: auto; }
   .recognition-preview-tabs { gap: 7px; margin-top: 10px; padding: 5px; border-radius: 12px; }

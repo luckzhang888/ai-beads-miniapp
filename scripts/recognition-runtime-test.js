@@ -381,6 +381,9 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.strictEqual(guidedGridDisagreesWithLocal({
       rows: 93, columns: 77, rotation: 0, dimensionSource: 'title'
     }, localGrid, 1170, 1178), false, 'red guide lines must not override title-declared dimensions')
+    assert.strictEqual(guidedGridDisagreesWithLocal({
+      rows: 93, columns: 77, rotation: 0, dimensionSource: 'manual'
+    }, localGrid, 1170, 1178), false, 'a user-confirmed grid must not be silently replaced by a detector')
     assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 30, columns: 30, rotation: 0 }, localGrid, 1170, 1178), false)
     assert.strictEqual(guidedGridDisagreesWithLocal({ rows: 40, columns: 40, rotation: 90 }, localGrid, 1170, 1178), false)
 
@@ -404,18 +407,36 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     convertPage.requestAiAnalysis = async () => ({ result: guidedAnalysis })
     convertPage.processAiGuidedImage = async (path, analysis, onProgress) => {
       assert.strictEqual(path, 'fixture.png')
-      assert.strictEqual(analysis, guidedAnalysis)
+      assert.notStrictEqual(analysis, guidedAnalysis)
+      assert.strictEqual(analysis.dimensionSource, 'manual')
+      assert.strictEqual(analysis.manualGridConfirmed, true)
       await onProgress(64, '逐格采样')
       assert.strictEqual(convertPage.data.recognitionProgress, 64)
       return Object.assign({}, result, { validation: { ok: false, warnings: ['Missing guides'] } })
     }
     await convertPage.runAiRecognition()
+    assert.strictEqual(convertPage.data.recognitionProgress, 32,
+      'grid charts must pause before colour recognition so the user can verify alignment')
+    assert.strictEqual(convertPage.data.recognitionPhase, 'grid-confirm')
+    assert.deepStrictEqual([convertPage.data.gridCalibration.columns, convertPage.data.gridCalibration.rows], [2, 2])
+    convertPage.resizeGrid({ currentTarget: { dataset: { delta: -1 } } })
+    const originalLeft = convertPage.data.gridCalibration.left
+    convertPage.nudgeGrid({ currentTarget: { dataset: { x: 1, y: 0 } } })
+    assert.ok(convertPage.data.gridCalibration.left > originalLeft, 'grid bounds must be movable before recognition')
+    convertPage.resetGridCalibration()
+    convertPage.adjustGridDimension({ currentTarget: { dataset: { axis: 'columns', delta: 1 } } })
+    assert.strictEqual(convertPage.data.gridCalibration.columns, 3, 'row and column counts must be editable')
+    convertPage.resetGridCalibration()
+    await convertPage.confirmGridAndRecognize()
     assert.strictEqual(convertPage.data.recognitionProgress, 100)
     assert.strictEqual(convertPage.data.recognitionSource, 'AI')
     assert.strictEqual(convertPage.data.recognitionResult.exactRecognition, false)
     assert.strictEqual(convertPage.data.recognitionResult.needsReview, true)
     convertPage.aiAnalysisCache = null
-    convertPage.setData({ recognitionProgress: 0 })
+    convertPage.pendingGridAnalysis = null
+    convertPage.pendingGridSignature = ''
+    convertPage.confirmedGridSignature = ''
+    convertPage.setData({ recognitionProgress: 0, recognitionPhase: 'idle' })
     convertPage.processAiGuidedImage = async () => {
       const error = new Error('AI dimensions disagree')
       error.code = 'AI_GRID_MISMATCH'
@@ -427,6 +448,8 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
       return Object.assign({}, result, { validation: { ok: true, warnings: [] } })
     }
     await convertPage.runAiRecognition()
+    assert.strictEqual(convertPage.data.recognitionPhase, 'grid-confirm')
+    await convertPage.confirmGridAndRecognize()
     assert.strictEqual(convertPage.data.recognitionProgress, 100)
     assert.strictEqual(convertPage.data.recognitionSource, '本地')
     assert.strictEqual(convertPage.data.recognitionResult.needsReview, true)

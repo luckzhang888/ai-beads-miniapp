@@ -483,6 +483,10 @@ assert.match(convertMarkup, /bindtap="chooseOriginalFile"/,
   'dense charts must offer uncompressed chat-file import instead of relying on album previews')
 assert.match(convertMarkup, /recognitionPreviewMode === 'source'/,
   'recognition results must let the user compare the screen preview with the selected source file')
+assert.match(convertMarkup, /grid-match-overlay/,
+  'grid recognition must visibly overlay the detected rows and columns before sampling colours')
+assert.match(convertMarkup, /confirmGridAndRecognize/,
+  'colour recognition must wait for explicit grid confirmation')
 assert.match(convertStyles, /\.classify-crop-frame\s*\{[^}]*inset:\s*0;/,
   'the visible crop frame must match the full exported square without a hidden inset')
 assert.strictEqual(convertPage.processAiPhotoImage.toString().includes('removeBackground: false'), true,

@@ -67,6 +67,11 @@
   <view class="recognition-preview {{!recognitionResult && recognitionCropEnabled ? 'cropped-source' : ''}}">
     <bead-grid wx:if="{{recognitionResult && recognitionPreviewMode === 'pattern'}}" matrix="{{recognitionResult.matrix}}" palette="{{paletteMap}}" compact="{{true}}" preview-size="{{330}}" show-grid="{{true}}" />
     <image wx:elif="{{recognitionResult}}" src="{{imagePath}}" mode="aspectFit" bindtap="previewRecognitionSource" />
+    <view wx:elif="{{recognitionPhase === 'grid-confirm'}}" id="grid-calibration-surface" class="grid-calibration-surface">
+      <image src="{{imagePath}}" mode="{{recognitionCropEnabled ? 'scaleToFill' : 'aspectFit'}}" style="{{recognitionCropEnabled ? recognitionCropImageStyle : ''}}" />
+      <view class="grid-match-overlay" style="{{gridOverlayStyle}}"></view>
+      <view class="grid-match-badge">紫线应贴合每一个豆格</view>
+    </view>
     <image wx:else src="{{imagePath}}" mode="{{recognitionCropEnabled ? 'scaleToFill' : 'aspectFit'}}" style="{{recognitionCropEnabled ? recognitionCropImageStyle : ''}}" />
   </view>
   <view wx:if="{{recognitionResult}}" class="recognition-preview-tabs">
@@ -75,6 +80,33 @@
   </view>
   <view wx:if="{{recognitionResult && recognitionPreviewMode === 'source'}}" class="recognition-preview-hint">点击原图可全屏打开，再用双指缩放查看格内文字。</view>
   <view wx:if="{{recognitionSource === '本地' && recognitionResult}}" class="recognition-local-note">本次图纸网格和色号由本地识别生成，请仔细核对尺寸和颜色。</view>
+  <view wx:if="{{recognitionPhase === 'grid-confirm'}}" class="grid-confirm-card">
+    <view class="grid-confirm-head">
+      <view><b>先确认网格，再开始识别</b><text>边界与每条紫线都对齐后，才会统计图例并逐格读取色号。</text></view>
+      <button bindtap="resetGridCalibration">恢复 AI 位置</button>
+    </view>
+    <view class="grid-confirm-summary">
+      <view><text>网格</text><b>{{gridCalibration.columns}} × {{gridCalibration.rows}}</b></view>
+      <view><text>图例</text><b>{{gridLegendSummary}}</b></view>
+    </view>
+    <view class="grid-dimension-controls">
+      <view class="grid-number-control"><text>列数</text><button data-axis="columns" data-delta="-1" bindtap="adjustGridDimension">−</button><b>{{gridCalibration.columns}}</b><button data-axis="columns" data-delta="1" bindtap="adjustGridDimension">＋</button></view>
+      <view class="grid-number-control"><text>行数</text><button data-axis="rows" data-delta="-1" bindtap="adjustGridDimension">−</button><b>{{gridCalibration.rows}}</b><button data-axis="rows" data-delta="1" bindtap="adjustGridDimension">＋</button></view>
+    </view>
+    <view class="grid-boundary-title">微调覆盖范围</view>
+    <view class="grid-boundary-controls">
+      <button data-x="0" data-y="-1" bindtap="nudgeGrid">↑</button>
+      <button data-x="-1" data-y="0" bindtap="nudgeGrid">←</button>
+      <button data-x="1" data-y="0" bindtap="nudgeGrid">→</button>
+      <button data-x="0" data-y="1" bindtap="nudgeGrid">↓</button>
+      <button data-delta="1" bindtap="resizeGrid">扩大</button>
+      <button data-delta="-1" bindtap="resizeGrid">缩小</button>
+    </view>
+    <view class="grid-confirm-actions">
+      <button bindtap="returnToImageSelection">返回调整原图</button>
+      <button class="primary" bindtap="confirmGridAndRecognize">确认网格，继续识别</button>
+    </view>
+  </view>
   <view wx:if="{{recognitionError}}" class="recognition-error">
     <b>AI 识别暂时不可用</b>
     <text>{{recognitionError}}</text>
@@ -116,7 +148,7 @@
     <button class="calibration-crop-button" bindtap="editRecognitionCrop">移动并重新裁剪主体</button>
   </view>
   <view wx:if="{{!recognitionError}}" class="recognition-progress-card">
-    <view class="recognition-steps"><text class="{{recognitionProgress >= 18 ? 'done' : ''}}">1. 定位网格面积</text><text class="{{recognitionProgress >= 48 ? 'done' : ''}}">2. 修复并切格</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 匹配色号</text></view>
+    <view class="recognition-steps"><text class="{{recognitionProgress >= 30 ? 'done' : ''}}">1. 对齐网格</text><text class="{{recognitionProgress >= 55 ? 'done' : ''}}">2. 统计图例</text><text class="{{recognitionProgress >= 82 ? 'done' : ''}}">3. 识别色号</text></view>
     <view class="recognition-step"><b>{{recognitionStep}}</b><text wx:if="{{recognitionProgress === 100}}">处理完成</text><text wx:else>{{recognitionProgress}}%</text></view>
     <progress percent="{{recognitionProgress}}" activeColor="#39c96b" stroke-width="8" />
   </view>

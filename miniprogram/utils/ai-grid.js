@@ -42,7 +42,7 @@ function guidedGridDisagreesWithLocal(analysis, detected, width, height) {
   // A clearly printed title such as 77x93 or 99x106 is authoritative. Red
   // 10/12-cell guide lines can look like the primary grid to the local line
   // detector, so disagreement must not force a lower-quality local fallback.
-  if (analysis && analysis.dimensionSource === 'title') return false
+  if (analysis && (analysis.dimensionSource === 'title' || analysis.dimensionSource === 'manual')) return false
   if (!detected || !detected.ok || Number(detected.confidence) < 0.85 ||
       Math.abs(Number(analysis.rotation) || 0) > 2 ||
       !Number.isFinite(detected.cellWidth) || !Number.isFinite(detected.cellHeight)) return false
