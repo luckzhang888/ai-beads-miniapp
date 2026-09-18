@@ -487,6 +487,10 @@ assert.match(convertMarkup, /grid-match-overlay/,
   'grid recognition must visibly overlay the detected rows and columns before sampling colours')
 assert.match(convertMarkup, /confirmGridAndRecognize/,
   'colour recognition must wait for explicit grid confirmation')
+assert.match(convertMarkup, /changeGridDimensionInput/,
+  'grid row and column counts must support direct numeric editing')
+assert.match(convertMarkup, /changeGridEdge/,
+  'grid boundaries must provide continuous slider adjustment')
 assert.match(convertStyles, /\.classify-crop-frame\s*\{[^}]*inset:\s*0;/,
   'the visible crop frame must match the full exported square without a hidden inset')
 assert.strictEqual(convertPage.processAiPhotoImage.toString().includes('removeBackground: false'), true,

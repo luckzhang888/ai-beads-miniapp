@@ -368,6 +368,17 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     assert.strictEqual(titleGuided.aiDimensionsCorrected, false)
 
     global.wx = createCanvasRuntime(edgeFixture)
+    const manuallyAdjusted = Object.assign({}, edgeAnalysis, {
+      dimensionSource: 'manual', manualGridConfirmed: true, manualGridAdjusted: true
+    })
+    const manualGuided = await aiGuidedImageToPattern('fixture.png', palette, manuallyAdjusted)
+    assert.strictEqual(manualGuided.manualGridApplied, true,
+      'an edited calibration must be sampled from the user grid instead of being replaced by local detection')
+    assert.strictEqual(manualGuided.localGridRefined, false)
+    assert.strictEqual(manualGuided.originalResolutionTileSampling, true,
+      'the user grid must still sample source-resolution tiles')
+
+    global.wx = createCanvasRuntime(edgeFixture)
     const fluctuatingAnalysis = Object.assign({}, edgeAnalysis, { rows: 32, columns: 31 })
     const correctedGuided = await aiGuidedImageToPattern('fixture.png', palette, fluctuatingAnalysis)
     assert.strictEqual(correctedGuided.localGridRefined, true)
@@ -410,6 +421,7 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
       assert.notStrictEqual(analysis, guidedAnalysis)
       assert.strictEqual(analysis.dimensionSource, 'manual')
       assert.strictEqual(analysis.manualGridConfirmed, true)
+      assert.strictEqual(analysis.manualGridAdjusted, true)
       await onProgress(64, '逐格采样')
       assert.strictEqual(convertPage.data.recognitionProgress, 64)
       return Object.assign({}, result, { validation: { ok: false, warnings: ['Missing guides'] } })
@@ -427,6 +439,14 @@ async function run({ guideFixture, edgeFixture, convertPage }) {
     convertPage.adjustGridDimension({ currentTarget: { dataset: { axis: 'columns', delta: 1 } } })
     assert.strictEqual(convertPage.data.gridCalibration.columns, 3, 'row and column counts must be editable')
     convertPage.resetGridCalibration()
+    convertPage.changeGridDimensionInput({
+      currentTarget: { dataset: { axis: 'columns' } }, detail: { value: '2' }
+    })
+    convertPage.changeGridEdge({
+      currentTarget: { dataset: { edge: 'right' } }, detail: { value: 980 }
+    })
+    assert.strictEqual(convertPage.data.gridCalibrationAdjusted, true,
+      'direct inputs and edge sliders must mark the user grid as authoritative')
     await convertPage.confirmGridAndRecognize()
     assert.strictEqual(convertPage.data.recognitionProgress, 100)
     assert.strictEqual(convertPage.data.recognitionSource, 'AI')

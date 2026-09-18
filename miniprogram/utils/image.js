@@ -660,18 +660,32 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   // edge detector that can miss one faint outside line. In that case the
   // detector supplies the physical grid area/cell pitch only; the declared
   // row/column count controls how that area is divided.
-  const useLocalGrid = Boolean(reliableLocalGrid && dimensionsAreClose)
+  const useManualGrid = Boolean(analysis.manualGridConfirmed && analysis.manualGridAdjusted)
+  const useLocalGrid = Boolean(!useManualGrid && reliableLocalGrid && dimensionsAreClose)
   const declaredDimensionsTrusted = analysis.dimensionSource === 'title' || analysis.dimensionSource === 'manual'
-  const samplingGrid = useLocalGrid && declaredDimensionsTrusted
-    ? fitDetectedGridToDeclaredDimensions(localGrid, analysis, width, height)
-    : localGrid
+  const manuallyConfirmedGrid = useManualGrid ? {
+    ok: true,
+    x: Number(analysis.grid.left) * width,
+    y: Number(analysis.grid.top) * height,
+    cellWidth: (Number(analysis.grid.right) - Number(analysis.grid.left)) * width / analysis.columns,
+    cellHeight: (Number(analysis.grid.bottom) - Number(analysis.grid.top)) * height / analysis.rows,
+    columns: analysis.columns,
+    rows: analysis.rows,
+    confidence: 1,
+    manual: true
+  } : null
+  const samplingGrid = useManualGrid
+    ? manuallyConfirmedGrid
+    : (useLocalGrid && declaredDimensionsTrusted
+        ? fitDetectedGridToDeclaredDimensions(localGrid, analysis, width, height)
+        : localGrid)
   const gridAreaRepaired = Boolean(useLocalGrid && declaredDimensionsTrusted &&
     samplingGrid && samplingGrid.declaredDimensionsApplied)
   const aiDimensionsCorrected = useLocalGrid && !declaredDimensionsTrusted &&
     (localGrid.rows !== analysis.rows || localGrid.columns !== analysis.columns)
   let sampleRows
   let sourceTileSampling = null
-  if (useLocalGrid) {
+  if (useLocalGrid || useManualGrid) {
     // AI is good at reading the count and printed labels; detected line pixels
     // are more accurate for sub-cell sampling, especially when screenshots
     // are cropped through the first or last row/column.
@@ -688,7 +702,9 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     } else {
       sampleRows = sampleGridCells(pixels, width, height, samplingGrid)
     }
-    await reportProcessingProgress(settings, 80, gridAreaRepaired ? '网格区域修复完成' : '本地网格精校完成')
+    await reportProcessingProgress(settings, 80, useManualGrid
+      ? '人工网格已按原图分块读取'
+      : (gridAreaRepaired ? '网格区域修复完成' : '本地网格精校完成'))
     await yieldProcessingThread()
   } else {
     sampleRows = await sampleGuidedGrid(pixels, width, height, analysis, (fraction) =>
@@ -710,7 +726,12 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   }), {
     confidence: analysis.confidence,
     recognitionMode: 'ai-guided-grid',
-    grid: { bounds: analysis.grid, perspective: analysis.perspective, local: useLocalGrid ? samplingGrid : null }
+    grid: {
+      bounds: analysis.grid,
+      perspective: analysis.perspective,
+      local: useLocalGrid ? samplingGrid : null,
+      manual: useManualGrid ? samplingGrid : null
+    }
   })
   result.sourceWidth = info.width
   result.sourceHeight = info.height
@@ -719,6 +740,7 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
   result.uploadIntegrityVerified = Boolean(analysis.uploadIntegrity && analysis.uploadIntegrity.verified)
   result.localGridRefined = Boolean(useLocalGrid)
   result.localGridKind = useLocalGrid ? localGridKind : ''
+  result.manualGridApplied = useManualGrid
   result.gridAreaRepaired = gridAreaRepaired
   result.aiDimensionsCorrected = Boolean(aiDimensionsCorrected)
   result.originalResolutionTileSampling = Boolean(sourceTileSampling)
@@ -753,6 +775,9 @@ async function aiGuidedImageToPattern(imagePath, palette, analysis, options) {
     warnings.unshift(`已先定位网格面积，再按标题标注的 ${analysis.columns}×${analysis.rows} 强制等分；本地漏检的边缘线未再改写尺寸`)
   }
   const calibrationNotes = []
+  if (useManualGrid) {
+    calibrationNotes.push(`已采用你调整后的 ${analysis.columns}×${analysis.rows} 网格边界，本地自动检测不会再覆盖人工设置`)
+  }
   if (result.uploadIntegrityVerified) {
     calibrationNotes.push('手机所选文件上传前后大小和 MD5 一致；这只证明传输没有再压缩，不代表相册中的文件是发布者原始分辨率')
   }

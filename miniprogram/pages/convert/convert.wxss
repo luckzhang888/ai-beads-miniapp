@@ -301,16 +301,22 @@
 .grid-confirm-summary > view { min-width: 0; padding: 16rpx; display: flex; flex-direction: column; gap: 5rpx; border-radius: 15rpx; background: #f7f5fb; }
 .grid-confirm-summary text { color: #9b92a3; font-size: 18rpx; }
 .grid-confirm-summary b { font-size: 22rpx; line-height: 1.4; }
+.grid-source-summary { margin-top: 12rpx; padding: 13rpx 15rpx; border-radius: 13rpx; color: #246b47; background: #eaf9f0; font-size: 19rpx; line-height: 1.5; }
 .grid-dimension-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; margin-top: 14rpx; }
 .grid-number-control { display: grid; grid-template-columns: auto 52rpx 1fr 52rpx; align-items: center; gap: 7rpx; padding: 10rpx 12rpx; border: 1rpx solid #e0d9ed; border-radius: 15rpx; }
 .grid-number-control text { color: #746a7d; font-size: 19rpx; }
-.grid-number-control b { text-align: center; font-size: 23rpx; }
+.grid-number-control input { width: 100%; height: 52rpx; box-sizing: border-box; text-align: center; font-size: 23rpx; font-weight: 700; }
 .grid-number-control button { width: 52rpx; height: 52rpx; margin: 0; padding: 0; color: #6546ca; border-radius: 12rpx; background: #f0ebfb; font-size: 26rpx; line-height: 52rpx; }
 .grid-number-control button::after { border: 0; }
+.grid-adjusted-tip { margin-top: 12rpx; padding: 11rpx 14rpx; border-radius: 12rpx; color: #6242c5; background: #f0ebfb; font-size: 18rpx; line-height: 1.45; }
 .grid-boundary-title { margin-top: 17rpx; color: #62586c; font-size: 20rpx; font-weight: 700; }
 .grid-boundary-controls { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8rpx; margin-top: 9rpx; }
 .grid-boundary-controls button { width: 100%; height: 57rpx; margin: 0; padding: 0; color: #6043c2; border-radius: 12rpx; background: #f4f0fc; font-size: 20rpx; line-height: 57rpx; }
 .grid-boundary-controls button::after { border-color: #ddd4ef; }
+.grid-edge-controls { margin-top: 12rpx; padding: 10rpx 13rpx; border-radius: 15rpx; background: #faf8fd; }
+.grid-edge-controls > view { display: grid; grid-template-columns: 145rpx 1fr; align-items: center; min-height: 54rpx; }
+.grid-edge-controls text { color: #736879; font-size: 18rpx; }
+.grid-edge-controls slider { margin: 0; }
 .grid-confirm-actions { display: grid; grid-template-columns: 1fr 1.7fr; gap: 12rpx; margin-top: 19rpx; }
 .grid-confirm-actions button { width: 100%; margin: 0; color: #6147bc; border-radius: 17rpx; background: #f1edfa; font-size: 22rpx; }
 .grid-confirm-actions button.primary { color: white; background: linear-gradient(135deg,#7b57e8,#6341d6); }

@@ -72,8 +72,10 @@ Page({
     recognitionPreviewMode: 'pattern',
     gridCalibration: null,
     gridCalibrationOriginal: null,
+    gridCalibrationAdjusted: false,
     gridOverlayStyle: '',
     gridLegendSummary: '',
+    gridSourceSummary: '',
     recognitionError: '',
     recognitionSource: '',
     recognitionSaving: false,
@@ -164,8 +166,10 @@ Page({
       recognitionPhase: 'idle',
       gridCalibration: null,
       gridCalibrationOriginal: null,
+      gridCalibrationAdjusted: false,
       gridOverlayStyle: '',
       gridLegendSummary: '',
+      gridSourceSummary: '',
       sourceVariant: 'main',
       cropX: 0,
       cropY: 0,
@@ -516,7 +520,15 @@ Page({
       left,
       top,
       right,
-      bottom
+      bottom,
+      leftValue: Math.round(left * 1000),
+      topValue: Math.round(top * 1000),
+      rightValue: Math.round(right * 1000),
+      bottomValue: Math.round(bottom * 1000),
+      leftLabel: (left * 100).toFixed(1) + '%',
+      topLabel: (top * 100).toFixed(1) + '%',
+      rightLabel: (right * 100).toFixed(1) + '%',
+      bottomLabel: (bottom * 100).toFixed(1) + '%'
     }
   },
 
@@ -534,6 +546,9 @@ Page({
 
   async showGridConfirmation(analysis, signature) {
     const gridCalibration = this.createGridCalibration(analysis)
+    const info = this.data.imageInfo || {}
+    const sourceWidth = Math.round(Number(info.width) || 0)
+    const sourceHeight = Math.round(Number(info.height) || 0)
     this.pendingGridAnalysis = analysis
     this.pendingGridSignature = signature
     await this.setDataAsync({
@@ -543,7 +558,11 @@ Page({
       recognitionSource: 'AI 网格匹配',
       gridCalibration,
       gridCalibrationOriginal: Object.assign({}, gridCalibration),
+      gridCalibrationAdjusted: false,
       gridLegendSummary: this.gridLegendText(analysis),
+      gridSourceSummary: sourceWidth > 0 && sourceHeight > 0
+        ? '手机实际文件 ' + sourceWidth + '×' + sourceHeight + '；当前只是缩放预览，确认后仍从原分辨率分块读取。'
+        : '当前只是屏幕缩放预览，识别时仍从所选文件的原始像素读取。',
       recognitionError: ''
     })
     this.updateGridOverlayStyle()
@@ -595,7 +614,21 @@ Page({
     next.top = this.clampGridValue(next.top, 0, 0.98)
     next.right = this.clampGridValue(next.right, next.left + 0.02, 1)
     next.bottom = this.clampGridValue(next.bottom, next.top + 0.02, 1)
-    this.setData({ gridCalibration: next }, () => this.updateGridOverlayStyle())
+    next.leftValue = Math.round(next.left * 1000)
+    next.topValue = Math.round(next.top * 1000)
+    next.rightValue = Math.round(next.right * 1000)
+    next.bottomValue = Math.round(next.bottom * 1000)
+    next.leftLabel = (next.left * 100).toFixed(1) + '%'
+    next.topLabel = (next.top * 100).toFixed(1) + '%'
+    next.rightLabel = (next.right * 100).toFixed(1) + '%'
+    next.bottomLabel = (next.bottom * 100).toFixed(1) + '%'
+    const original = this.data.gridCalibrationOriginal
+    const adjusted = Boolean(original && (
+      next.rows !== original.rows || next.columns !== original.columns ||
+      Math.abs(next.left - original.left) > 0.0005 || Math.abs(next.top - original.top) > 0.0005 ||
+      Math.abs(next.right - original.right) > 0.0005 || Math.abs(next.bottom - original.bottom) > 0.0005
+    ))
+    this.setData({ gridCalibration: next, gridCalibrationAdjusted: adjusted }, () => this.updateGridOverlayStyle())
   },
 
   adjustGridDimension(event) {
@@ -606,28 +639,54 @@ Page({
     this.setGridCalibration(changes)
   },
 
+  changeGridDimensionInput(event) {
+    const axis = event.currentTarget.dataset.axis === 'rows' ? 'rows' : 'columns'
+    const value = Number(event.detail && event.detail.value)
+    if (!Number.isFinite(value) || value < 1) return
+    const changes = {}
+    changes[axis] = value
+    this.setGridCalibration(changes)
+  },
+
+  changeGridEdge(event) {
+    const edge = String(event.currentTarget.dataset.edge || '')
+    if (['left', 'top', 'right', 'bottom'].indexOf(edge) < 0) return
+    let value = Number(event.detail && event.detail.value) / 1000
+    if (!Number.isFinite(value)) return
+    const grid = this.data.gridCalibration
+    if (!grid) return
+    if (edge === 'left') value = this.clampGridValue(value, 0, grid.right - 0.02)
+    if (edge === 'top') value = this.clampGridValue(value, 0, grid.bottom - 0.02)
+    if (edge === 'right') value = this.clampGridValue(value, grid.left + 0.02, 1)
+    if (edge === 'bottom') value = this.clampGridValue(value, grid.top + 0.02, 1)
+    const changes = {}
+    changes[edge] = value
+    this.setGridCalibration(changes)
+  },
+
   nudgeGrid(event) {
-    const step = 0.0025
-    const dx = (Number(event.currentTarget.dataset.x) || 0) * step
-    const dy = (Number(event.currentTarget.dataset.y) || 0) * step
     const grid = this.data.gridCalibration
     if (!grid) return
     const width = grid.right - grid.left
     const height = grid.bottom - grid.top
+    const dx = (Number(event.currentTarget.dataset.x) || 0) * width / Math.max(1, grid.columns)
+    const dy = (Number(event.currentTarget.dataset.y) || 0) * height / Math.max(1, grid.rows)
     const left = this.clampGridValue(grid.left + dx, 0, 1 - width)
     const top = this.clampGridValue(grid.top + dy, 0, 1 - height)
     this.setGridCalibration({ left, right: left + width, top, bottom: top + height })
   },
 
   resizeGrid(event) {
-    const expand = (Number(event.currentTarget.dataset.delta) || 0) * 0.0025
     const grid = this.data.gridCalibration
     if (!grid) return
+    const direction = Number(event.currentTarget.dataset.delta) || 0
+    const expandX = direction * (grid.right - grid.left) / Math.max(1, grid.columns)
+    const expandY = direction * (grid.bottom - grid.top) / Math.max(1, grid.rows)
     this.setGridCalibration({
-      left: grid.left - expand,
-      top: grid.top - expand,
-      right: grid.right + expand,
-      bottom: grid.bottom + expand
+      left: grid.left - expandX,
+      top: grid.top - expandY,
+      right: grid.right + expandX,
+      bottom: grid.bottom + expandY
     })
   },
 
@@ -645,6 +704,7 @@ Page({
       columns: grid.columns,
       dimensionSource: 'manual',
       manualGridConfirmed: true,
+      manualGridAdjusted: Boolean(this.data.gridCalibrationAdjusted),
       grid: { left: grid.left, top: grid.top, right: grid.right, bottom: grid.bottom },
       perspective: {
         topLeft: [grid.left, grid.top],
@@ -835,6 +895,9 @@ Page({
     if (result.recognitionMode === 'ai-guided-grid' && result.labelTileRefinementApplied) {
       result.recognitionModeText = 'AI 定位 + 分块放大文字复核 + MARD 匹配'
     }
+    if (result.recognitionMode === 'ai-guided-grid' && result.manualGridApplied) {
+      result.recognitionModeText = '人工校准网格 + 原图分块读取 + MARD 匹配'
+    }
     result.confidencePercent = Math.round(Number(result.confidence || 0) * 100)
     result.geometryConfidencePercent = Math.round(Number(result.geometryConfidence || result.confidence || 0) * 100)
     if (result.recognitionMode === 'pixel-fallback' || result.recognitionMode === 'ai-photo' ||
@@ -920,6 +983,7 @@ Page({
       recognitionStep: '等待确认选区',
       recognitionPhase: 'idle',
       gridCalibration: null,
+      gridCalibrationAdjusted: false,
       recognitionResult: null,
       recognitionError: '',
       previewResult: null
@@ -960,6 +1024,7 @@ Page({
       recognitionStep: '请移动原图并确认截取区域',
       recognitionPhase: 'idle',
       gridCalibration: null,
+      gridCalibrationAdjusted: false,
       recognitionResult: null,
       recognitionError: '',
       previewResult: null
@@ -1262,8 +1327,10 @@ Page({
       recognitionSource: '',
       gridCalibration: null,
       gridCalibrationOriginal: null,
+      gridCalibrationAdjusted: false,
       gridOverlayStyle: '',
       gridLegendSummary: '',
+      gridSourceSummary: '',
       previewResult: null,
       cropMode: 'ratio',
       imageMode: 'aspectFit',

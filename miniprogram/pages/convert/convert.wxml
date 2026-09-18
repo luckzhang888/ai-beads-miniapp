@@ -89,11 +89,13 @@
       <view><text>网格</text><b>{{gridCalibration.columns}} × {{gridCalibration.rows}}</b></view>
       <view><text>图例</text><b>{{gridLegendSummary}}</b></view>
     </view>
+    <view class="grid-source-summary">原图分辨率：{{gridSourceSummary}}</view>
     <view class="grid-dimension-controls">
-      <view class="grid-number-control"><text>列数</text><button data-axis="columns" data-delta="-1" bindtap="adjustGridDimension">−</button><b>{{gridCalibration.columns}}</b><button data-axis="columns" data-delta="1" bindtap="adjustGridDimension">＋</button></view>
-      <view class="grid-number-control"><text>行数</text><button data-axis="rows" data-delta="-1" bindtap="adjustGridDimension">−</button><b>{{gridCalibration.rows}}</b><button data-axis="rows" data-delta="1" bindtap="adjustGridDimension">＋</button></view>
+      <view class="grid-number-control"><text>列数</text><button data-axis="columns" data-delta="-1" bindtap="adjustGridDimension">−</button><input type="number" value="{{gridCalibration.columns}}" data-axis="columns" bindblur="changeGridDimensionInput" bindconfirm="changeGridDimensionInput" /><button data-axis="columns" data-delta="1" bindtap="adjustGridDimension">＋</button></view>
+      <view class="grid-number-control"><text>行数</text><button data-axis="rows" data-delta="-1" bindtap="adjustGridDimension">−</button><input type="number" value="{{gridCalibration.rows}}" data-axis="rows" bindblur="changeGridDimensionInput" bindconfirm="changeGridDimensionInput" /><button data-axis="rows" data-delta="1" bindtap="adjustGridDimension">＋</button></view>
     </view>
-    <view class="grid-boundary-title">微调覆盖范围</view>
+    <view class="grid-adjusted-tip" wx:if="{{gridCalibrationAdjusted}}">已采用人工网格；后续原分辨率采样不会再覆盖这些调整。</view>
+    <view class="grid-boundary-title">微调覆盖范围（每次箭头移动一格）</view>
     <view class="grid-boundary-controls">
       <button data-x="0" data-y="-1" bindtap="nudgeGrid">↑</button>
       <button data-x="-1" data-y="0" bindtap="nudgeGrid">←</button>
@@ -101,6 +103,12 @@
       <button data-x="0" data-y="1" bindtap="nudgeGrid">↓</button>
       <button data-delta="1" bindtap="resizeGrid">扩大</button>
       <button data-delta="-1" bindtap="resizeGrid">缩小</button>
+    </view>
+    <view class="grid-edge-controls">
+      <view><text>左边界 {{gridCalibration.leftLabel}}</text><slider min="0" max="1000" step="1" value="{{gridCalibration.leftValue}}" data-edge="left" bindchanging="changeGridEdge" bindchange="changeGridEdge" activeColor="#7350dc" block-size="18" /></view>
+      <view><text>右边界 {{gridCalibration.rightLabel}}</text><slider min="0" max="1000" step="1" value="{{gridCalibration.rightValue}}" data-edge="right" bindchanging="changeGridEdge" bindchange="changeGridEdge" activeColor="#7350dc" block-size="18" /></view>
+      <view><text>上边界 {{gridCalibration.topLabel}}</text><slider min="0" max="1000" step="1" value="{{gridCalibration.topValue}}" data-edge="top" bindchanging="changeGridEdge" bindchange="changeGridEdge" activeColor="#7350dc" block-size="18" /></view>
+      <view><text>下边界 {{gridCalibration.bottomLabel}}</text><slider min="0" max="1000" step="1" value="{{gridCalibration.bottomValue}}" data-edge="bottom" bindchanging="changeGridEdge" bindchange="changeGridEdge" activeColor="#7350dc" block-size="18" /></view>
     </view>
     <view class="grid-confirm-actions">
       <button bindtap="returnToImageSelection">返回调整原图</button>
